@@ -118,6 +118,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
         onItemHovered,
         onDragStart,
         canvasRef,
+        verticalOnly,
     } = p;
 
     const canResize = (onColumnResize ?? onColumnResizeEnd ?? onColumnResizeStart) !== undefined;
@@ -438,6 +439,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
             dragAndDropState={dragOffset}
             onMouseMoveRaw={onMouseMove}
             ref={gridRef}
+            verticalOnly={verticalOnly}
         />
     );
 };

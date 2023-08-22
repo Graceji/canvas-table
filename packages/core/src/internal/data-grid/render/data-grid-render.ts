@@ -166,6 +166,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         damage,
         minimumCellWidth,
         resizeIndicator,
+        verticalOnly,
     } = arg;
     if (width === 0 || height === 0) return;
     const doubleBuffer = renderStrategy === "double-buffer";
@@ -308,7 +309,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             freezeTrailingRows,
             rows,
             theme,
-            true
+            verticalOnly
         );
 
         overlayCtx.beginPath();
