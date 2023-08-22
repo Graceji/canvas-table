@@ -799,6 +799,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         groupHeaderHeight: groupHeaderHeightIn = headerHeightIn,
         theme: themeIn,
         isOutsideClick,
+        verticalOnly = false,
     } = p;
 
     const minColumnWidth = Math.max(minColumnWidthIn, 20);
@@ -3711,6 +3712,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     gridRef={gridRef}
                     getCellRenderer={getCellRenderer}
                     scrollToEnd={scrollToEnd}
+                    verticalOnly={verticalOnly}
                 />
                 {renameGroupNode}
                 {overlay !== undefined && (

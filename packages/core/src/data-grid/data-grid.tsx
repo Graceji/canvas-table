@@ -173,6 +173,8 @@ export interface DataGridProps {
 
     readonly verticalBorder: (col: number) => boolean;
 
+    readonly verticalOnly?: boolean;
+
     /**
      * Determines what can be dragged using HTML drag and drop
      * @defaultValue false
@@ -356,6 +358,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         smoothScrollY = false,
         experimental,
         getCellRenderer,
+        verticalOnly,
     } = p;
     const translateX = p.translateX ?? 0;
     const translateY = p.translateY ?? 0;
@@ -716,6 +719,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             enqueue: enqueueRef.current,
             renderStrategy: experimental?.renderStrategy ?? (browserIsSafari.value ? "double-buffer" : "single-buffer"),
             getCellRenderer,
+            verticalOnly,
         };
 
         // This confusing bit of code due to some poor design. Long story short, the damage property is only used
@@ -771,6 +775,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         experimental?.renderStrategy,
         lastWasTouch,
         getCellRenderer,
+        verticalOnly,
     ]);
 
     const lastDrawRef = React.useRef(draw);

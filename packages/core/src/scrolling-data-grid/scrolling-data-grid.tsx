@@ -139,6 +139,7 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
         smoothScrollX = false,
         smoothScrollY = false,
         isDraggable,
+        verticalOnly,
     } = p;
     const { paddingRight, paddingBottom } = experimental ?? {};
 
@@ -438,6 +439,7 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
                 onRowMoved={p.onRowMoved}
                 smoothScrollX={p.smoothScrollX}
                 smoothScrollY={p.smoothScrollY}
+                verticalOnly={verticalOnly}
             />
         </InfiniteScroller>
     );

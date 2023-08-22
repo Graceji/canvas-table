@@ -1876,6 +1876,7 @@ export interface DrawGridArg {
     readonly disabledRows: CompactSelection;
     readonly rowHeight: number | ((index: number) => number);
     readonly verticalBorder: (col: number) => boolean;
+    readonly verticalOnly?: boolean;
     readonly isResizing: boolean;
     readonly isFocused: boolean;
     readonly drawFocus: boolean;
@@ -2010,6 +2011,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         renderStrategy,
         bufferA,
         bufferB,
+        verticalOnly,
     } = arg;
     let { damage } = arg;
     if (width === 0 || height === 0) return;
@@ -2488,7 +2490,8 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         verticalBorder,
         trailingRowType,
         rows,
-        theme
+        theme,
+        verticalOnly
     );
 
     focusRedraw?.();
