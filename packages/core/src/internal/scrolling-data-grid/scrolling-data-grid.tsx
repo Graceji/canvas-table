@@ -71,6 +71,7 @@ export interface ScrollingDataGridProps extends Props {
 
 const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
     const {
+        hasRowMarkers,
         columns,
         rows,
         rowHeight,
@@ -93,6 +94,9 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
         smoothScrollX = false,
         smoothScrollY = false,
         isDraggable,
+        filterHeight,
+        showFilter,
+        rowMarkerGroup,
     } = p;
     const { paddingRight, paddingBottom } = experimental ?? {};
 
@@ -104,7 +108,9 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
 
     const width = nonGrowWidth + Math.max(0, overscrollX ?? 0);
 
-    let height = enableGroups ? headerHeight + groupHeaderHeight : headerHeight;
+    const totalHeaderHeight = showFilter ? headerHeight + filterHeight : headerHeight;
+
+    let height = enableGroups ? totalHeaderHeight + groupHeaderHeight : totalHeaderHeight;
     if (typeof rowHeight === "number") {
         height += rows * rowHeight;
     } else {
@@ -268,6 +274,8 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
             update={onScrollUpdate}
             initialSize={initialSize}>
             <DataGridDnd
+                hasRowMarkers={hasRowMarkers}
+                rowMarkerGroup={rowMarkerGroup}
                 eventTargetRef={scrollRef}
                 width={clientWidth}
                 height={clientHeight}
@@ -297,6 +305,7 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
                 maxColumnWidth={p.maxColumnWidth}
                 minColumnWidth={p.minColumnWidth}
                 onHeaderMenuClick={p.onHeaderMenuClick}
+                onFilterClearClick={p.onFilterClearClick}
                 onHeaderIndicatorClick={p.onHeaderIndicatorClick}
                 onMouseMove={p.onMouseMove}
                 prelightCells={p.prelightCells}
@@ -310,6 +319,7 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
                 translateY={p.translateY}
                 onColumnProposeMove={p.onColumnProposeMove}
                 verticalBorder={p.verticalBorder}
+                horizontalBorder={p.horizontalBorder}
                 drawFocusRing={p.drawFocusRing}
                 drawHeader={p.drawHeader}
                 drawCell={p.drawCell}
@@ -340,6 +350,9 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
                 smoothScrollY={p.smoothScrollY}
                 resizeIndicator={p.resizeIndicator}
                 setScrollDir={p.setScrollDir}
+                showFilter={p.showFilter}
+                filterHeight={p.filterHeight}
+                getFilterCellContent={p.getFilterCellContent}
             />
         </InfiniteScroller>
     );

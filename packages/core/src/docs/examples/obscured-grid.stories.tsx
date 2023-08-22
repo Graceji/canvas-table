@@ -9,6 +9,7 @@ import {
     defaultProps,
 } from "../../data-editor/stories/utils.js";
 import { SimpleThemeWrapper } from "../../stories/story-utils.js";
+import { CompactSelection } from "../../index.js";
 
 export default {
     title: "Glide-Data-Grid/DataEditor Demos",
@@ -44,16 +45,29 @@ export default {
 
 export const ObscuredDataGrid: React.VFC = () => {
     const { cols, getCellContent, setCellValue } = useMockDataGenerator(60, false);
+    const [selection, setSelection] = React.useState<GridSelection>({
+        columns: CompactSelection.empty(),
+        rows: CompactSelection.empty(),
+    });
 
     return (
         <DataEditor
             {...defaultProps}
             getCellContent={getCellContent}
-            onItemHovered={x => console.log("onItemHovered", x)}
-            onCellClicked={x => console.log("onCellClicked", x)}
-            onHeaderClicked={x => console.log("onHeaderClicked", x)}
-            onCellContextMenu={x => console.log("onCellContextMenu", x)}
-            onHeaderContextMenu={x => console.log("onHeaderContextMenu", x)}
+            // onItemHovered={x => console.log("onItemHovered", x)}
+            // onCellClicked={x => console.log("onCellClicked", x)}
+            // onHeaderClicked={x => console.log("onHeaderClicked", x)}
+            onCellContextMenu={x => {
+                setSelection({
+                    ...selection,
+                    rows: CompactSelection.fromSingleSelection([x[1], x[1 + 1]]),
+                });
+            }}
+            onHeaderContextMenu={(x, event) => {
+                event.preventDefault();
+            }}
+            gridSelection={selection}
+            onGridSelectionChange={setSelection}
             columns={cols}
             rowMarkers={"both"}
             onPaste={true} // we want to allow paste to just call onCellEdited

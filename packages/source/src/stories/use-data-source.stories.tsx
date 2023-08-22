@@ -290,9 +290,10 @@ export const UseDataSource: React.VFC = () => {
             <DataEditor
                 {...defaultProps}
                 {...moveArgs}
-                {...sortArgs}
+                // {...sortArgs}
                 {...collapseArgs}
                 rows={rows}
+                getCellContent={sortArgs.getCellContent}
                 onColumnMoved={moveArgs.onColumnMoved}
                 onHeaderClicked={onHeaderClick}
             />

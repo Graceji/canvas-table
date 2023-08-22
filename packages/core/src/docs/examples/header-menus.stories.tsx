@@ -128,23 +128,32 @@ export const HeaderMenus: React.VFC = () => {
         setMenu({ col, bounds });
     }, []);
 
-    const onHeaderClicked = React.useCallback(() => {
+    // const onFilterClearClick = React.useCallback((col: number, bounds: Rectangle) => {
+    //     //
+    // }, []);
+
+    const onHeaderClicked = React.useCallback((location, event) => {
         // eslint-disable-next-line no-console
-        console.log("Header clicked");
+        console.log("Header clicked", location, event);
     }, []);
 
     return (
         <>
             <DataEditor
                 {...defaultProps}
+                theme={{
+                    filterHeaderBg: "orange",
+                }}
                 getCellContent={getCellContent}
                 onHeaderMenuClick={onHeaderMenuClick}
+                // onFilterClearClick={onFilterClearClick}
                 onHeaderClicked={onHeaderClicked}
                 columns={realCols}
                 onCellContextMenu={(_, e) => e.preventDefault()}
                 onCellEdited={setCellValue}
                 onColumnResize={onColumnResize}
                 rows={1000}
+                showFilter
             />
             {isOpen &&
                 renderLayer(

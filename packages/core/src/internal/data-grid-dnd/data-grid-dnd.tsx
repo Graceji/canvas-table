@@ -101,7 +101,9 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
     const [dragStartY, setDragStartY] = React.useState<number>();
 
     const {
+        hasRowMarkers,
         onHeaderMenuClick,
+        onFilterClearClick,
         onHeaderIndicatorClick,
         getCellContent,
         onColumnMoved,
@@ -119,7 +121,8 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
         onItemHovered,
         onDragStart,
         canvasRef,
-        setScrollDir
+        setScrollDir,
+        rowMarkerGroup,
     } = p;
 
     const canResize = (onColumnResize ?? onColumnResizeEnd ?? onColumnResizeStart) !== undefined;
@@ -150,22 +153,23 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
         (args: GridMouseEventArgs) => {
             if (args.button === 0) {
                 const [col, row] = args.location;
-                if (args.kind === "out-of-bounds" && args.isEdge && canResize) {
+                const allowResize = canResize && columns[col]?.resizable === true;
+                if (args.kind === "out-of-bounds" && args.isEdge && allowResize) {
                     const bounds = gridRef?.current?.getBounds(columns.length - 1, -1);
                     if (bounds !== undefined) {
                         setResizeColStartX(bounds.x);
                         setResizeCol(columns.length - 1);
                     }
-                } else if (args.kind === "header" && col >= lockColumns) {
+                } else if ((args.kind === "header" || args.kind === "filterHeader") && col >= lockColumns) {
                     const canvas = canvasRef?.current;
-                    if (args.isEdge && canResize && canvas) {
+                    if (args.isEdge && allowResize && canvas) {
                         setResizeColStartX(args.bounds.x);
                         setResizeCol(col);
                         const rect = canvas.getBoundingClientRect();
                         const scale = rect.width / canvas.offsetWidth;
                         const width = args.bounds.width / scale;
                         onColumnResizeStart?.(columns[col], width, col, width + (columns[col].growOffset ?? 0));
-                    } else if (args.kind === "header" && canDragCol) {
+                    } else if ((args.kind === "header" || args.kind === "filterHeader") && canDragCol) {
                         setDragStartX(args.bounds.x);
                         setDragCol(col);
                     }
@@ -193,6 +197,14 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
         [dragColActive, dragRowActive, onHeaderMenuClick]
     );
 
+    const onFilterClearClickMangled = React.useCallback(
+        (col: number, screenPosition: Rectangle) => {
+            if (dragColActive || dragRowActive) return;
+            onFilterClearClick?.(col, screenPosition);
+        },
+        [dragColActive, dragRowActive, onFilterClearClick]
+    );
+
     const onHeaderIndicatorClickMangled = React.useCallback(
         (col: number, screenPosition: Rectangle) => {
             if (dragColActive || dragRowActive) return;
@@ -218,7 +230,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
     }, []);
 
     const onMouseUpImpl = React.useCallback(
-        (args: GridMouseEventArgs, isOutside: boolean) => {
+        (args: GridMouseEventArgs, isOutside: boolean, sourceEvent: MouseEvent | TouchEvent) => {
             if (args.button === 0) {
                 if (resizeCol !== undefined) {
                     // if the column is in selection, the selection may contain extra cols, so lets just re-send the last
@@ -255,14 +267,18 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
                 }
 
                 clearAll();
-                if (dragCol !== undefined && dropCol !== undefined && onColumnProposeMove?.(dragCol, dropCol) !== false) {
+                if (
+                    dragCol !== undefined &&
+                    dropCol !== undefined &&
+                    onColumnProposeMove?.(dragCol, dropCol) !== false
+                ) {
                     onColumnMoved?.(dragCol, dropCol);
                 }
                 if (dragRow !== undefined && dropRow !== undefined) {
                     onRowMoved?.(dragRow, dropRow);
                 }
             }
-            onMouseUp?.(args, isOutside);
+            onMouseUp?.(args, isOutside, sourceEvent);
         },
         [
             onMouseUp,
@@ -284,11 +300,18 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
         ]
     );
 
+    const [dragCursor, setDargCursor] = React.useState<"move" | "not-allowed">("move");
+
     const dragOffset = React.useMemo(() => {
         if (dragCol === undefined || dropCol === undefined) return undefined;
         if (dragCol === dropCol) return undefined;
 
-        if (onColumnProposeMove?.(dragCol, dropCol) === false) return undefined;
+        if (onColumnProposeMove?.(dragCol, dropCol) === false) {
+            setDargCursor("not-allowed");
+            return undefined;
+        }
+
+        setDargCursor("move");
 
         return {
             src: dragCol,
@@ -374,6 +397,8 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
 
     return (
         <DataGrid
+            rowMarkerGroup={rowMarkerGroup}
+            hasRowMarkers={hasRowMarkers}
             accessibilityHeight={p.accessibilityHeight}
             canvasRef={p.canvasRef}
             cellXOffset={p.cellXOffset}
@@ -428,10 +453,12 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
             translateY={p.translateY}
             resizeIndicator={p.resizeIndicator}
             verticalBorder={p.verticalBorder}
+            horizontalBorder={p.horizontalBorder}
             width={p.width}
             getCellContent={getMangledCellContent}
             isResizing={resizeCol !== undefined}
             onHeaderMenuClick={onHeaderMenuClickMangled}
+            onFilterClearClick={onFilterClearClickMangled}
             onHeaderIndicatorClick={onHeaderIndicatorClickMangled}
             isDragging={dragColActive}
             onItemHovered={onItemHoveredImpl}
@@ -442,6 +469,10 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
             dragAndDropState={dragOffset}
             onMouseMoveRaw={onMouseMove}
             ref={gridRef}
+            showFilter={p.showFilter}
+            filterHeight={p.filterHeight}
+            getFilterCellContent={p.getFilterCellContent}
+            dragCursor={dragCursor}
         />
     );
 };

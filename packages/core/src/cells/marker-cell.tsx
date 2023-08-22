@@ -1,33 +1,66 @@
-import { getMiddleCenterBias } from "../internal/data-grid/render/data-grid-lib.js";
-import { InnerGridCellKind, type MarkerCell } from "../internal/data-grid/data-grid-types.js";
+import { getMiddleCenterBias, measureTextCached } from "../internal/data-grid/render/data-grid-lib.js";
+import { InnerGridCellKind, type MarkerCell, type MarkerFn } from "../internal/data-grid/data-grid-types.js";
+import type { BaseDrawArgs, DrawArgs, InternalCellRenderer, PrepResult } from "./cell-types.js";
 import { drawCheckbox } from "../internal/data-grid/render/draw-checkbox.js";
-import type { BaseDrawArgs, InternalCellRenderer, PrepResult } from "./cell-types.js";
+import type { SpriteVariant } from "../index.js";
 
 export const markerCellRenderer: InternalCellRenderer<MarkerCell> = {
     getAccessibilityString: c => c.row.toString(),
     kind: InnerGridCellKind.Marker,
     needsHover: true,
-    needsHoverPosition: false,
+    needsHoverPosition: true,
     drawPrep: prepMarkerRowCell,
     measure: () => 44,
-    draw: a =>
-        drawMarkerRowCell(a, a.cell.row, a.cell.checked, a.cell.markerKind, a.cell.drawHandle, a.cell.checkboxStyle),
+    draw: a => drawMarkerRowCell(a, a.cell),
     onClick: e => {
         const { bounds, cell, posX: x, posY: y } = e;
-        const { width, height } = bounds;
 
-        const centerX = cell.drawHandle ? 7 + (width - 7) / 2 : width / 2;
-        const centerY = height / 2;
+        // 计算边界时应该按照每一项的盒子来计算
+        const isOverHeaderMarkerfn = cell.functions?.find?.(
+            item => x >= item.start && x <= item.end && y >= 0 && y <= bounds.height
+        );
 
-        if (Math.abs(x - centerX) <= 10 && Math.abs(y - centerY) <= 10) {
-            return {
-                ...cell,
-                checked: !cell.checked,
-            };
+        if (isOverHeaderMarkerfn !== undefined && isOverHeaderMarkerfn.type !== "number") {
+            if (isOverHeaderMarkerfn.type === "expand" && cell?.node !== undefined) {
+                const { node } = cell;
+
+                // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+                node.collapsed = !node.collapsed;
+            } else {
+                let disabled = isOverHeaderMarkerfn?.disabled;
+
+                if (typeof isOverHeaderMarkerfn?.disabled === "function") {
+                    disabled = isOverHeaderMarkerfn?.disabled?.(cell.node);
+                }
+
+                if (disabled !== true) {
+                    isOverHeaderMarkerfn?.onClick?.(cell.node);
+                }
+            }
+
+            // 索引单元格可能会有多个功能区，每个功能区点击事件不一致。所以需要在调用onCelledited前设定所点击的功能区
+            cell.activeFn = isOverHeaderMarkerfn;
+
+            return cell;
         }
+
         return undefined;
     },
     onPaste: () => undefined,
+    onSelect: args => {
+        const { cell, posX: x, posY: y, bounds } = args;
+
+        // 计算边界时应该按照每一项的盒子来计算
+        const isOverHeaderMarkerfn = cell.functions?.find?.(
+            item => x >= item.start && x <= item.end && y >= 0 && y <= bounds.height
+        );
+
+        if (isOverHeaderMarkerfn && isOverHeaderMarkerfn.type !== "number") {
+            args.preventDefault(isOverHeaderMarkerfn.type === "checkbox" ? false : true);
+        } else {
+            args.preventDefault(false);
+        }
+    },
 };
 
 function prepMarkerRowCell(args: BaseDrawArgs, lastPrep: PrepResult | undefined): Partial<PrepResult> {
@@ -48,63 +81,220 @@ function deprepMarkerRowCell(args: Pick<BaseDrawArgs, "ctx">) {
     ctx.textAlign = "start";
 }
 
-function drawMarkerRowCell(
-    args: BaseDrawArgs,
-    index: number,
-    checked: boolean,
-    markerKind: "checkbox" | "both" | "number" | "checkbox-visible",
-    drawHandle: boolean,
-    style: "circle" | "square"
-) {
-    const { ctx, rect, hoverAmount, theme } = args;
+function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
+    const { ctx, rect, hoverAmount, theme, spriteManager, hoverX = -100, highlighted, hoverY } = args;
+    const { row: index, markerKind, node, functions, checked, drawHandle, checkboxStyle } = cell;
     const { x, y, width, height } = rect;
-    const checkedboxAlpha = checked ? 1 : markerKind === "checkbox-visible" ? 0.6 + 0.4 * hoverAmount : hoverAmount;
-    if (markerKind !== "number" && checkedboxAlpha > 0) {
-        ctx.globalAlpha = checkedboxAlpha;
-        const offsetAmount = 7 * (checked ? hoverAmount : 1);
-        drawCheckbox(
-            ctx,
-            theme,
-            checked,
-            drawHandle ? x + offsetAmount : x,
-            y,
-            drawHandle ? width - offsetAmount : width,
-            height,
-            true,
-            undefined,
-            undefined,
-            theme.checkboxMaxSize,
-            "center",
-            style
-        );
-        if (drawHandle) {
-            ctx.globalAlpha = hoverAmount;
-            ctx.beginPath();
-            for (const xOffset of [3, 6]) {
-                for (const yOffset of [-5, -1, 3]) {
-                    ctx.rect(x + xOffset, y + height / 2 + yOffset, 2, 2);
-                }
-            }
+    const text = index.toString();
+    const markerFontStyle = theme.markerFontFull;
+    const rectHoverX = rect.x + hoverX;
+    const padding = theme.cellHorizontalPadding;
 
-            ctx.fillStyle = theme.textLight;
-            ctx.fill();
-            ctx.beginPath();
-        }
-        ctx.globalAlpha = 1;
-    }
-    if (markerKind === "number" || (markerKind === "both" && !checked)) {
-        const text = index.toString();
-        const fontStyle = theme.markerFontFull;
+    const textWith = measureTextCached(text, ctx, markerFontStyle).width;
 
-        const start = x + width / 2;
+    const drawIndexNumber = (start: number, textWidth: number, color?: string, accentColor?: string) => {
         if (markerKind === "both" && hoverAmount !== 0) {
-            ctx.globalAlpha = 1 - hoverAmount;
+            // ctx.globalAlpha = 1 - hoverAmount;
         }
-        ctx.fillStyle = theme.textLight;
-        ctx.font = fontStyle;
-        ctx.fillText(text, start, y + height / 2 + getMiddleCenterBias(ctx, fontStyle));
+        ctx.fillStyle = highlighted ? accentColor ?? theme.markerTextAccent : color ?? theme.markerTextLight;
+        ctx.font = `${hoverAmount > 0 ? "bold " + markerFontStyle : markerFontStyle}`;
+        ctx.fillText(
+            text,
+            start + textWidth / 2,
+            y + height / 2 + getMiddleCenterBias(ctx, markerFontStyle),
+            textWidth
+        );
+
         if (hoverAmount !== 0) {
             ctx.globalAlpha = 1;
         }
+    };
+
+    const drawExpand = (start: number, size: number, color?: string) => {
+        if (node !== undefined) {
+            const { children, collapsed, pid, isLast } = node;
+
+            ctx.save();
+
+            if (children?.length) {
+                // 父元素，绘制expand icon
+                const startY = rect.y + (rect.height - size) / 2;
+
+                spriteManager.drawSprite(
+                    collapsed === true ? "expand" : "collapse",
+                    "normal",
+                    ctx,
+                    start,
+                    startY,
+                    size,
+                    theme,
+                    1,
+                    size,
+                    color
+                );
+            } else if (pid !== undefined) {
+                // 子元素绘制刻度线
+                ctx.fillStyle = "none";
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = theme.markLine;
+                ctx.beginPath();
+                const startX = start + size / 2;
+
+                if (isLast === true) {
+                    ctx.moveTo(startX, y);
+                    ctx.lineTo(startX, y + height / 2);
+                    ctx.lineTo(startX + 6, y + height / 2);
+                } else {
+                    ctx.moveTo(startX, y);
+                    ctx.lineTo(startX, y + height);
+                    ctx.moveTo(startX, y + height / 2);
+                    ctx.lineTo(startX + 6, y + height / 2);
+                }
+
+                ctx.stroke();
+            }
+
+            ctx.restore();
+
+            return true;
+        }
+    };
+
+    const drawIcon = (item: MarkerFn, totalWidth: number, size: number, disabled?: boolean) => {
+        const { content, start, color, hoverColor, rowDefKey, selectedColor, getColor } = item;
+        const icon = typeof content === "string" ? content : content?.(node);
+
+        let isHovered = false;
+        if (
+            hoverX !== undefined &&
+            hoverX > item.start &&
+            hoverX <= item.end &&
+            hoverY !== undefined &&
+            hoverY > 0 &&
+            hoverY <= rect.height
+        ) {
+            isHovered = true;
+        }
+
+        let variant = "normal" as SpriteVariant;
+
+        if (disabled === true) {
+            variant = isHovered ? "disableHovered" : "disabled";
+        } else if (node !== undefined && rowDefKey !== undefined && node.rowDef?.[rowDefKey] === true) {
+            variant = "selected";
+        } else if (isHovered) {
+            variant = isHovered ? "hovered" : "normal";
+        }
+
+        if (icon !== undefined) {
+            const iconSize = isHovered && item.hoverEffect === true ? size + 2 : size;
+            spriteManager.drawSprite(
+                icon,
+                variant,
+                ctx,
+                start + (totalWidth - iconSize) / 2,
+                y + (height - iconSize) / 2,
+                iconSize,
+                theme,
+                1,
+                iconSize,
+                typeof color === "string" ? color : color?.(node),
+                undefined,
+                typeof hoverColor === "string" ? hoverColor : hoverColor?.(node),
+                undefined,
+                typeof selectedColor === "string" ? selectedColor : getColor?.("selected", node)
+            );
+            if (hoverAmount !== 0) {
+                ctx.globalAlpha = 1;
+            }
+        }
+    };
+
+    if (functions?.length) {
+        let startX = x + padding;
+        const perWidth = (rect.width - padding * 2) / functions.length;
+
+        functions
+            .sort((a, b) => a.order - b.order)
+            // eslint-disable-next-line unicorn/no-array-for-each
+            .forEach(fnItem => {
+                const { spriteCbMap, type, size } = fnItem;
+                if (spriteCbMap !== undefined) {
+                    // eslint-disable-next-line unicorn/no-array-for-each
+                    Object.keys(spriteCbMap).forEach(item => {
+                        spriteManager.addAdditionalIcon(item, spriteCbMap[item]);
+                    });
+                }
+
+                const itemWidth =
+                    type === "number" ? textWith : type === "checkbox" ? size ?? 18 : size ?? theme.markerIconSize;
+
+                if (functions.length === 1) {
+                    // 居中显示
+                    fnItem.start = rect.x + (rect.width - itemWidth) / 2;
+                    fnItem.end = fnItem.start + itemWidth;
+                } else {
+                    fnItem.start = startX;
+                    fnItem.end = startX + perWidth;
+
+                    startX = fnItem.end;
+                }
+
+                const disabled =
+                    fnItem.disabled === true ||
+                    (typeof fnItem.disabled === "function" && fnItem.disabled?.(node) === true);
+
+                // 找出鼠标悬浮的项，修正鼠标悬浮样式
+                const isHovered = rectHoverX > fnItem.start && rectHoverX <= fnItem.end;
+
+                if (isHovered) {
+                    if (fnItem.type === "number") {
+                        args.overrideCursor?.("default");
+                    } else if (disabled) {
+                        args.overrideCursor?.("not-allowed");
+                    }
+                }
+
+                // eslint-disable-next-line unicorn/prefer-switch
+                if (type === "number") {
+                    drawIndexNumber(
+                        fnItem.start,
+                        perWidth,
+                        typeof fnItem.color === "string" ? fnItem.color : fnItem.color?.(node),
+                        typeof fnItem.hoverColor === "string" ? fnItem.hoverColor : fnItem.hoverColor?.(node)
+                    );
+                } else if (type === "checkbox") {
+                    const offsetAmount = 7 * (checked ? hoverAmount : 1);
+                    drawCheckbox(
+                        ctx,
+                        theme,
+                        checked,
+                        drawHandle ? fnItem.start + offsetAmount : fnItem.start,
+                        y,
+                        drawHandle ? width - offsetAmount : width,
+                        height,
+                        false, // 源码为true
+                        hoverX,
+                        hoverY,
+                        theme.checkboxMaxSize,
+                        "left", // 源码为center
+                        checkboxStyle
+                    );
+                } else if (type === "expand") {
+                    drawExpand(
+                        fnItem.start,
+                        itemWidth,
+                        typeof fnItem.color === "string" ? fnItem.color : fnItem.color?.(node)
+                    );
+                } else {
+                    drawIcon(fnItem, perWidth, itemWidth, disabled);
+                }
+            });
+    } else {
+        const start = x + (width - textWith) / 2;
+
+        drawIndexNumber(start, textWith);
     }
 }

@@ -104,6 +104,8 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
         onSearchResultsChanged,
         showSearch = false,
         onSearchClose,
+        hasRowMarkers,
+        rowMarkerGroup,
     } = p;
 
     const [searchID] = React.useState(() => "search-box-" + Math.round(Math.random() * 1000));
@@ -488,6 +490,10 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
     return (
         <>
             <ScrollingDataGrid
+                showFilter={p.showFilter}
+                filterHeight={p.filterHeight}
+                hasRowMarkers={hasRowMarkers}
+                rowMarkerGroup={rowMarkerGroup}
                 prelightCells={searchResults}
                 accessibilityHeight={p.accessibilityHeight}
                 canvasRef={p.canvasRef}
@@ -519,6 +525,7 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
                 maxColumnWidth={p.maxColumnWidth}
                 minColumnWidth={p.minColumnWidth}
                 onHeaderMenuClick={p.onHeaderMenuClick}
+                onFilterClearClick={p.onFilterClearClick}
                 onHeaderIndicatorClick={p.onHeaderIndicatorClick}
                 onMouseMove={p.onMouseMove}
                 onVisibleRegionChanged={p.onVisibleRegionChanged}
@@ -537,6 +544,7 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
                 translateX={p.translateX}
                 translateY={p.translateY}
                 verticalBorder={p.verticalBorder}
+                horizontalBorder={p.horizontalBorder}
                 onColumnProposeMove={p.onColumnProposeMove}
                 drawFocusRing={p.drawFocusRing}
                 drawCell={p.drawCell}
@@ -568,6 +576,7 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
                 smoothScrollY={p.smoothScrollY}
                 resizeIndicator={p.resizeIndicator}
                 setScrollDir={p.setScrollDir}
+                getFilterCellContent={p.getFilterCellContent}
             />
             {searchbox}
         </>

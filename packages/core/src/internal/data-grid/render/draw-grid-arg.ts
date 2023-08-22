@@ -48,6 +48,7 @@ export interface DrawGridArg {
     readonly disabledRows: CompactSelection;
     readonly rowHeight: number | ((index: number) => number);
     readonly verticalBorder: (col: number) => boolean;
+    readonly horizontalBorder: (col: number, row: number) => boolean;
     readonly isResizing: boolean;
     readonly resizeCol: number | undefined;
     readonly isFocused: boolean;
@@ -59,6 +60,7 @@ export interface DrawGridArg {
     readonly hyperWrapping: boolean;
     readonly rows: number;
     readonly getCellContent: (cell: Item) => InnerGridCell;
+    readonly getFilterCellContent: (cell: number) => InnerGridCell;
     readonly overrideCursor: (cursor: React.CSSProperties["cursor"]) => void;
     readonly getGroupDetails: GroupDetailsCallback;
     readonly getRowThemeOverride: GetRowThemeCallback | undefined;
@@ -80,4 +82,9 @@ export interface DrawGridArg {
     readonly getCellRenderer: GetCellRendererCallback;
     readonly minimumCellWidth: number;
     readonly resizeIndicator: "full" | "header" | "none";
+    readonly showFilter: boolean;
+    readonly filterHeight: number;
+    readonly hasRowMarkers?: boolean;
+    readonly rowMarkerWidth?: number;
+    readonly rowMarkerGroup?: string;
 }

@@ -1,11 +1,23 @@
+import type { GetCellRendererCallback, PrepResult } from "../../../cells/cell-types.js";
 import { intersectRect, pointInRect } from "../../../common/math.js";
+import type { RenderStateProvider } from "../../../common/render-state-provider.js";
 import { mergeAndRealizeTheme, type FullTheme } from "../../../common/styles.js";
 import { direction } from "../../../common/utils.js";
 import type { HoverValues } from "../animation-manager.js";
 import type { CellSet } from "../cell-set.js";
 import { withAlpha } from "../color-parser.js";
 import type { SpriteManager, SpriteVariant } from "../data-grid-sprites.js";
-import { GridColumnMenuIcon, type DrawHeaderCallback, type GridSelection, type Rectangle } from "../data-grid-types.js";
+import {
+    type DrawHeaderCallback,
+    type Rectangle,
+    GridColumnMenuIcon,
+    type GridSelection,
+    type DrawCellCallback,
+    type InnerGridCell,
+    type Item,
+    GridCellKind,
+} from "../data-grid-types.js";
+import type { ImageWindowLoader } from "../image-window-loader-interface.js";
 import {
     drawMenuDots,
     getMeasuredTextCache,
@@ -13,8 +25,9 @@ import {
     measureTextCached,
     roundedPoly,
     type MappedGridColumn,
+    truncateTextToFit,
 } from "./data-grid-lib.js";
-import type { GroupDetails, GroupDetailsCallback } from "./data-grid-render.cells.js";
+import { drawCell, loadingCell, type GroupDetails, type GroupDetailsCallback } from "./data-grid-render.cells.js";
 import { walkColumns, walkGroups } from "./data-grid-render.walk.js";
 import { drawCheckbox } from "./draw-checkbox.js";
 import type { DragAndDropState, HoverInfo } from "./draw-grid-arg.js";
@@ -22,12 +35,14 @@ import type { DragAndDropState, HoverInfo } from "./draw-grid-arg.js";
 export function drawGridHeaders(
     ctx: CanvasRenderingContext2D,
     effectiveCols: readonly MappedGridColumn[],
+    allColumns: readonly MappedGridColumn[],
     enableGroups: boolean,
     hovered: HoverInfo | undefined,
     width: number,
     translateX: number,
     headerHeight: number,
     groupHeaderHeight: number,
+    filterHeight: number,
     dragAndDropState: DragAndDropState | undefined,
     isResizing: boolean,
     selection: GridSelection,
@@ -38,14 +53,23 @@ export function drawGridHeaders(
     getGroupDetails: GroupDetailsCallback,
     damage: CellSet | undefined,
     drawHeaderCallback: DrawHeaderCallback | undefined,
-    touchMode: boolean
+    touchMode: boolean,
+    drawCellCallback: DrawCellCallback | undefined,
+    imageLoader: ImageWindowLoader,
+    hyperWrapping: boolean,
+    enqueue: (item: Item) => void,
+    renderStateProvider: RenderStateProvider,
+    overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
+    getFilterCellRenderer: GetCellRendererCallback,
+    getFilterCellContent: (cell: number) => InnerGridCell
 ) {
     const totalHeaderHeight = headerHeight + groupHeaderHeight;
     if (totalHeaderHeight <= 0) return;
 
     ctx.fillStyle = outerTheme.bgHeader;
-    ctx.fillRect(0, 0, width, totalHeaderHeight);
+    ctx.fillRect(0, 0, width, totalHeaderHeight + filterHeight);
 
+    const frameTime = performance.now();
     const hCol = hovered?.[0]?.[0];
     const hRow = hovered?.[0]?.[1];
     const hPosX = hovered?.[1]?.[0];
@@ -54,12 +78,18 @@ export function drawGridHeaders(
     const font = outerTheme.headerFontFull;
     // Assinging the context font too much can be expensive, it can be worth it to minimze this
     ctx.font = font;
+
     walkColumns(effectiveCols, 0, translateX, 0, totalHeaderHeight, (c, x, _y, clipX) => {
-        if (damage !== undefined && !damage.has([c.sourceIndex, -1])) return;
+        if (damage !== undefined && !(damage.has([c.sourceIndex, -1]) || damage.has([c.sourceIndex, -3]))) return;
         const diff = Math.max(0, clipX - x);
         ctx.save();
         ctx.beginPath();
-        ctx.rect(x + diff, groupHeaderHeight, c.width - diff, headerHeight);
+
+        if (c.group === undefined) {
+            ctx.rect(x + diff, 0, c.width - diff, totalHeaderHeight + filterHeight);
+        } else {
+            ctx.rect(x + diff, groupHeaderHeight, c.width - diff, headerHeight + filterHeight);
+        }
         ctx.clip();
 
         const groupTheme = getGroupDetails(c.group ?? "").overrideTheme;
@@ -76,26 +106,47 @@ export function drawGridHeaders(
         if (theme !== outerTheme) {
             ctx.font = theme.headerFontFull;
         }
+
+        if (enableGroups && c.group !== undefined) {
+            // 二级表头叠加线
+            ctx.beginPath();
+            ctx.moveTo(x, groupHeaderHeight + 0.5);
+            ctx.lineTo(x + c.width, groupHeaderHeight + 0.5);
+            ctx.strokeStyle = theme.headerHorizontalBorderColor;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
         const selected = selection.columns.hasIndex(c.sourceIndex);
         const noHover = dragAndDropState !== undefined || isResizing || c.headerRowMarkerDisabled === true;
         const hoveredBoolean = !noHover && hRow === -1 && hCol === c.sourceIndex;
+        const filterHoveredBoolean = !noHover && hRow === -3 && hCol === c.sourceIndex;
         const hover = noHover
             ? 0
-            : (hoverValues.find(s => s.item[0] === c.sourceIndex && s.item[1] === -1)?.hoverAmount ?? 0);
+            : hoverValues.find(s => s.item[0] === c.sourceIndex && s.item[1] === -1)?.hoverAmount ?? 0;
 
         const hasSelectedCell = selection?.current !== undefined && selection.current.cell[0] === c.sourceIndex;
 
-        const bgFillStyle = selected ? theme.accentColor : hasSelectedCell ? theme.bgHeaderHasFocus : theme.bgHeader;
+        const bgFillStyle = selected ? theme.bgHeaderAccent : hasSelectedCell ? theme.bgHeaderHasFocus : theme.bgHeader;
 
-        const y = enableGroups ? groupHeaderHeight : 0;
+        const y = enableGroups && c.group !== undefined ? groupHeaderHeight : 0;
         const xOffset = c.sourceIndex === 0 ? 0 : 1;
 
         if (selected) {
             ctx.fillStyle = bgFillStyle;
-            ctx.fillRect(x + xOffset, y, c.width - xOffset, headerHeight);
+            ctx.fillRect(
+                x + xOffset,
+                enableGroups && c.group !== undefined ? y + 1 : y,
+                c.width - xOffset,
+                enableGroups && c.group !== undefined ? headerHeight - 1 : totalHeaderHeight
+            );
         } else if (hasSelectedCell || hover > 0) {
             ctx.beginPath();
-            ctx.rect(x + xOffset, y, c.width - xOffset, headerHeight);
+            if (c.group === undefined) {
+                ctx.rect(x + xOffset, 0, c.width - xOffset, totalHeaderHeight);
+            } else {
+                ctx.rect(x + xOffset, y + 1, c.width - xOffset, headerHeight - 1);
+            }
             if (hasSelectedCell) {
                 ctx.fillStyle = theme.bgHeaderHasFocus;
                 ctx.fill();
@@ -108,12 +159,52 @@ export function drawGridHeaders(
             }
         }
 
+        if (filterHeight > 0) {
+            // 绘制filter cell
+            // 先获取内容
+            const f = `${theme.filterFontStyle} ${theme.fontFamily}`;
+            if (font !== f) {
+                ctx.font = f;
+            }
+
+            drawFilterCell(
+                ctx,
+                allColumns,
+                x,
+                _y,
+                filterHeight,
+                c,
+                selected,
+                theme,
+                filterHoveredBoolean,
+                filterHoveredBoolean ? hPosX : undefined,
+                filterHoveredBoolean ? hPosY : undefined,
+                drawCellCallback,
+                spriteManager,
+                imageLoader,
+                hoverValues,
+                hovered,
+                hyperWrapping,
+                enqueue,
+                frameTime,
+                renderStateProvider,
+                overrideCursor,
+                getFilterCellRenderer,
+                getFilterCellContent
+            );
+        }
+
+        const f = `${theme.headerFontStyle} ${theme.fontFamily}`;
+        if (font !== f) {
+            ctx.font = f;
+        }
+
         drawHeader(
             ctx,
             x,
             y,
             c.width,
-            headerHeight,
+            enableGroups && c.group !== undefined ? headerHeight : totalHeaderHeight,
             c,
             selected,
             theme,
@@ -121,11 +212,13 @@ export function drawGridHeaders(
             hoveredBoolean ? hPosX : undefined,
             hoveredBoolean ? hPosY : undefined,
             hasSelectedCell,
+            // hovered,
             hover,
             spriteManager,
             drawHeaderCallback,
             touchMode
         );
+
         ctx.restore();
     });
 
@@ -161,7 +254,6 @@ export function drawGroups(
     getGroupDetails: GroupDetailsCallback,
     damage: CellSet | undefined
 ) {
-    const xPad = 8;
     const [hCol, hRow] = hovered?.[0] ?? [];
 
     let finalX = 0;
@@ -176,87 +268,157 @@ export function drawGroups(
             })
         )
             return;
+
         ctx.save();
         ctx.beginPath();
-        ctx.rect(x, y, w, h);
+        if (groupName !== "") {
+            ctx.rect(x, y, w, h);
+        }
         ctx.clip();
-
         const group = getGroupDetails(groupName);
         const groupTheme =
             group?.overrideTheme === undefined ? theme : mergeAndRealizeTheme(theme, group.overrideTheme);
+        const groupIconSize = group?.iconSize ?? 16;
         const isHovered = hRow === -2 && hCol !== undefined && hCol >= span[0] && hCol <= span[1];
         const fillColor = isHovered
-            ? (groupTheme.bgGroupHeaderHovered ?? groupTheme.bgHeaderHovered)
-            : (groupTheme.bgGroupHeader ?? groupTheme.bgHeader);
+            ? groupTheme.bgGroupHeaderHovered ?? groupTheme.bgHeaderHovered
+            : groupTheme.bgGroupHeader ?? groupTheme.bgHeader;
 
         if (fillColor !== theme.bgHeader) {
             ctx.fillStyle = fillColor;
             ctx.fill();
         }
 
-        ctx.fillStyle = groupTheme.textGroupHeader ?? groupTheme.textHeader;
         if (group !== undefined) {
             let drawX = x;
             if (group.icon !== undefined) {
+                let variant: SpriteVariant = "normal";
+                const box = getMarkerActionBoundsForGroup(
+                    { x, y, width: w, height: h },
+                    groupHeaderHeight,
+                    groupIconSize,
+                    group.iconAlign
+                );
+                const [mouseX, mouseY] = hovered?.[1] ?? [-1, -1];
+                const iconHovered = isHovered && pointInRect(box, mouseX + x, mouseY);
+
+                if (iconHovered) {
+                    variant = "hovered";
+                }
+
                 spriteManager.drawSprite(
                     group.icon,
-                    "normal",
+                    variant,
                     ctx,
-                    drawX + xPad,
-                    (groupHeaderHeight - 20) / 2,
-                    20,
-                    groupTheme
+                    group.iconAlign === "center" ? drawX + (w - groupIconSize) / 2 : drawX,
+                    (groupHeaderHeight - groupIconSize) / 2,
+                    groupIconSize,
+                    groupTheme,
+                    1,
+                    groupIconSize,
+                    groupTheme.groupHeaderIconColor,
+                    undefined,
+                    groupTheme.groupIconHover
                 );
                 drawX += 26;
             }
-            ctx.fillText(
-                group.name,
-                drawX + xPad,
-                groupHeaderHeight / 2 + getMiddleCenterBias(ctx, theme.headerFontFull)
-            );
 
-            if (group.actions !== undefined && isHovered) {
-                const actionBoxes = getActionBoundsForGroup({ x, y, width: w, height: h }, group.actions);
+            let displayName = groupName;
+            const padding = theme.cellHorizontalPadding;
+            const groupActionsWidth = getGroupActonsWidth(group.actions);
+            const drawTextWidth =
+                w -
+                (padding * 2 + (group.icon !== undefined ? 26 : 0)) -
+                (group?.actions !== undefined ? groupActionsWidth : 0);
 
-                ctx.beginPath();
-                const fadeStartX = actionBoxes[0].x - 10;
-                const fadeWidth = x + w - fadeStartX;
-                ctx.rect(fadeStartX, 0, fadeWidth, groupHeaderHeight);
-                const grad = ctx.createLinearGradient(fadeStartX, 0, fadeStartX + fadeWidth, 0);
-                const trans = withAlpha(fillColor, 0);
-                grad.addColorStop(0, trans);
-                grad.addColorStop(10 / fadeWidth, fillColor);
-                grad.addColorStop(1, fillColor);
-                ctx.fillStyle = grad;
+            // 索引列有group时，默认为功能性显示，不绘制group name
+            if (group.type !== "icon") {
+                let start = x + padding;
+                const textWidth = measureTextCached(displayName, ctx).width;
+                if (textWidth > drawTextWidth) {
+                    const ellipsisWidth = measureTextCached("...", ctx).width;
+                    const truncatedText = truncateTextToFit(ctx, displayName, drawTextWidth - ellipsisWidth);
+                    displayName = truncatedText + "...";
+                }
+                if (group.actions !== undefined) {
+                    const actionBoxes = getActionBoundsForGroup({ x, y, width: w, height: h }, group.actions);
 
-                ctx.fill();
+                    start =
+                        group.actions?.[0]?.iconAlign === "left"
+                            ? actionBoxes[actionBoxes.length - 1].x +
+                              actionBoxes[actionBoxes.length - 1].width +
+                              (drawTextWidth - measureTextCached(displayName, ctx).width) / 2
+                            : x +
+                              (padding + (group.icon !== undefined ? groupIconSize ?? 16 : 0)) +
+                              (drawTextWidth - measureTextCached(displayName, ctx).width) / 2;
 
-                ctx.globalAlpha = 0.6;
+                    // ctx.beginPath();
+                    // const fadeStartX = actionBoxes[0].x - 10;
+                    // const fadeWidth = x + w - fadeStartX;
+                    // ctx.rect(fadeStartX, 0, fadeWidth, groupHeaderHeight);
+                    // const grad = ctx.createLinearGradient(fadeStartX, 0, fadeStartX + fadeWidth, 0);
+                    // const trans = withAlpha(fillColor, 0);
+                    // grad.addColorStop(0, trans);
+                    // grad.addColorStop(10 / fadeWidth, fillColor);
+                    // grad.addColorStop(1, fillColor);
+                    // ctx.fillStyle = grad;
 
-                // eslint-disable-next-line prefer-const
-                const [mouseX, mouseY] = hovered?.[1] ?? [-1, -1];
-                for (let i = 0; i < group.actions.length; i++) {
-                    const action = group.actions[i];
-                    const box = actionBoxes[i];
-                    const actionHovered = pointInRect(box, mouseX + x, mouseY);
-                    if (actionHovered) {
-                        ctx.globalAlpha = 1;
+                    // ctx.fill();
+
+                    ctx.globalAlpha = 0.87;
+
+                    // eslint-disable-next-line prefer-const
+                    const [mouseX, mouseY] = hovered?.[1] ?? [-1, -1];
+                    for (let i = 0; i < group.actions.length; i++) {
+                        const action = group.actions[i];
+
+                        if (action.needHover === true && !isHovered) {
+                            break;
+                        }
+
+                        const box = actionBoxes[i];
+                        const actionHovered = isHovered && pointInRect(box, mouseX + x, mouseY);
+                        if (actionHovered) {
+                            ctx.globalAlpha = 1;
+                            ctx.fillStyle = groupTheme.groupIconHover ?? groupTheme.bgHeaderHovered;
+                            ctx.fillRect(
+                                x,
+                                y,
+                                (action.padding !== undefined ? action.padding * 2 : 0) + (action.iconSize ?? 16),
+                                groupHeaderHeight
+                            );
+                        }
+                        spriteManager.drawSprite(
+                            action.icon,
+                            "normal", // actionHovered ? "hovered" : "normal",
+                            ctx,
+                            box.x + (action.padding ?? 0),
+                            box.y + (box.height - (action.iconSize ?? 16)) / 2,
+                            action.iconSize ?? 16,
+                            groupTheme,
+                            1,
+                            action.iconSize ?? 16,
+                            groupTheme.groupIconColor,
+                            undefined,
+                            groupTheme.groupIconHover
+                        );
                     }
-                    spriteManager.drawSprite(
-                        action.icon,
-                        "normal",
-                        ctx,
-                        box.x + box.width / 2 - 10,
-                        box.y + box.height / 2 - 10,
-                        20,
-                        groupTheme
-                    );
-                    if (actionHovered) {
-                        ctx.globalAlpha = 0.6;
-                    }
+
+                    ctx.globalAlpha = 1;
+                } else {
+                    start =
+                        x +
+                        (padding + (group.icon !== undefined ? groupIconSize ?? 16 : 0)) +
+                        (drawTextWidth - measureTextCached(displayName, ctx).width) / 2;
                 }
 
-                ctx.globalAlpha = 1;
+                ctx.fillStyle = groupTheme.textGroupHeader ?? groupTheme.textHeader;
+
+                ctx.fillText(
+                    displayName,
+                    start,
+                    groupHeaderHeight / 2 + getMiddleCenterBias(ctx, theme.headerFontFull)
+                );
             }
         }
 
@@ -264,7 +426,7 @@ export function drawGroups(
             ctx.beginPath();
             ctx.moveTo(x + 0.5, 0);
             ctx.lineTo(x + 0.5, groupHeaderHeight);
-            ctx.strokeStyle = theme.borderColor;
+            ctx.strokeStyle = theme.headerBorderColor;
             ctx.lineWidth = 1;
             ctx.stroke();
         }
@@ -272,17 +434,26 @@ export function drawGroups(
         ctx.restore();
 
         finalX = x + w;
+
+        if (group !== undefined && group.name !== "") {
+            ctx.beginPath();
+            ctx.moveTo(x, groupHeaderHeight - 0.5);
+            ctx.lineTo(finalX, groupHeaderHeight - 0.5);
+            ctx.strokeStyle = theme.groupHorizontalBorderColor;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
     });
 
-    ctx.beginPath();
-    ctx.moveTo(finalX + 0.5, 0);
-    ctx.lineTo(finalX + 0.5, groupHeaderHeight);
+    // ctx.beginPath();
+    // ctx.moveTo(finalX + 0.5, 0);
+    // ctx.lineTo(finalX + 0.5, groupHeaderHeight);
 
-    ctx.moveTo(0, groupHeaderHeight + 0.5);
-    ctx.lineTo(width, groupHeaderHeight + 0.5);
-    ctx.strokeStyle = theme.borderColor;
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    // ctx.moveTo(0, groupHeaderHeight + 0.5);
+    // ctx.lineTo(width, groupHeaderHeight + 0.5);
+    // ctx.strokeStyle = theme.borderColor;
+    // ctx.lineWidth = 1;
+    // ctx.stroke();
 }
 
 const menuButtonSize = 30;
@@ -296,15 +467,46 @@ function getHeaderMenuBounds(x: number, y: number, width: number, height: number
     };
 }
 
+const filterActionButtonSize = 13;
+export function getFilterActionBounds(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    padding: number,
+    isRtl: boolean
+): Rectangle {
+    const buttonWidth = filterActionButtonSize + padding;
+    if (isRtl) return { x, y, width: filterActionButtonSize, height: Math.min(buttonWidth, height) };
+    return {
+        x: x + width - buttonWidth, // right align
+        y: Math.max(y, y + height / 2 - buttonWidth / 2), // center vertically
+        width: buttonWidth,
+        height: Math.min(buttonWidth, height),
+    };
+}
+
+function getGroupActonsWidth(actions: GroupDetails["actions"]) {
+    if (Array.isArray(actions)) {
+        return actions.reduce((prev, next) => {
+            prev += (next.iconSize ?? 16) + (next.padding ?? 0) * 2;
+            return prev;
+        }, 0);
+    }
+
+    return 0;
+}
+
 export function getActionBoundsForGroup(
     box: Rectangle,
     actions: NonNullable<GroupDetails["actions"]>
 ): readonly Rectangle[] {
     const result: Rectangle[] = [];
-    let x = box.x + box.width - 26 * actions.length;
+    let x = actions[0].iconAlign === "left" ? box.x : box.x + box.width - 26 * actions.length;
     const y = box.y + box.height / 2 - 13;
     const height = 26;
-    const width = 26;
+    const stepWidth = getGroupActonsWidth(actions);
+    const width = stepWidth;
     for (let i = 0; i < actions.length; i++) {
         result.push({
             x,
@@ -312,9 +514,23 @@ export function getActionBoundsForGroup(
             width,
             height,
         });
-        x += 26;
+        x += stepWidth;
     }
     return result;
+}
+
+export function getMarkerActionBoundsForGroup(
+    box: Rectangle,
+    totalHeight: number,
+    size: number = 20,
+    align: "left" | "center" = "center"
+) {
+    return {
+        x: align === "left" ? box.x : box.x + (box.width - size) / 2,
+        y: (totalHeight - size) / 2,
+        width: size,
+        height: size,
+    };
 }
 
 type Mutable<T> = {
@@ -329,7 +545,7 @@ interface HeaderLayout {
     readonly menuBounds: Rectangle | undefined;
 }
 
-function flipHorizontal(
+export function flipHorizontal(
     toFlip: Mutable<Rectangle> | undefined,
     mirrorX: number,
     isRTL: boolean
@@ -389,7 +605,7 @@ export function computeHeaderLayout(
     if (c.indicatorIcon !== undefined) {
         const textWidth =
             ctx === undefined
-                ? (getMeasuredTextCache(c.title, theme.headerFontFull)?.width ?? 0)
+                ? getMeasuredTextCache(c.title, theme.headerFontFull)?.width ?? 0
                 : measureTextCached(c.title, ctx, theme.headerFontFull).width;
         textBounds.width = textWidth;
         drawX += textWidth + xPad;
@@ -610,6 +826,108 @@ function drawHeaderInner(
     }
 }
 
+export function drawFilterCell(
+    ctx: CanvasRenderingContext2D,
+    allColumns: readonly MappedGridColumn[],
+    x: number,
+    y: number,
+    filterHeight: number,
+    c: MappedGridColumn,
+    selected: boolean,
+    theme: FullTheme,
+    isHovered: boolean,
+    posX: number | undefined,
+    posY: number | undefined,
+    drawCellCallback: DrawCellCallback | undefined,
+    spriteManager: SpriteManager,
+    imageLoader: ImageWindowLoader,
+    hoverValues: HoverValues,
+    hoverInfo: HoverInfo | undefined,
+    hyperWrapping: boolean,
+    enqueue: (item: Item) => void,
+    frameTime: number,
+    renderStateProvider: RenderStateProvider,
+    overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
+    getFilterCellRenderer: GetCellRendererCallback,
+    getFilterCellContent?: (cell: number) => InnerGridCell
+) {
+    let prepResult: PrepResult | undefined = undefined;
+    const filterCell = getFilterCellContent?.(c.sourceIndex) ?? loadingCell;
+
+    ctx.fillStyle = filterCell.themeOverride?.filterHeaderBg ?? theme.filterHeaderBg ?? theme.bgHeader;
+    ctx.fillRect(x, y, c.width, filterHeight);
+
+    const fillStyle = selected ? theme.textHeaderSelected : theme.textHeader;
+    ctx.fillStyle = fillStyle;
+    const isLastColumn = c.sourceIndex === allColumns.length - 1;
+
+    let hoverValue: HoverValues[number] | undefined;
+    for (const hv of hoverValues) {
+        if (hv.item[0] === c.sourceIndex && hv.item[1] === -3) {
+            hoverValue = hv;
+            break;
+        }
+    }
+
+    const filterBounds = getFilterActionBounds(x, y, c.width, filterHeight, theme.cellHorizontalPadding, false);
+    const shouldDrawMenu =
+        isHovered &&
+        filterBounds !== undefined &&
+        filterCell?.kind === GridCellKind.Custom &&
+        (Array.isArray((filterCell.data as any)?.displayData)
+            ? (filterCell.data as any)?.displayData.length > 0
+            : // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+              !!(filterCell.data as any)?.displayData);
+
+    if (shouldDrawMenu) {
+        const hovered = posX !== undefined && posY !== undefined && pointInRect(filterBounds, posX + x, posY + y);
+
+        if (!hovered) {
+            ctx.globalAlpha = 0.7;
+        }
+
+        if (hovered) {
+            overrideCursor("pointer");
+        }
+
+        const startX = x + c.width - 13 - theme.cellHorizontalPadding * 2;
+        const startY = y + (filterHeight - 13) / 2 + 0.3;
+        spriteManager.drawSprite("clearIcon", "normal", ctx, startX, startY, 13, theme);
+
+        if (!hovered) {
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    prepResult = drawCell(
+        ctx,
+        filterCell,
+        c.sourceIndex,
+        -3,
+        isLastColumn,
+        false,
+        x,
+        y,
+        c.width,
+        filterHeight,
+        false, // accentCount > 0,
+        theme,
+        "", // fill ?? theme.bgCell,
+        imageLoader,
+        spriteManager,
+        hoverValue?.hoverAmount ?? 0,
+        hoverInfo,
+        hyperWrapping,
+        frameTime,
+        drawCellCallback,
+        prepResult,
+        enqueue,
+        renderStateProvider,
+        getFilterCellRenderer,
+        overrideCursor
+    );
+}
+
 export function drawHeader(
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -623,6 +941,7 @@ export function drawHeader(
     posX: number | undefined,
     posY: number | undefined,
     hasSelectedCell: boolean,
+    // hoverInfo: HoverInfo | undefined,
     hoverAmount: number,
     spriteManager: SpriteManager,
     drawHeaderCallback: DrawHeaderCallback | undefined,
@@ -630,6 +949,13 @@ export function drawHeader(
 ) {
     const isRtl = direction(c.title) === "rtl";
     const headerLayout = computeHeaderLayout(ctx, c, x, y, width, height, theme, isRtl);
+
+    // let hoverX: number | undefined;
+    // let hoverY: number | undefined;
+    // if (hoverInfo !== undefined && hoverInfo[0][0] === c.sourceIndex && hoverInfo[0][1] === -1) {
+    //     hoverX = hoverInfo[1][0];
+    //     hoverY = hoverInfo[1][1];
+    // }
 
     if (drawHeaderCallback !== undefined) {
         drawHeaderCallback(

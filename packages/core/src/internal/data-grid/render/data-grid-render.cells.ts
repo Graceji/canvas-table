@@ -34,7 +34,7 @@ import { intersectRect } from "../../../common/math.js";
 import type { GridMouseGroupHeaderEventArgs } from "../event-args.js";
 import { getSkipPoint, getSpanBounds, walkColumns, walkRowsInCol } from "./data-grid-render.walk.js";
 
-const loadingCell: InnerGridCell = {
+export const loadingCell: InnerGridCell = {
     kind: GridCellKind.Loading,
     allowOverlay: false,
 };
@@ -43,10 +43,17 @@ export interface GroupDetails {
     readonly name: string;
     readonly icon?: string;
     readonly overrideTheme?: Partial<Theme>;
+    readonly iconAlign?: "left" | "center";
+    readonly iconSize?: number;
+    readonly type?: "icon" | "icon-text";
     readonly actions?: readonly {
         readonly title: string;
         readonly onClick: (e: GridMouseGroupHeaderEventArgs) => void;
         readonly icon: GridColumnIcon | string;
+        readonly needHover?: boolean; // 是否悬浮出现
+        readonly iconSize?: number;
+        readonly iconAlign?: "left" | "right" | "center"; // icon 位置;
+        readonly padding?: number;
     }[];
 }
 
@@ -87,7 +94,6 @@ export function drawCells(
     getGroupDetails: GroupDetailsCallback,
     getRowThemeOverride: GetRowThemeCallback | undefined,
     disabledRows: CompactSelection,
-    isFocused: boolean,
     drawFocus: boolean,
     freezeTrailingRows: number,
     hasAppendRow: boolean,
@@ -275,12 +281,19 @@ export function drawCells(
 
                     const isSelected = cellIsSelected(cellIndex, cell, selection);
                     let accentCount = cellIsInRange(cellIndex, cell, selection, drawFocus);
+                    let isColSelected = false;
                     const spanIsHighlighted =
                         cell.span !== undefined &&
                         selection.columns.some(
                             index => cell.span !== undefined && index >= cell.span[0] && index <= cell.span[1] //alloc
                         );
-                    if (isSelected && !isFocused && drawFocus) {
+                    if (
+                        isSelected &&
+                        drawFocus &&
+                        (cell.allowOverlay === true && cell.readonly === false ? false : !rowSelected)
+                    ) {
+                        // 绘制focus边框: 单元格选中，但是行没有选中时，不需要填充accentLight背景色；
+                        // 原本是与focus相关，foucus时不填充背景色，就会导致行选中后，cell失去焦点后，只有边框，没有背景色。
                         accentCount = 0;
                     } else if (isSelected && drawFocus) {
                         accentCount = Math.max(accentCount, 1);
@@ -290,10 +303,30 @@ export function drawCells(
                     }
                     if (!isSelected) {
                         if (rowSelected) accentCount++;
-                        if (colSelected && !isTrailingRow) accentCount++;
+                        if (colSelected && !isTrailingRow) {
+                            isColSelected = true;
+                            accentCount++;
+                        }
                     }
 
-                    const bgCell = cell.kind === GridCellKind.Protected ? theme.bgCellMedium : theme.bgCell;
+                    if (cell.readonly === false && cell.allowOverlay === true && !isSelected) {
+                        /**
+                         * 编辑单元格不需要有选中高亮背景
+                         * 适用于：
+                         * 1. 只有垂直线的表格
+                         * 2. 编辑单元格
+                         * 3. 单元格允许overlay
+                         *
+                         */
+                        accentCount = 0;
+                    }
+
+                    const bgCell =
+                        cell.kind === GridCellKind.Protected
+                            ? theme.bgCellMedium
+                            : cell.readonly === false
+                            ? theme.editBgCell
+                            : theme.bgCell;
                     let fill: string | undefined;
                     if (isSticky || bgCell !== outerTheme.bgCell) {
                         fill = blend(bgCell, fill);
@@ -301,10 +334,16 @@ export function drawCells(
 
                     if (accentCount > 0 || rowDisabled) {
                         if (rowDisabled) {
-                            fill = blend(theme.bgHeader, fill);
+                            fill = blend(theme.bgHeaderDisabled, fill);
                         }
                         for (let i = 0; i < accentCount; i++) {
-                            fill = blend(theme.accentLight, fill);
+                            fill = isColSelected
+                                ? rowSelected
+                                    ? blend(theme.bgCellAccent, theme.accentLight)
+                                    : blend(theme.bgCellAccent, fill)
+                                : cell.readonly === false && cell.allowOverlay === true && isSelected
+                                ? blend(theme.accentMask, fill)
+                                : blend(theme.accentLight, fill);
                         }
                     } else if (prelightCells !== undefined) {
                         for (const pre of prelightCells) {
@@ -367,11 +406,12 @@ export function drawCells(
                         if (damage !== undefined) {
                             // this accounts for the fill handle outline being drawn inset on these cells. We do this
                             // because technically the bottom right corner of the outline are on other cells.
+                            // 单元格高亮框绘制在单元格边框内部，参考data-grid.render.rings#L139中绘制的起点。这里的偏差值需要做同步
                             ctx.fillRect(
-                                cellX + 1,
-                                drawY + 1,
-                                cellWidth - (isLastColumn ? 2 : 1),
-                                rh - (isLastRow ? 2 : 1)
+                                cellX + 2,
+                                drawY + 2,
+                                cellWidth - (isLastColumn ? 4 : 3),
+                                rh - (isLastRow ? 4 : 3)
                             );
                         } else {
                             ctx.fillRect(cellX, drawY, cellWidth, rh);
@@ -452,6 +492,7 @@ export function drawCells(
             return toDraw <= 0;
         }
     );
+
     return result;
 }
 
