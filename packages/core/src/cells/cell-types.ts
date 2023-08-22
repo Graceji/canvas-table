@@ -8,6 +8,7 @@ import type {
     BooleanEmpty,
     BooleanIndeterminate,
     Item,
+    GridSelection,
 } from "../internal/data-grid/data-grid-types.js";
 import type { FullTheme } from "../common/styles.js";
 import type { ImageWindowLoader } from "../internal/data-grid/image-window-loader-interface.js";
@@ -28,6 +29,10 @@ export interface BaseDrawArgs {
     spriteManager: SpriteManager;
     hyperWrapping: boolean;
     cell: InnerGridCell;
+}
+
+export interface FilterDrawArgs<T extends InnerGridCell> extends DrawArgs<T> {
+    isRowMarkerCol: boolean;
 }
 
 /** @category Drawing */
@@ -82,12 +87,14 @@ interface BaseCellRenderer<T extends InnerGridCell> {
 
     readonly onSelect?: (
         args: {
+            readonly location: Item;
             readonly cell: T;
             readonly posX: number;
             readonly posY: number;
             readonly bounds: Rectangle;
             readonly theme: FullTheme;
-            readonly preventDefault: () => void;
+            readonly preventDefault: (status?: boolean) => void;
+            readonly gridSelection?: GridSelection;
         } & BaseGridMouseEventArgs
     ) => void;
     readonly onDelete?: (cell: T) => T | undefined;

@@ -45,36 +45,42 @@ const zeroBounds = {
 };
 
 export const Tooltips: React.VFC = () => {
-    const { cols, getCellContent } = useMockDataGenerator(6);
+    const { cols, getCellContent, onColumnResize } = useMockDataGenerator(6);
 
     const [tooltip, setTooltip] = React.useState<{ val: string; bounds: IBounds } | undefined>();
 
     const timeoutRef = React.useRef(0);
 
-    const onItemHovered = React.useCallback((args: GridMouseEventArgs) => {
-        if (args.kind === "cell") {
-            window.clearTimeout(timeoutRef.current);
-            setTooltip(undefined);
-            timeoutRef.current = window.setTimeout(() => {
-                setTooltip({
-                    val: `Tooltip for ${args.location[0]}, ${args.location[1]}`,
-                    bounds: {
-                        // translate to react-laag types
-                        left: args.bounds.x,
-                        top: args.bounds.y,
-                        width: args.bounds.width,
-                        height: args.bounds.height,
-                        right: args.bounds.x + args.bounds.width,
-                        bottom: args.bounds.y + args.bounds.height,
-                    },
-                });
-            }, 1000);
-        } else {
-            window.clearTimeout(timeoutRef.current);
-            timeoutRef.current = 0;
-            setTooltip(undefined);
-        }
-    }, []);
+    const onItemHovered = React.useCallback(
+        (args: GridMouseEventArgs) => {
+            if (args.kind === "cell") {
+                window.clearTimeout(timeoutRef.current);
+                setTooltip(undefined);
+                const cell = getCellContent(args.location);
+                timeoutRef.current = window.setTimeout(() => {
+                    if (cell.truncated === true) {
+                        setTooltip({
+                            val: cell.displayData, //`Tooltip for ${args.location[0]}, ${args.location[1]}`,
+                            bounds: {
+                                // translate to react-laag types
+                                left: args.bounds.x,
+                                top: args.bounds.y,
+                                width: args.bounds.width,
+                                height: args.bounds.height,
+                                right: args.bounds.x + args.bounds.width,
+                                bottom: args.bounds.y + args.bounds.height,
+                            },
+                        });
+                    }
+                }, 1000);
+            } else {
+                window.clearTimeout(timeoutRef.current);
+                timeoutRef.current = 0;
+                setTooltip(undefined);
+            }
+        },
+        [getCellContent]
+    );
 
     React.useEffect(() => () => window.clearTimeout(timeoutRef.current), []);
 
@@ -98,6 +104,7 @@ export const Tooltips: React.VFC = () => {
                 columns={cols}
                 rowMarkers="both"
                 rows={1000}
+                onColumnResize={onColumnResize}
             />
             {isOpen &&
                 renderLayer(

@@ -66,6 +66,8 @@ export const ImperativeScroll: React.VFC<ImperativeScrollProps> = p => {
                 columns={cols}
                 onCellEdited={setCellValue}
                 onColumnResize={onColumnResize}
+                showFilter
+                filterHeight={20}
                 rows={10_000}
             />
         </BeautifulWrapper>

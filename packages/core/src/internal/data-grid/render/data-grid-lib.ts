@@ -27,6 +27,8 @@ export function useMappedColumns(
         () =>
             columns.map(
                 (c, i): MappedGridColumn => ({
+                    ...c,
+                    resizable: c.resizable,
                     group: c.group,
                     grow: c.grow,
                     hasMenu: c.hasMenu,
@@ -48,6 +50,10 @@ export function useMappedColumns(
                     headerRowMarkerTheme: c.headerRowMarkerTheme,
                     headerRowMarkerAlwaysVisible: c.headerRowMarkerAlwaysVisible,
                     headerRowMarkerDisabled: c.headerRowMarkerDisabled,
+                    minWidth: c.minWidth,
+                    maxWidth: c.maxWidth,
+                    customHeaderCell: c.customHeaderCell,
+                    align: c.align,
                 })
             ),
         [columns, freezeColumns]
@@ -152,6 +158,14 @@ export function remapForDnDState(
     if (dndState !== undefined) {
         let writable = [...columns];
         const temp = mappedCols[dndState.src];
+
+        const srcCol = writable[dndState.src];
+        const target = writable[dndState.dest];
+
+        if (srcCol.group !== target.group) {
+            (srcCol as any).group = target.group;
+        }
+
         if (dndState.src > dndState.dest) {
             writable.splice(dndState.src, 1);
             writable.splice(dndState.dest, 0, temp);
@@ -159,6 +173,7 @@ export function remapForDnDState(
             writable.splice(dndState.dest + 1, 0, temp);
             writable.splice(dndState.src, 1);
         }
+
         writable = writable.map((c, i) => ({
             ...c,
             sticky: columns[i].sticky,
@@ -267,15 +282,19 @@ export function getRowIndexForY(
     hasGroups: boolean,
     headerHeight: number,
     groupHeaderHeight: number,
+    filterHeight: number,
     rows: number,
     rowHeight: number | ((index: number) => number),
     cellYOffset: number,
     translateY: number,
     freezeTrailingRows: number
 ): number | undefined {
-    const totalHeaderHeight = headerHeight + groupHeaderHeight;
+    const innerHeaderHeight = headerHeight + groupHeaderHeight;
+    const totalHeaderHeight = innerHeaderHeight + filterHeight;
     if (hasGroups && targetY <= groupHeaderHeight) return -2;
-    if (targetY <= totalHeaderHeight) return -1;
+    if (targetY <= innerHeaderHeight) return -1;
+    // filter area
+    if (filterHeight > 0 && targetY > innerHeaderHeight && targetY <= totalHeaderHeight) return -3;
 
     let y = height;
     for (let fr = 0; fr < freezeTrailingRows; fr++) {
@@ -432,10 +451,10 @@ export function prepTextCell(
     lastPrep: PrepResult | undefined,
     overrideColor?: string
 ): Partial<PrepResult> {
-    const { ctx, theme } = args;
+    const { ctx, theme, highlighted } = args;
     const result: Partial<PrepResult> = lastPrep ?? {};
 
-    const newFill = overrideColor ?? theme.textDark;
+    const newFill = overrideColor ?? (highlighted === true ? theme.textDarkAccent : theme.textDark);
     if (newFill !== result.fillStyle) {
         ctx.fillStyle = newFill;
         result.fillStyle = newFill;
@@ -492,6 +511,24 @@ export function getEmHeight(ctx: CanvasRenderingContext2D, fontStyle: string): n
     return textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
 }
 
+export function extractFontSizeNumber(baseFontStyle: string): number | null {
+    const match = baseFontStyle.match(/(\d+(?:\.\d+)?)px/);
+    return match ? Number(match[1]) : null;
+}
+
+export function truncateTextToFit(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
+    let truncatedText = "";
+    for (let i = 0; i < text.length; i++) {
+        const width = measureTextCached(truncatedText + text[i], ctx).width;
+        if (width <= maxWidth) {
+            truncatedText += text[i];
+        } else {
+            break;
+        }
+    }
+    return truncatedText;
+}
+
 function truncateString(data: string, w: number): string {
     if (data.includes("\n")) {
         // new lines are rare and split is relatively expensive compared to the search
@@ -516,15 +553,35 @@ function drawMultiLineText(
     bias: number,
     theme: FullTheme,
     contentAlign?: BaseGridCell["contentAlign"],
-    hyperWrapping?: boolean
+    hyperWrapping?: boolean,
+    splitNum?: number
 ) {
+    let truncated = false;
     const fontStyle = theme.baseFontFull;
-    const split = splitText(ctx, data, fontStyle, w - theme.cellHorizontalPadding * 2, hyperWrapping ?? false);
+    const fontSize = extractFontSizeNumber(fontStyle);
+    // 在需求截断的情况下，若w - theme.cellHorizontalPadding * 2小于字体宽度大小，截断将会很耗时，卡死页面。
+    // 原因：
+    // 13px 微软雅黑字体宽度远大于 12px（尤其是中文字符一个可能宽到 13~15px，英文字符也不会太窄）。
+    // 于是 split() 可能始终测不出能放得下的字符，就会陷入无限尝试测量每个字符是否能“放下”的循环。
+    // 最终造成 CPU 占用激增，浏览器冻结。
+    const canTruncateWidth =
+        fontSize !== null && w - theme.cellHorizontalPadding * 2 < fontSize + 2
+            ? fontSize + 2
+            : w - theme.cellHorizontalPadding * 2;
+    const split = splitText(ctx, data, fontStyle, canTruncateWidth, hyperWrapping ?? false);
 
     const emHeight = getEmHeight(ctx, fontStyle);
     const lineHeight = theme.lineHeight * emHeight;
 
-    const actualHeight = emHeight + lineHeight * (split.length - 1);
+    let lineNum = 0;
+    let newSplit = split;
+    const canTruncate = splitNum !== undefined && typeof splitNum === "number" && splitNum > 1;
+
+    if (canTruncate && split.length > splitNum) {
+        newSplit = [...split.slice(0, splitNum - 1), split.slice(splitNum - 1).join("")];
+    }
+
+    const actualHeight = emHeight + lineHeight * (newSplit.length - 1);
     const mustClip = actualHeight + theme.cellVerticalPadding > h;
 
     if (mustClip) {
@@ -536,14 +593,31 @@ function drawMultiLineText(
 
     const optimalY = y + h / 2 - actualHeight / 2;
     let drawY = Math.max(y + theme.cellVerticalPadding, optimalY);
-    for (const line of split) {
+
+    for (let line of newSplit) {
+        lineNum++;
+
+        if (canTruncate && lineNum > splitNum - 1) {
+            const textWidth = measureTextCached(line, ctx).width;
+            const padding = theme.cellHorizontalPadding * 2;
+            if (textWidth > w - padding) {
+                const ellipsisWidth = measureTextCached("...", ctx).width;
+                const truncatedText = truncateTextToFit(ctx, line, w - padding - ellipsisWidth);
+                line = truncatedText + "...";
+                truncated = true;
+            }
+        }
+
         drawSingleTextLine(ctx, line, x, drawY, w, emHeight, bias, theme, contentAlign);
         drawY += lineHeight;
-        if (drawY > y + h) break;
+
+        if (drawY > y + h && (canTruncate ? lineNum > splitNum - 1 : true)) break;
     }
     if (mustClip) {
         ctx.restore();
     }
+
+    return truncated;
 }
 
 /** @category Drawing */
@@ -552,8 +626,15 @@ export function drawTextCell(
     data: string,
     contentAlign?: BaseGridCell["contentAlign"],
     allowWrapping?: boolean,
-    hyperWrapping?: boolean
-): void {
+    hyperWrapping?: boolean,
+    striked?: boolean,
+    splitNum?: number
+): boolean {
+    let truncated = false;
+    if (!data) {
+        return truncated;
+    }
+
     const { ctx, rect, theme } = args;
 
     const { x, y, width: w, height: h } = rect;
@@ -589,9 +670,47 @@ export function drawTextCell(
         }
 
         if (!allowWrapping) {
+            const textWidth = measureTextCached(data, ctx).width;
+            let truncatedText = data;
+            let ellipsisWidth = 0;
+            const padding = theme.cellHorizontalPadding * 2;
+            if (textWidth > rect.width - padding) {
+                ellipsisWidth = measureTextCached("...", ctx).width;
+                truncatedText = truncateTextToFit(ctx, data, rect.width - padding - ellipsisWidth);
+                data = truncatedText + "...";
+                truncated = true;
+            }
             drawSingleTextLine(ctx, data, x, y, w, h, bias, theme, contentAlign);
+            if (striked === true) {
+                // 绘制文字删除线
+                const truncatedTextWidth = truncated ? measureTextCached(truncatedText, ctx).width : textWidth;
+
+                let startX = x;
+                const startY = y + h / 2 + bias;
+
+                if (contentAlign === "right") {
+                    startX =
+                        x +
+                        (truncated
+                            ? w - (theme.cellHorizontalPadding + 0.5) - ellipsisWidth
+                            : w - (theme.cellHorizontalPadding + 0.5));
+                } else if (contentAlign === "center") {
+                    startX =
+                        x + (truncated ? (w - truncatedTextWidth - ellipsisWidth) / 2 : (w - truncatedTextWidth) / 2);
+                } else {
+                    startX = x + theme.cellHorizontalPadding + 0.5;
+                }
+
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(
+                    contentAlign === "right" ? startX - truncatedTextWidth : startX + truncatedTextWidth,
+                    startY
+                );
+                ctx.strokeStyle = theme.textDark;
+                ctx.stroke();
+            }
         } else {
-            drawMultiLineText(ctx, data, x, y, w, h, bias, theme, contentAlign, hyperWrapping);
+            truncated = drawMultiLineText(ctx, data, x, y, w, h, bias, theme, contentAlign, hyperWrapping, splitNum);
         }
 
         if (changed) {
@@ -603,6 +722,7 @@ export function drawTextCell(
             ctx.direction = "inherit";
         }
     }
+    return truncated;
 }
 
 interface CornerRadius {
@@ -763,6 +883,7 @@ export function computeBounds(
     height: number,
     groupHeaderHeight: number,
     totalHeaderHeight: number,
+    filterHeight: number,
     cellXOffset: number,
     cellYOffset: number,
     translateX: number,
@@ -780,11 +901,11 @@ export function computeBounds(
         height: 0,
     };
 
-    if (col >= mappedColumns.length || row >= rows || row < -2 || col < 0) {
+    if (col >= mappedColumns.length || row >= rows || row < -3 || col < 0) {
         return result;
     }
 
-    const headerHeight = totalHeaderHeight - groupHeaderHeight;
+    const headerHeight = totalHeaderHeight - groupHeaderHeight - filterHeight;
 
     if (col >= freezeColumns) {
         const dir = cellXOffset > col ? -1 : 1;
@@ -800,70 +921,91 @@ export function computeBounds(
     }
     result.width = mappedColumns[col].width + 1;
 
-    if (row === -1) {
-        result.y = groupHeaderHeight;
-        result.height = headerHeight;
-    } else if (row === -2) {
-        result.y = 0;
-        result.height = groupHeaderHeight;
+    switch (row) {
+        case -1: {
+            result.y = mappedColumns[col]?.group !== undefined ? groupHeaderHeight : 0;
+            result.height = headerHeight;
 
-        let start = col;
-        const group = mappedColumns[col].group;
-        const sticky = mappedColumns[col].sticky;
-        while (
-            start > 0 &&
-            isGroupEqual(mappedColumns[start - 1].group, group) &&
-            mappedColumns[start - 1].sticky === sticky
-        ) {
-            const c = mappedColumns[start - 1];
-            result.x -= c.width;
-            result.width += c.width;
-            start--;
+            break;
         }
+        case -3: {
+            result.y = totalHeaderHeight - filterHeight;
+            result.height = filterHeight;
 
-        let end = col;
-        while (
-            end + 1 < mappedColumns.length &&
-            isGroupEqual(mappedColumns[end + 1].group, group) &&
-            mappedColumns[end + 1].sticky === sticky
-        ) {
-            const c = mappedColumns[end + 1];
-            result.width += c.width;
-            end++;
+            break;
         }
-        if (!sticky) {
-            const freezeWidth = getStickyWidth(mappedColumns);
-            const clip = result.x - freezeWidth;
-            if (clip < 0) {
-                result.x -= clip;
-                result.width += clip;
+        case -2: {
+            result.y = 0;
+            result.height = groupHeaderHeight;
+
+            let start = col;
+            const group = mappedColumns[col].group;
+            const sticky = mappedColumns[col].sticky;
+            while (
+                start > 0 &&
+                isGroupEqual(mappedColumns[start - 1].group, group) &&
+                mappedColumns[start - 1].sticky === sticky
+            ) {
+                const c = mappedColumns[start - 1];
+                result.x -= c.width;
+                result.width += c.width;
+                start--;
             }
 
-            if (result.x + result.width > width) {
+            let end = col;
+            while (
+                end + 1 < mappedColumns.length &&
+                isGroupEqual(mappedColumns[end + 1].group, group) &&
+                mappedColumns[end + 1].sticky === sticky
+            ) {
+                const c = mappedColumns[end + 1];
+                result.width += c.width;
+                end++;
+            }
+
+            // 修正宽度
+            if (result.width + result.x >= width) {
                 result.width = width - result.x;
             }
-        }
-    } else if (row >= rows - freezeTrailingRows) {
-        let dy = rows - row;
-        result.y = height;
-        while (dy > 0) {
-            const r = row + dy - 1;
-            result.height = typeof rowHeight === "number" ? rowHeight : rowHeight(r);
-            result.y -= result.height;
-            dy--;
-        }
-        result.height += 1;
-    } else {
-        const dir = cellYOffset > row ? -1 : 1;
-        if (typeof rowHeight === "number") {
-            const delta = row - cellYOffset;
-            result.y += delta * rowHeight;
-        } else {
-            for (let r = cellYOffset; r !== row; r += dir) {
-                result.y += rowHeight(r) * dir;
+
+            if (!sticky) {
+                const freezeWidth = getStickyWidth(mappedColumns);
+                const clip = result.x - freezeWidth;
+                if (clip < 0) {
+                    result.x -= clip;
+                    result.width += clip;
+                }
+
+                if (result.x + result.width > width) {
+                    result.width = width - result.x;
+                }
             }
+
+            break;
         }
-        result.height = (typeof rowHeight === "number" ? rowHeight : rowHeight(row)) + 1;
+        default:
+            if (row >= rows - freezeTrailingRows) {
+                let dy = rows - row;
+                result.y = height;
+                while (dy > 0) {
+                    const r = row + dy - 1;
+                    result.height = typeof rowHeight === "number" ? rowHeight : rowHeight(r);
+                    result.y -= result.height;
+                    dy--;
+                }
+                result.height += 1;
+            } else {
+                const dir = cellYOffset > row ? -1 : 1;
+                if (typeof rowHeight === "number") {
+                    const delta = row - cellYOffset;
+                    result.y += delta * rowHeight;
+                } else {
+                    for (let r = cellYOffset; r !== row; r += dir) {
+                        result.y += rowHeight(r) * dir;
+                    }
+                }
+                result.height = (typeof rowHeight === "number" ? rowHeight : rowHeight(row)) + 1;
+            }
     }
 
     return result;

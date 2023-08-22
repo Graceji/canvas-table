@@ -34,7 +34,6 @@ export default {
 
 export const DragSource: React.VFC<{ isDraggable: boolean | "header" | "cell" }> = p => {
     const { cols, getCellContent, onColumnResize } = useMockDataGenerator(200);
-
     return (
         <DataEditor
             {...defaultProps}

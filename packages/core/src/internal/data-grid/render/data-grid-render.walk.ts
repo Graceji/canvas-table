@@ -114,6 +114,8 @@ export function walkGroups(
         }
         while (
             end < effectiveCols.length &&
+            !!(effectiveCols?.[end]?.group ?? "") === true &&
+            !!(startCol?.group ?? "") === true &&
             isGroupEqual(effectiveCols[end].group, startCol.group) &&
             effectiveCols[end].sticky === effectiveCols[index].sticky
         ) {

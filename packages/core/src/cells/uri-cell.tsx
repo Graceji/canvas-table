@@ -75,34 +75,42 @@ export const uriCellRenderer: InternalCellRenderer<UriCell> = {
         const { cell, theme, overrideCursor, hoverX, hoverY, rect, ctx } = a;
         const txt = cell.displayData ?? cell.data;
         const isLinky = cell.hoverEffect === true;
-        if (overrideCursor !== undefined && isLinky && hoverX !== undefined && hoverY !== undefined) {
+        if (isLinky) {
             const m = measureTextCached(txt, ctx, theme.baseFontFull);
             const textRect = getTextRect(m, rect, theme, cell.contentAlign);
 
             const { x, y, width: w, height: h } = textRect;
 
             // check if hoverX and hoverY inside the box
-            if (hoverX >= x - 4 && hoverX <= x - 4 + w + 8 && hoverY >= y - 4 && hoverY <= y - 4 + h + 8) {
-                const middleCenterBias = getMiddleCenterBias(ctx, theme.baseFontFull);
-                overrideCursor("pointer");
-                const underlineOffset = 5;
-                const drawY = y - middleCenterBias;
-
-                ctx.beginPath();
-                ctx.moveTo(rect.x + x, Math.floor(rect.y + drawY + h + underlineOffset) + 0.5);
-                ctx.lineTo(rect.x + x + w, Math.floor(rect.y + drawY + h + underlineOffset) + 0.5);
-
-                ctx.strokeStyle = theme.linkColor;
-                ctx.stroke();
-
-                ctx.save();
-                ctx.fillStyle = a.cellFillColor;
-                drawTextCell({ ...a, rect: { ...rect, x: rect.x - 1 } }, txt, cell.contentAlign);
-                drawTextCell({ ...a, rect: { ...rect, x: rect.x - 2 } }, txt, cell.contentAlign);
-                drawTextCell({ ...a, rect: { ...rect, x: rect.x + 1 } }, txt, cell.contentAlign);
-                drawTextCell({ ...a, rect: { ...rect, x: rect.x + 2 } }, txt, cell.contentAlign);
-                ctx.restore();
+            if (
+                hoverX !== undefined &&
+                hoverY !== undefined &&
+                hoverX >= x - 4 &&
+                hoverX <= x - 4 + w + 8 &&
+                hoverY >= y - 4 &&
+                hoverY <= y - 4 + h + 8
+            ) {
+                overrideCursor?.("pointer");
             }
+
+            const middleCenterBias = getMiddleCenterBias(ctx, theme.baseFontFull);
+            const underlineOffset = 5;
+            const drawY = y - middleCenterBias;
+
+            ctx.beginPath();
+            ctx.moveTo(rect.x + x, Math.floor(rect.y + drawY + h + underlineOffset) + 0.5);
+            ctx.lineTo(rect.x + x + w, Math.floor(rect.y + drawY + h + underlineOffset) + 0.5);
+
+            ctx.strokeStyle = theme.linkColor;
+            ctx.stroke();
+
+            // ctx.save();
+            // ctx.fillStyle = a.cellFillColor;
+            // drawTextCell({ ...a, rect: { ...rect, x: rect.x - 1 } }, txt, cell.contentAlign);
+            // drawTextCell({ ...a, rect: { ...rect, x: rect.x - 2 } }, txt, cell.contentAlign);
+            // drawTextCell({ ...a, rect: { ...rect, x: rect.x + 1 } }, txt, cell.contentAlign);
+            // drawTextCell({ ...a, rect: { ...rect, x: rect.x + 2 } }, txt, cell.contentAlign);
+            // ctx.restore();
         }
 
         ctx.fillStyle = isLinky ? theme.linkColor : theme.textDark;
@@ -129,6 +137,7 @@ export const uriCellRenderer: InternalCellRenderer<UriCell> = {
     }),
     provideEditor: cell => p => {
         const { onChange, value, forceEditMode, validatedSelection } = p;
+
         return (
             <UriOverlayEditor
                 forceEditMode={

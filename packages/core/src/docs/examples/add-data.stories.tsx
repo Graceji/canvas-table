@@ -56,8 +56,16 @@ export const AddData: React.VFC = () => {
         <DataEditor
             {...defaultProps}
             getCellContent={getCellContent}
-            columns={cols}
             rangeSelectionColumnSpanning={false}
+            columns={cols.map((item, index) => {
+                if (index < 5) {
+                    return {
+                        sticky: true,
+                        ...item,
+                    };
+                }
+                return item;
+            })}
             rowMarkers={"both"}
             onPaste={true} // we want to allow paste to just call onCellEdited
             onCellEdited={setCellValue} // Sets the mock cell content
@@ -66,9 +74,16 @@ export const AddData: React.VFC = () => {
                 sticky: false,
                 tint: true,
                 hint: "New row...",
+                marker: true,
+                themeOverride: {
+                    bgHeader: "#001232",
+                    bgHeaderHovered: "#001232",
+                },
             }}
-            rows={numRows}
+            rows={100}
             onRowAppended={onRowAppended}
+            style={{ height: "100%" }}
+            freezeColumns={4}
         />
     );
 };

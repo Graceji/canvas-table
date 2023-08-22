@@ -1,6 +1,12 @@
 /* eslint-disable sonarjs/no-duplicate-string */
 /* eslint-disable unicorn/no-for-loop */
-import { type GridSelection, type InnerGridCell, type Item, type FillHandle, DEFAULT_FILL_HANDLE } from "../data-grid-types.js";
+import {
+    type GridSelection,
+    type InnerGridCell,
+    type Item,
+    type FillHandle,
+    DEFAULT_FILL_HANDLE,
+} from "../data-grid-types.js";
 import { getStickyWidth, type MappedGridColumn, computeBounds, getFreezeTrailingHeight } from "./data-grid-lib.js";
 import { type FullTheme } from "../../../common/styles.js";
 import { blend, withAlpha } from "../color-parser.js";
@@ -18,6 +24,7 @@ export function drawHighlightRings(
     translateY: number,
     mappedColumns: readonly MappedGridColumn[],
     freezeColumns: number,
+    filterHeight: number,
     headerHeight: number,
     groupHeaderHeight: number,
     rowHeight: number | ((index: number) => number),
@@ -47,7 +54,8 @@ export function drawHighlightRings(
                 width,
                 height,
                 groupHeaderHeight,
-                headerHeight + groupHeaderHeight,
+                headerHeight + groupHeaderHeight + filterHeight,
+                filterHeight,
                 cellXOffset,
                 cellYOffset,
                 translateX,
@@ -68,6 +76,7 @@ export function drawHighlightRings(
                           height,
                           groupHeaderHeight,
                           headerHeight + groupHeaderHeight,
+                          filterHeight,
                           cellXOffset,
                           cellYOffset,
                           translateX,
@@ -105,7 +114,7 @@ export function drawHighlightRings(
     });
 
     const drawCb = () => {
-        ctx.lineWidth = 1;
+        ctx.lineWidth = theme.accentWidth;
 
         let dashed = false;
 
@@ -135,7 +144,8 @@ export function drawHighlightRings(
                             ? blend(blend(s.color, theme.borderColor), theme.bgCell)
                             : withAlpha(s.color, 1);
                     ctx.closePath();
-                    ctx.strokeRect(s.rect.x + 0.5, s.rect.y + 0.5, s.rect.width - 1, s.rect.height - 1);
+                    // ctx.strokeRect(s.rect.x + 0.5, s.rect.y + 0.5, s.rect.width - 1, s.rect.height - 1);
+                    ctx.strokeRect(s.rect.x + 1.5, s.rect.y + 1.5, s.rect.width - 3, s.rect.height - 3);
                     if (needsClip) {
                         ctx.restore();
                         dashed = wasDashed;
@@ -278,7 +288,7 @@ export function drawFillHandle(
                             // Draw a larger, outlined fill handle similar to Excel / Google Sheets.
                             const size = fill.size;
                             const half = size / 2;
-                            
+
                             // Place the handle so its center sits on the bottom-right corner of the cell,
                             // plus any configured offsets (fill.offsetX, fill.offsetY).
                             // Offset by half pixel to align with grid lines.
@@ -302,13 +312,7 @@ export function drawFillHandle(
                                 ctx.strokeStyle = theme.bgCell;
                                 if (fill.shape === "circle") {
                                     ctx.beginPath();
-                                    ctx.arc(
-                                        hx + half,
-                                        hy + half,
-                                        half + fill.outline / 2,
-                                        0,
-                                        Math.PI * 2
-                                    );
+                                    ctx.arc(hx + half, hy + half, half + fill.outline / 2, 0, Math.PI * 2);
                                     ctx.stroke();
                                 } else {
                                     ctx.strokeRect(

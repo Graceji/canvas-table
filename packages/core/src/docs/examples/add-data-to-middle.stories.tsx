@@ -42,7 +42,7 @@ interface AddDataToMiddleProps {
     insertIndex: number;
 }
 export const AddDataToMiddle: React.FC<AddDataToMiddleProps> = p => {
-    const { cols, getCellContent, setCellValueRaw, setCellValue } = useMockDataGenerator(60, false);
+    const { cols, getCellContent, setCellValueRaw, setCellValue } = useMockDataGenerator(60, true);
 
     const [numRows, setNumRows] = React.useState(50);
 
@@ -67,7 +67,7 @@ export const AddDataToMiddle: React.FC<AddDataToMiddleProps> = p => {
             {...defaultProps}
             getCellContent={getCellContent}
             columns={cols}
-            rowMarkers={"both"}
+            rowMarkers={"number"}
             onCellEdited={setCellValue}
             trailingRowOptions={{
                 hint: "New row...",
@@ -76,6 +76,8 @@ export const AddDataToMiddle: React.FC<AddDataToMiddleProps> = p => {
             }}
             rows={numRows}
             onRowAppended={onRowAppended}
+            rowSelectionBlending="mixed"
+            columnSelectionBlending="mixed"
         />
     );
 };

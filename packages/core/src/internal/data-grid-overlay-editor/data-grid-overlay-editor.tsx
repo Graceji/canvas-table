@@ -1,6 +1,5 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
-
 import ClickOutsideContainer from "../click-outside-container/click-outside-container.js";
 import { makeCSSStyle, type Theme, ThemeContext } from "../../common/styles.js";
 import type { GetCellRendererCallback } from "../../cells/cell-types.js";
@@ -15,6 +14,7 @@ import {
     type ProvideEditorCallbackResult,
     type Rectangle,
     type ValidatedGridCell,
+    type GridSelection,
 } from "../data-grid/data-grid-types.js";
 
 import type { CellActivatedEventArgs } from "../data-grid/event-args.js";
@@ -33,7 +33,12 @@ interface DataGridOverlayEditorProps {
     readonly initialValue?: string;
     readonly bloom?: readonly [number, number];
     readonly theme: Theme;
-    readonly onFinishEditing: (newCell: GridCell | undefined, movement: readonly [-1 | 0 | 1, -1 | 0 | 1]) => void;
+    readonly onFinishEditing: (
+        newCell: GridCell | undefined,
+        movement: readonly [-1 | 0 | 1, -1 | 0 | 1 | -3],
+        eventKey?: string
+    ) => void;
+    readonly onEditing: (newCell: GridCell | undefined) => void;
     readonly forceEditMode: boolean;
     readonly highlight: boolean;
     readonly portalElementRef?: React.RefObject<HTMLElement>;
@@ -49,6 +54,10 @@ interface DataGridOverlayEditorProps {
     ) => boolean | ValidatedGridCell;
     readonly isOutsideClick?: (e: MouseEvent | TouchEvent) => boolean;
     readonly customEventTarget?: HTMLElement | Window | Document;
+    readonly gridSelection?: GridSelection;
+    // readonly visibleRegion: VisibleRegion;
+    // readonly minCol: number;
+    // readonly maxCol: number;
 }
 
 const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps> = p => {
@@ -56,6 +65,7 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
         target,
         content,
         onFinishEditing: onFinishEditingIn,
+        onEditing: onEditingIn,
         forceEditMode,
         initialValue,
         imageEditorOverride,
@@ -73,6 +83,16 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
         isOutsideClick,
         customEventTarget,
         activation,
+        gridSelection,
+        // visibleRegion,
+        // gridRef,
+        // canvasBounds,
+        // headerHeight,
+        // rowHeight,
+        // column,
+        // leftSiblingsWidth,
+        // minCol,
+        // maxCol,
     } = p;
 
     const [tempValue, setTempValueRaw] = React.useState<GridCell | undefined>(forceEditMode ? content : undefined);
@@ -85,8 +105,8 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
     });
 
     const onFinishEditing = React.useCallback<typeof onFinishEditingIn>(
-        (newCell, movement) => {
-            onFinishEditingIn(isValid ? newCell : undefined, movement);
+        (newCell, movement, eventKey) => {
+            onFinishEditingIn(isValid ? newCell : undefined, movement, eventKey);
         },
         [isValid, onFinishEditingIn]
     );
@@ -105,12 +125,13 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
                 }
             }
             setTempValueRaw(newVal);
+            onEditingIn(newVal);
         },
-        [cell, validateCell]
+        [cell, validateCell, onEditingIn]
     );
 
     const finished = React.useRef(false);
-    const customMotion = React.useRef<[-1 | 0 | 1, -1 | 0 | 1] | undefined>(undefined);
+    const customMotion = React.useRef<[-1 | 0 | 1, -1 | 0 | 1 | -3] | undefined>(undefined);
 
     const onClickOutside = React.useCallback(() => {
         onFinishEditing(tempValue, [0, 0]);
@@ -118,13 +139,35 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
     }, [tempValue, onFinishEditing]);
 
     const onEditorFinished = React.useCallback(
-        (newValue: GridCell | undefined, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) => {
-            onFinishEditing(newValue, movement ?? customMotion.current ?? [0, 0]);
+        (newValue: GridCell | undefined, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1], eventKey?: string) => {
+            onFinishEditing(newValue, movement ?? customMotion.current ?? [0, 0], eventKey);
             finished.current = true;
         },
         [onFinishEditing]
     );
 
+    const targetValue = tempValue ?? content;
+
+    const [editorProvider, useLabel] = React.useMemo((): [ProvideEditorCallbackResult<GridCell>, boolean] | [] => {
+        if (isInnerOnlyCell(content)) return [];
+        const cellWithLocation = { ...content, location: cell, activation } as GridCell & {
+            location: Item;
+            activation: CellActivatedEventArgs;
+        };
+        const external = provideEditor?.(cellWithLocation);
+        if (external !== undefined) return [external, false];
+        return [getCellRenderer(content)?.provideEditor?.(cellWithLocation), false];
+    }, [cell, content, getCellRenderer, provideEditor, activation]);
+
+    /** @type {*}
+        选中行功能
+
+        左右选择 不更新选中行
+
+        上下选择 在可视行范围内上下选中行，边界条件与上方功能结合
+
+        遇到合计行行为,选中单元格
+     */
     const onKeyDown = React.useCallback(
         async (event: React.KeyboardEvent) => {
             let save = false;
@@ -147,30 +190,89 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
                 event.preventDefault();
                 customMotion.current = [event.shiftKey ? -1 : 1, 0];
                 save = true;
+            } else {
+                switch (event.key) {
+                    // case "ArrowRight":
+                    // case "ArrowLeft": {
+                    //     event.stopPropagation();
+                    //     event.preventDefault();
+                    //     save = true;
+
+                    //     if (editorProvider?.preventArrow === "horizontal") {
+                    //         break;
+                    //     }
+
+                    //     if (
+                    //         gridSelection !== undefined &&
+                    //         gridSelection.current !== undefined &&
+                    //         gridSelection.current.cell?.[1] === -3 &&
+                    //         ((event.key === "ArrowRight" && gridSelection.current.cell[0] === maxCol) ||
+                    //             (event.key === "ArrowLeft" && gridSelection.current.cell[0] === minCol))
+                    //     ) {
+                    //         // 涉及过滤行的单元格选择逻辑
+                    //         // 左右选择
+                    //         // 有索引列 最小1 没有索引列 最小0
+                    //         // 有索引列 最大len 没有索引列 最大len -1
+                    //         break;
+                    //     }
+
+                    //     customMotion.current = [event.key === "ArrowRight" ? 1 : -1, 0];
+
+                    //     break;
+                    // }
+                    case "ArrowUp":
+                    case "ArrowDown": {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        save = true;
+
+                        if (editorProvider?.preventArrow === "vertical") {
+                            break;
+                        }
+
+                        if (
+                            gridSelection !== undefined &&
+                            gridSelection.current !== undefined &&
+                            gridSelection.current.cell?.[1] === -3
+                        ) {
+                            // 上下选择: 当前为过滤行，往上没有反应; 往下选中正下方单元格
+                            if (event.key === "ArrowDown") {
+                                customMotion.current = [0, 1];
+                            }
+
+                            break;
+                        }
+
+                        if (
+                            gridSelection !== undefined &&
+                            gridSelection.current !== undefined &&
+                            gridSelection.current.cell?.[1] === 0 &&
+                            event.key === "ArrowUp"
+                        ) {
+                            // 当前为第一行: 往上 进入正上方过滤行单元格编辑态; 往下 选中正下方单元格
+                            customMotion.current = [0, -3];
+                            break;
+                        }
+
+                        customMotion.current = [0, event.key === "ArrowDown" ? 1 : -1];
+                        break;
+                    }
+                    default:
+                        break;
+                }
             }
 
             window.setTimeout(() => {
                 if (!finished.current && customMotion.current !== undefined) {
-                    onFinishEditing(save ? tempValue : undefined, customMotion.current);
+                    // 这里将tempValue改成了lastValueRef.current， 是为了需求：批量编辑框enter不输入时清空。
+                    // 在input cell中的onPressEnter调用onChange方法，先更新了tempValue, 但是这里拿不到更新后的值，导致外面不会调用onCellEdited
+                    onFinishEditing(save ? lastValueRef.current : undefined, customMotion.current, event.key);
                     finished.current = true;
                 }
             }, 0);
         },
-        [onFinishEditing, tempValue]
+        [gridSelection, onFinishEditing, editorProvider]
     );
-
-    const targetValue = tempValue ?? content;
-
-    const [editorProvider, useLabel] = React.useMemo((): [ProvideEditorCallbackResult<GridCell>, boolean] | [] => {
-        if (isInnerOnlyCell(content)) return [];
-        const cellWithLocation = { ...content, location: cell, activation } as GridCell & {
-            location: Item;
-            activation: CellActivatedEventArgs;
-        };
-        const external = provideEditor?.(cellWithLocation);
-        if (external !== undefined) return [external, false];
-        return [getCellRenderer(content)?.provideEditor?.(cellWithLocation), false];
-    }, [cell, content, getCellRenderer, provideEditor, activation]);
 
     const { ref, style: stayOnScreenStyle } = useStayOnScreen();
 
@@ -245,10 +347,10 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
                     className={classWrap}
                     style={styleOverride}
                     as={useLabel === true ? "label" : undefined}
-                    targetX={target.x - bloomX}
-                    targetY={target.y - bloomY}
-                    targetWidth={target.width + bloomX * 2}
-                    targetHeight={target.height + bloomY * 2}>
+                    targetX={target.x + (cell?.[1] < 0 ? 0 : 1.5) - bloomX}
+                    targetY={target.y + (cell?.[1] < 0 ? 0 : 1.5) - bloomY}
+                    targetWidth={target.width - (cell?.[1] < 0 ? 0 : 3) + bloomX * 2}
+                    targetHeight={target.height - (cell?.[1] < 0 ? 0 : 3) + bloomY * 2}>
                     <div className="gdg-clip-region" onKeyDown={onKeyDown}>
                         {editor}
                     </div>

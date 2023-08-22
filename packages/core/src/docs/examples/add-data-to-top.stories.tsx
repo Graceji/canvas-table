@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { DataEditorAll as DataEditor } from "../../data-editor-all.js";
 import {
     BeautifulWrapper,
@@ -51,20 +51,36 @@ export const AddDataToTop: React.VFC = () => {
         return "top" as const;
     }, [getCellContent, numRows, setCellValueRaw]);
 
+    const [location, setLocation] = useState<number[]>([]);
+
+    useEffect(() => {
+        setLocation([Math.floor(Math.random() * 10), Math.ceil(Math.random() * 10)]);
+    }, []);
+
     return (
-        <DataEditor
-            {...defaultProps}
-            getCellContent={getCellContent}
-            columns={cols}
-            rowMarkers={"both"}
-            onCellEdited={setCellValue}
-            trailingRowOptions={{
-                hint: "New row...",
-                sticky: true,
-                tint: true,
-            }}
-            rows={numRows}
-            onRowAppended={onRowAppended}
-        />
+        <>
+            <button
+                onClick={() => {
+                    setLocation([Math.floor(Math.random() * 10), Math.ceil(Math.random() * 10)]);
+                }}>
+                点击
+            </button>
+            <DataEditor
+                {...defaultProps}
+                getCellContent={getCellContent}
+                columns={cols}
+                rowMarkers={"both"}
+                onCellEdited={setCellValue}
+                trailingRowOptions={{
+                    hint: "New row...",
+                    sticky: true,
+                    tint: true,
+                }}
+                rows={numRows}
+                onRowAppended={onRowAppended}
+                autoFocusLocation={location}
+                cellActivationBehavior="single-click"
+            />
+        </>
     );
 };

@@ -62,8 +62,13 @@ function clipHeaderDamage(
 
             const finalX = drawX + diff + 1;
             const finalWidth = c.width - diff - 1;
-            if (damage.has([c.sourceIndex, -1])) {
-                ctx.rect(finalX, groupHeaderHeight, finalWidth, totalHeaderHeight - groupHeaderHeight);
+            if (damage.has([c.sourceIndex, -1]) || damage.has([c.sourceIndex, -3])) {
+                ctx.rect(
+                    finalX,
+                    c.group === undefined ? 0 : groupHeaderHeight,
+                    finalWidth,
+                    totalHeaderHeight // totalHeaderHeight - groupHeaderHeight
+                );
             }
         }
     );
@@ -133,6 +138,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         disabledRows,
         rowHeight,
         verticalBorder,
+        horizontalBorder,
         overrideCursor,
         isResizing,
         selection,
@@ -142,7 +148,6 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         getCellContent,
         getGroupDetails,
         getRowThemeOverride,
-        isFocused,
         drawHeaderCallback,
         prelightCells,
         drawCellCallback,
@@ -166,6 +171,9 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         damage,
         minimumCellWidth,
         resizeIndicator,
+        filterHeight,
+        showFilter,
+        getFilterCellContent,
     } = arg;
     if (width === 0 || height === 0) return;
     const doubleBuffer = renderStrategy === "double-buffer";
@@ -185,9 +193,9 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
     }
 
     const overlayCanvas = headerCanvasCtx.canvas;
-    const totalHeaderHeight = enableGroups ? groupHeaderHeight + headerHeight : headerHeight;
-
-    const overlayHeight = totalHeaderHeight + 1; // border
+    const totalHeaderHeight =
+        (enableGroups ? groupHeaderHeight + headerHeight : headerHeight) + (showFilter ? filterHeight : 0);
+    const overlayHeight = totalHeaderHeight + 0; // border
     if (overlayCanvas.width !== width * dpr || overlayCanvas.height !== overlayHeight * dpr) {
         overlayCanvas.width = width * dpr;
         overlayCanvas.height = overlayHeight * dpr;
@@ -271,12 +279,14 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         drawGridHeaders(
             overlayCtx,
             effectiveCols,
+            mappedColumns,
             enableGroups,
             hoverInfo,
             width,
             translateX,
             headerHeight,
             groupHeaderHeight,
+            showFilter ? filterHeight : 0,
             dragAndDropState,
             isResizing,
             selection,
@@ -287,7 +297,15 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             getGroupDetails,
             damage,
             drawHeaderCallback,
-            touchMode
+            touchMode,
+            drawCellCallback,
+            imageLoader,
+            hyperWrapping,
+            enqueue,
+            renderStateProvider,
+            overrideCursor,
+            getCellRenderer,
+            getFilterCellContent
         );
 
         drawGridLines(
@@ -305,20 +323,22 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             getRowHeight,
             getRowThemeOverride,
             verticalBorder,
+            horizontalBorder,
             freezeTrailingRows,
             rows,
             theme,
+            true,
             true
         );
 
-        overlayCtx.beginPath();
-        overlayCtx.moveTo(0, overlayHeight - 0.5);
-        overlayCtx.lineTo(width, overlayHeight - 0.5);
-        overlayCtx.strokeStyle = blend(
-            theme.headerBottomBorderColor ?? theme.horizontalBorderColor ?? theme.borderColor,
-            theme.bgHeader
-        );
-        overlayCtx.stroke();
+        // overlayCtx.beginPath();
+        // overlayCtx.moveTo(0, overlayHeight - 0.5);
+        // overlayCtx.lineTo(width, overlayHeight - 0.5);
+        // overlayCtx.strokeStyle = blend(
+        //     theme.headerBottomBorderColor ?? theme.horizontalBorderColor ?? theme.borderColor,
+        //     theme.bgHeader
+        // );
+        // overlayCtx.stroke();
 
         if (mustDrawHighlightRingsOnHeader) {
             drawHighlightRings(
@@ -331,6 +351,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
                 translateY,
                 mappedColumns,
                 freezeColumns,
+                showFilter ? filterHeight : 0,
                 headerHeight,
                 groupHeaderHeight,
                 rowHeight,
@@ -370,9 +391,9 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         const damageInView = damage.hasItemInRegion([
             {
                 x: cellXOffset,
-                y: -2,
+                y: -3,
                 width: viewRegionWidth,
-                height: 2,
+                height: 3,
             },
             {
                 x: cellXOffset,
@@ -388,9 +409,9 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             },
             {
                 x: 0,
-                y: -2,
+                y: -3,
                 width: freezeColumns,
-                height: 2,
+                height: 3,
             },
             {
                 x: cellXOffset,
@@ -417,7 +438,6 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
                 getGroupDetails,
                 getRowThemeOverride,
                 disabledRows,
-                isFocused,
                 drawFocus,
                 freezeTrailingRows,
                 hasAppendRow,
@@ -471,7 +491,9 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         };
 
         if (damageInView) {
-            doDamage(targetCtx);
+            if (rows > (freezeTrailingRows > 0 ? freezeTrailingRows : 0)) {
+                doDamage(targetCtx);
+            }
             if (mainCtx !== null) {
                 mainCtx.save();
                 mainCtx.scale(dpr, dpr);
@@ -554,243 +576,278 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         );
     }
 
-    overdrawStickyBoundaries(
-        targetCtx,
-        effectiveCols,
-        width,
-        height,
-        freezeTrailingRows,
-        rows,
-        verticalBorder,
-        getRowHeight,
-        theme
-    );
-
-    const highlightRedraw = drawHighlightRings(
-        targetCtx,
-        width,
-        height,
-        cellXOffset,
-        cellYOffset,
-        translateX,
-        translateY,
-        mappedColumns,
-        freezeColumns,
-        headerHeight,
-        groupHeaderHeight,
-        rowHeight,
-        freezeTrailingRows,
-        rows,
-        highlightRegions,
-        theme
-    );
-
-    // the overdraw may have nuked out our focus ring right edge.
-    const focusRedraw = drawFocus
-        ? drawFillHandle(
-              targetCtx,
-              width,
-              height,
-              cellYOffset,
-              translateX,
-              translateY,
-              effectiveCols,
-              mappedColumns,
-              theme,
-              totalHeaderHeight,
-              selection,
-              getRowHeight,
-              getCellContent,
-              freezeTrailingRows,
-              hasAppendRow,
-              fillHandle,
-              rows
-          )
-        : undefined;
-
-    targetCtx.fillStyle = theme.bgCell;
-    if (drawRegions.length > 0) {
-        targetCtx.beginPath();
-        for (const r of drawRegions) {
-            targetCtx.rect(r.x, r.y, r.width, r.height);
-        }
-        targetCtx.clip();
-        targetCtx.fill();
-        targetCtx.beginPath();
-    } else {
-        targetCtx.fillRect(0, 0, width, height);
-    }
-
-    const spans = drawCells(
-        targetCtx,
-        effectiveCols,
-        mappedColumns,
-        height,
-        totalHeaderHeight,
-        translateX,
-        translateY,
-        cellYOffset,
-        rows,
-        getRowHeight,
-        getCellContent,
-        getGroupDetails,
-        getRowThemeOverride,
-        disabledRows,
-        isFocused,
-        drawFocus,
-        freezeTrailingRows,
-        hasAppendRow,
-        drawRegions,
-        damage,
-        selection,
-        prelightCells,
-        highlightRegions,
-        imageLoader,
-        spriteManager,
-        hoverValues,
-        hoverInfo,
-        drawCellCallback,
-        hyperWrapping,
-        theme,
-        enqueue,
-        renderStateProvider,
-        getCellRenderer,
-        overrideCursor,
-        minimumCellWidth
-    );
-
-    drawBlanks(
-        targetCtx,
-        effectiveCols,
-        mappedColumns,
-        width,
-        height,
-        totalHeaderHeight,
-        translateX,
-        translateY,
-        cellYOffset,
-        rows,
-        getRowHeight,
-        getRowThemeOverride,
-        selection.rows,
-        disabledRows,
-        freezeTrailingRows,
-        hasAppendRow,
-        drawRegions,
-        damage,
-        theme
-    );
-
-    drawExtraRowThemes(
-        targetCtx,
-        effectiveCols,
-        cellYOffset,
-        translateX,
-        translateY,
-        width,
-        height,
-        drawRegions,
-        totalHeaderHeight,
-        getRowHeight,
-        getRowThemeOverride,
-        verticalBorder,
-        freezeTrailingRows,
-        rows,
-        theme
-    );
-
-    drawGridLines(
-        targetCtx,
-        effectiveCols,
-        cellYOffset,
-        translateX,
-        translateY,
-        width,
-        height,
-        drawRegions,
-        spans,
-        groupHeaderHeight,
-        totalHeaderHeight,
-        getRowHeight,
-        getRowThemeOverride,
-        verticalBorder,
-        freezeTrailingRows,
-        rows,
-        theme
-    );
-
-    highlightRedraw?.();
-    focusRedraw?.();
-
-    if (isResizing && resizeIndicator !== "none") {
-        walkColumns(effectiveCols, 0, translateX, 0, totalHeaderHeight, (c, x) => {
-            if (c.sourceIndex === resizeCol) {
-                drawColumnResizeOutline(
-                    overlayCtx,
-                    x + c.width,
-                    0,
-                    totalHeaderHeight + 1,
-                    blend(theme.resizeIndicatorColor ?? theme.accentLight, theme.bgHeader)
-                );
-                if (resizeIndicator === "full") {
-                    drawColumnResizeOutline(
-                        targetCtx,
-                        x + c.width,
-                        totalHeaderHeight,
-                        height,
-                        blend(theme.resizeIndicatorColor ?? theme.accentLight, theme.bgCell)
-                    );
-                }
-                return true;
-            }
-            return false;
-        });
-    }
-
-    if (mainCtx !== null) {
-        mainCtx.fillStyle = theme.bgCell;
-        mainCtx.fillRect(0, 0, width, height);
-        mainCtx.drawImage(targetCtx.canvas, 0, 0);
-    }
-
-    const lastRowDrawn = getLastRow(
-        effectiveCols,
-        height,
-        totalHeaderHeight,
-        translateX,
-        translateY,
-        cellYOffset,
-        rows,
-        getRowHeight,
-        freezeTrailingRows,
-        hasAppendRow
-    );
-
-    imageLoader?.setWindow(
-        {
-            x: cellXOffset,
-            y: cellYOffset,
-            width: effectiveCols.length,
-            height: lastRowDrawn - cellYOffset,
-        },
-        freezeColumns,
-        Array.from({ length: freezeTrailingRows }, (_, i) => rows - 1 - i)
-    );
-
     const scrollX = last !== undefined && (cellXOffset !== last.cellXOffset || translateX !== last.translateX);
     const scrollY = last !== undefined && (cellYOffset !== last.cellYOffset || translateY !== last.translateY);
 
-    lastBlitData.current = {
-        cellXOffset,
-        cellYOffset,
-        translateX,
-        translateY,
-        mustDrawFocusOnHeader,
-        mustDrawHighlightRingsOnHeader,
-        lastBuffer: doubleBuffer ? (targetBuffer === bufferA ? "a" : "b") : undefined,
-        aBufferScroll: targetBuffer === bufferA ? [scrollX, scrollY] : last?.aBufferScroll,
-        bBufferScroll: targetBuffer === bufferB ? [scrollX, scrollY] : last?.bBufferScroll,
-    };
+    if (rows > (freezeTrailingRows > 0 ? freezeTrailingRows : 0)) {
+        overdrawStickyBoundaries(
+            targetCtx,
+            effectiveCols,
+            // width,
+            height,
+            freezeTrailingRows,
+            rows,
+            verticalBorder,
+            getRowHeight,
+            theme
+        );
+        const highlightRedraw = drawHighlightRings(
+            targetCtx,
+            width,
+            height,
+            cellXOffset,
+            cellYOffset,
+            translateX,
+            translateY,
+            mappedColumns,
+            freezeColumns,
+            showFilter ? filterHeight : 0,
+            headerHeight,
+            groupHeaderHeight,
+            rowHeight,
+            freezeTrailingRows,
+            rows,
+            highlightRegions,
+            theme
+        );
+        // the overdraw may have nuked out our focus ring right edge.
+        const focusRedraw = drawFocus
+            ? drawFillHandle(
+                  targetCtx,
+                  width,
+                  height,
+                  cellYOffset,
+                  translateX,
+                  translateY,
+                  effectiveCols,
+                  mappedColumns,
+                  theme,
+                  totalHeaderHeight,
+                  selection,
+                  getRowHeight,
+                  getCellContent,
+                  freezeTrailingRows,
+                  hasAppendRow,
+                  fillHandle,
+                  rows
+              )
+            : undefined;
+
+        targetCtx.fillStyle = theme.bgCell;
+        if (drawRegions.length > 0) {
+            targetCtx.beginPath();
+            for (const r of drawRegions) {
+                targetCtx.rect(r.x, r.y, r.width, r.height);
+            }
+            targetCtx.clip();
+            targetCtx.fill();
+            targetCtx.beginPath();
+        } else {
+            targetCtx.fillRect(0, 0, width, height);
+        }
+        const spans = drawCells(
+            targetCtx,
+            effectiveCols,
+            mappedColumns,
+            height,
+            totalHeaderHeight,
+            translateX,
+            translateY,
+            cellYOffset,
+            rows,
+            getRowHeight,
+            getCellContent,
+            getGroupDetails,
+            getRowThemeOverride,
+            disabledRows,
+            drawFocus,
+            freezeTrailingRows,
+            hasAppendRow,
+            drawRegions,
+            damage,
+            selection,
+            prelightCells,
+            highlightRegions,
+            imageLoader,
+            spriteManager,
+            hoverValues,
+            hoverInfo,
+            drawCellCallback,
+            hyperWrapping,
+            theme,
+            enqueue,
+            renderStateProvider,
+            getCellRenderer,
+            overrideCursor,
+            minimumCellWidth
+        );
+        drawBlanks(
+            targetCtx,
+            effectiveCols,
+            mappedColumns,
+            width,
+            height,
+            totalHeaderHeight,
+            translateX,
+            translateY,
+            cellYOffset,
+            rows,
+            getRowHeight,
+            getRowThemeOverride,
+            selection.rows,
+            disabledRows,
+            freezeTrailingRows,
+            hasAppendRow,
+            drawRegions,
+            damage,
+            theme
+        );
+
+        drawExtraRowThemes(
+            targetCtx,
+            effectiveCols,
+            cellYOffset,
+            translateX,
+            translateY,
+            width,
+            height,
+            drawRegions,
+            totalHeaderHeight,
+            getRowHeight,
+            getRowThemeOverride,
+            verticalBorder,
+            freezeTrailingRows,
+            rows,
+            theme
+        );
+
+        drawGridLines(
+            targetCtx,
+            effectiveCols,
+            cellYOffset,
+            translateX,
+            translateY,
+            width,
+            height,
+            drawRegions,
+            spans,
+            groupHeaderHeight,
+            totalHeaderHeight,
+            getRowHeight,
+            getRowThemeOverride,
+            verticalBorder,
+            horizontalBorder,
+            freezeTrailingRows,
+            rows,
+            theme
+        );
+
+        highlightRedraw?.();
+        focusRedraw?.();
+
+        if (isResizing && resizeIndicator !== "none") {
+            walkColumns(effectiveCols, 0, translateX, 0, totalHeaderHeight, (c, x) => {
+                if (c.sourceIndex === resizeCol) {
+                    drawColumnResizeOutline(
+                        overlayCtx,
+                        x + c.width,
+                        0,
+                        totalHeaderHeight + 1,
+                        blend(theme.resizeIndicatorColor ?? theme.accentLight, theme.bgHeader)
+                    );
+                    if (resizeIndicator === "full") {
+                        drawColumnResizeOutline(
+                            targetCtx,
+                            x + c.width,
+                            totalHeaderHeight,
+                            height,
+                            blend(theme.resizeIndicatorColor ?? theme.accentLight, theme.bgCell)
+                        );
+                    }
+                    return true;
+                }
+                return false;
+            });
+        }
+
+        if (mainCtx !== null) {
+            mainCtx.fillStyle = theme.bgCell;
+            mainCtx.fillRect(0, 0, width, height);
+            mainCtx.drawImage(targetCtx.canvas, 0, 0);
+        }
+
+        const lastRowDrawn = getLastRow(
+            effectiveCols,
+            height,
+            totalHeaderHeight,
+            translateX,
+            translateY,
+            cellYOffset,
+            rows,
+            getRowHeight,
+            freezeTrailingRows,
+            hasAppendRow
+        );
+
+        imageLoader?.setWindow(
+            {
+                x: cellXOffset,
+                y: cellYOffset,
+                width: effectiveCols.length,
+                height: lastRowDrawn - cellYOffset,
+            },
+            freezeColumns,
+            Array.from({ length: freezeTrailingRows }, (_, i) => rows - 1 - i)
+        );
+
+        lastBlitData.current = {
+            cellXOffset,
+            cellYOffset,
+            translateX,
+            translateY,
+            mustDrawFocusOnHeader,
+            mustDrawHighlightRingsOnHeader,
+            lastBuffer: doubleBuffer ? (targetBuffer === bufferA ? "a" : "b") : undefined,
+            aBufferScroll: targetBuffer === bufferA ? [scrollX, scrollY] : last?.aBufferScroll,
+            bBufferScroll: targetBuffer === bufferB ? [scrollX, scrollY] : last?.bBufferScroll,
+        };
+    } else {
+        targetCtx.fillStyle = theme.bgCell;
+        targetCtx.fillRect(0, 0, width, height);
+
+        if (theme.emptyIcon !== undefined) {
+            spriteManager.drawSprite(
+                theme.emptyIcon,
+                "normal",
+                targetCtx,
+                width / 2 - 32,
+                height / 2 - 20.5,
+                64,
+                theme,
+                1,
+                41,
+                theme.emptyFgColor,
+                theme.emptyBgColor
+            );
+        }
+
+        targetCtx.fillStyle = theme.emptyTextLight;
+        targetCtx.font = `13px ${theme.fontFamily}`;
+        const textWidth = targetCtx.measureText(theme.emptyText).width;
+        targetCtx.fillText(theme.emptyText, width / 2 - textWidth / 2, height / 2 + 41);
+
+        lastBlitData.current = {
+            cellXOffset: 1,
+            cellYOffset: 1,
+            translateX: 1,
+            translateY: 1,
+            mustDrawFocusOnHeader,
+            mustDrawHighlightRingsOnHeader,
+            lastBuffer: doubleBuffer ? (targetBuffer === bufferA ? "a" : "b") : undefined,
+            aBufferScroll: targetBuffer === bufferA ? [scrollX, scrollY] : last?.aBufferScroll,
+            bBufferScroll: targetBuffer === bufferB ? [scrollX, scrollY] : last?.bBufferScroll,
+        };
+    }
 
     targetCtx.restore();
     overlayCtx.restore();

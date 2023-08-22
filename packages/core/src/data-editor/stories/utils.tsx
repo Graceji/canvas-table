@@ -288,26 +288,30 @@ function getResizableColumns(amount: number, group: boolean): GridColumnWithMock
         {
             title: "First name",
             id: "First name",
-            group: group ? "Name" : undefined,
+            group: group ? "NameNameInfo" : undefined,
             icon: GridColumnIcon.HeaderString,
             hasMenu: false,
+            resizable: true,
             getContent: () => {
                 const firstName = faker.name.firstName();
                 return {
                     kind: GridCellKind.Text,
                     displayData: firstName,
                     data: firstName,
-                    allowOverlay: true,
-                    readonly: true,
+                    allowOverlay: false,
+                    readonly: false,
+                    contentAlign: "center",
+                    striked: true,
                 };
             },
         },
         {
             title: "Last name",
             id: "Last name",
-            group: group ? "Name" : undefined,
+            // group: group ? "NameNameInfo" : undefined,
             icon: GridColumnIcon.HeaderString,
             hasMenu: false,
+            resizable: true,
             getContent: () => {
                 const lastName = faker.name.lastName();
                 return {
@@ -316,6 +320,7 @@ function getResizableColumns(amount: number, group: boolean): GridColumnWithMock
                     data: lastName,
                     allowOverlay: true,
                     readonly: true,
+                    contentAlign: "right",
                 };
             },
         },
@@ -342,6 +347,7 @@ function getResizableColumns(amount: number, group: boolean): GridColumnWithMock
             group: group ? "Info" : undefined,
             icon: GridColumnIcon.HeaderString,
             hasMenu: false,
+            resizable: true,
             getContent: () => {
                 const email = faker.internet.email();
                 return {
@@ -384,7 +390,7 @@ function getResizableColumns(amount: number, group: boolean): GridColumnWithMock
                     data: url,
                     hoverEffect: true,
                     allowOverlay: true,
-                    readonly: true,
+                    readonly: false,
                     onClickUri: a => {
                         window.open(url, "_blank");
                         a.preventDefault();

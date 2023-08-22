@@ -7,6 +7,7 @@ type CellsForSelectionCallback = NonNullable<DataGridSearchProps["getCellsForSel
 export function useCellsForSelection(
     getCellsForSelectionIn: CellsForSelectionCallback | true | undefined,
     getCellContent: DataEditorProps["getCellContent"],
+    getFilterCellContent: DataEditorProps["getFilterCellContent"],
     rowMarkerOffset: number,
     abortController: AbortController,
     rows: number
@@ -24,6 +25,11 @@ export function useCellsForSelection(
                                 kind: GridCellKind.Loading,
                                 allowOverlay: false,
                             });
+                        } else if (rect.y === -3) {
+                            // filter行
+                            if (getFilterCellContent) {
+                                row.push(getFilterCellContent(x));
+                            }
                         } else {
                             row.push(getCellContent([x, y]));
                         }
@@ -35,7 +41,7 @@ export function useCellsForSelection(
             }
             return getCellsForSelectionIn?.(rect, abortController.signal) ?? [];
         },
-        [abortController.signal, getCellContent, getCellsForSelectionIn, rows]
+        [abortController.signal, getCellContent, getCellsForSelectionIn, getFilterCellContent, rows]
     );
     const getCellsForSelectionDirect =
         getCellsForSelectionIn !== undefined ? getCellsForSelectionDirectWhenValid : undefined;

@@ -3,8 +3,8 @@ import type React from "react";
 import type { CSSProperties } from "react";
 import type { Theme } from "../../common/styles.js";
 import { assertNever, proveType } from "../../common/support.js";
+import type { Sprite, SpriteManager } from "./data-grid-sprites.js";
 import type { OverlayImageEditorProps } from "../data-grid-overlay-editor/private/image-overlay-editor.js";
-import type { SpriteManager } from "./data-grid-sprites.js";
 import type { BaseGridMouseEventArgs, CellActivatedEventArgs } from "./event-args.js";
 import type { ImageWindowLoader } from "./image-window-loader-interface.js";
 
@@ -93,6 +93,7 @@ export enum GridCellKind {
 
 /** @category Columns */
 export enum GridColumnIcon {
+    HeaderAdd = "headerAdd",
     HeaderRowID = "headerRowID",
     HeaderCode = "headerCode",
     HeaderNumber = "headerNumber",
@@ -162,7 +163,13 @@ export interface BaseGridColumn {
         readonly targetColumn?: number | GridColumn;
         readonly themeOverride?: Partial<Theme>;
         readonly disabled?: boolean;
+        readonly showAddIcon?: boolean;
+        readonly marker?: boolean;
+        readonly contentAlign?: "left" | "center" | "right";
     };
+    readonly customHeaderCell?: GridCell;
+    readonly resizable?: boolean;
+    readonly align?: "left" | "right" | "center";
 }
 
 /** @category Columns */
@@ -174,6 +181,8 @@ export function isSizedGridColumn(c: GridColumn): c is SizedGridColumn {
 export interface SizedGridColumn extends BaseGridColumn {
     readonly width: number;
     readonly id?: string;
+    readonly minWidth?: number;
+    readonly maxWidth?: number;
 }
 
 /** @category Columns */
@@ -254,7 +263,8 @@ export function isTextEditableGridCell(cell: GridCell): cell is ReadWriteGridCel
 
 /** @category Cells */
 export function isInnerOnlyCell(cell: InnerGridCell): cell is InnerOnlyGridCell {
-    return cell.kind === InnerGridCellKind.Marker || cell.kind === InnerGridCellKind.NewRow;
+    return cell.kind === InnerGridCellKind.NewRow;
+    // return cell.kind === InnerGridCellKind.Marker || cell.kind === InnerGridCellKind.NewRow;
 }
 
 /** @category Cells */
@@ -318,6 +328,8 @@ export interface BaseGridCell {
     readonly cursor?: CSSProperties["cursor"];
     readonly copyData?: string;
     readonly activationBehaviorOverride?: CellActivationBehavior;
+    readonly readonly?: boolean;
+    readonly striked?: boolean;
 }
 
 /** @category Cells */
@@ -347,6 +359,7 @@ export interface TextCell extends BaseGridCell {
     readonly allowWrapping?: boolean;
     readonly hoverEffect?: boolean;
     readonly hoverEffectTheme?: HoverEffectTheme;
+    truncated?: boolean; // 文本是否被截断
 }
 
 /** @category Cells */
@@ -384,7 +397,7 @@ export type SelectionRange = number | readonly [number, number];
 /** @category Renderers */
 export type ProvideEditorComponent<T extends InnerGridCell> = React.FunctionComponent<{
     readonly onChange: (newValue: T) => void;
-    readonly onFinishedEditing: (newValue?: T, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) => void;
+    readonly onFinishedEditing: (newValue?: T, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1], eventKey?: string) => void;
     readonly isHighlighted: boolean;
     readonly value: T;
     readonly initialValue?: string;
@@ -405,6 +418,7 @@ type ObjectEditorCallbackResult<T extends InnerGridCell> = {
     styleOverride?: CSSProperties;
     disablePadding?: boolean;
     disableStyling?: boolean;
+    preventArrow?: "horizontal" | "vertical";
 };
 
 /** @category Renderers */
@@ -412,6 +426,7 @@ export type ProvideEditorCallbackResult<T extends InnerGridCell> =
     | (ProvideEditorComponent<T> & {
           disablePadding?: boolean;
           disableStyling?: boolean;
+          preventArrow?: "horizontal" | "vertical";
       })
     | ObjectEditorCallbackResult<T>
     | undefined;
@@ -507,6 +522,39 @@ export interface NewRowCell extends BaseGridCell {
     readonly hint: string;
     readonly allowOverlay: false;
     readonly icon?: string;
+    readonly showAddIcon?: boolean;
+}
+
+export type TreeNode = {
+    id?: string;
+    name: string;
+    depth?: number;
+    collapsed?: boolean;
+    children: TreeNode[];
+    isLast?: boolean;
+    pid?: number | string;
+    rowDef?: { [key: string]: any };
+};
+
+export interface MarkerFn {
+    key?: string;
+    type: "icon" | "checkbox" | "delete" | "expand" | "number" | "text";
+    start: number;
+    end: number;
+    onClick?: (node?: any) => void;
+    content?: string | ((node?: any) => string);
+    spriteCbMap?: { [key: string]: Sprite };
+    order: number;
+    size?: number;
+    disabled?: boolean | ((row: any) => boolean);
+    color?: string | ((node?: any) => string);
+    hoverColor?: string | ((node?: any) => string);
+    tooltip?: string;
+    placement?: string;
+    hoverEffect?: boolean;
+    rowDefKey?: string;
+    selectedColor?: string;
+    getColor?: (key: "selected" | "hovered" | "normal", node?: any) => string;
 }
 
 /** @category Cells */
@@ -517,7 +565,18 @@ export interface MarkerCell extends BaseGridCell {
     readonly drawHandle: boolean;
     readonly checked: boolean;
     readonly checkboxStyle: "square" | "circle";
-    readonly markerKind: "checkbox" | "number" | "both" | "checkbox-visible";
+    readonly markerKind:
+        | "checkbox"
+        | "number"
+        | "both"
+        | "checkbox-visible"
+        | "none"
+        | "expand-number-icon"
+        | "expand-number"
+        | "number-icon";
+    readonly functions: MarkerFn[];
+    activeFn?: MarkerFn;
+    node?: TreeNode;
 }
 
 /** @category Selection */

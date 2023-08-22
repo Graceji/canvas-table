@@ -1,6 +1,6 @@
 export type { OverlayImageEditorProps } from "./internal/data-grid-overlay-editor/private/image-overlay-editor.js";
 export type { MarkdownDivProps } from "./internal/markdown-div/markdown-div.js";
-export type { SpriteMap, HeaderIcon, Sprite } from "./internal/data-grid/data-grid-sprites.js";
+export type { SpriteMap, HeaderIcon, Sprite, SpriteVariant } from "./internal/data-grid/data-grid-sprites.js";
 export type { SpriteProps } from "./common/utils.js";
 export type { Theme } from "./common/styles.js";
 export type { CustomRenderer, BaseDrawArgs, DrawArgs } from "./cells/cell-types.js";
@@ -28,6 +28,7 @@ export type {
     OutOfBoundsRegionAxis,
     PositionableMouseEventArgs,
     PreventableEvent,
+    CellContextEventArgs,
 } from "./internal/data-grid/event-args.js";
 export { ImageOverlayEditor } from "./internal/data-grid-overlay-editor/private/image-overlay-editor.js";
 export { default as MarkdownDiv } from "./internal/markdown-div/markdown-div.js";
@@ -40,7 +41,11 @@ export {
     roundedPoly,
     roundedRect,
     drawTextCellExternal as drawTextCell,
+    drawTextCell as drawTextCellInner,
+    prepTextCell,
+    extractFontSizeNumber,
 } from "./internal/data-grid/render/data-grid-lib.js";
+export { drawCheckbox } from "./internal/data-grid/render/draw-checkbox.js";
 export { CellSet } from "./internal/data-grid/cell-set.js";
 export { getDataEditorTheme as getDefaultTheme, useTheme } from "./common/styles.js";
 export { useColumnSizer } from "./data-editor/use-column-sizer.js";

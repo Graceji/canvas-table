@@ -61,7 +61,7 @@ export const RowHover: React.VFC = () => {
             getCellContent={getCellContent}
             getRowThemeOverride={getRowThemeOverride}
             columns={cols}
-            rows={300}
+            rows={10_000}
         />
     );
 };
