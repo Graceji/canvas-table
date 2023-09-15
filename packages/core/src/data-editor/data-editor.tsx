@@ -1179,11 +1179,13 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 } else {
                     const hint = c?.trailingRowOptions?.hint ?? maybeFirstColumnHint;
                     const icon = c?.trailingRowOptions?.addIcon ?? trailingRowOptions?.addIcon;
+                    const showAddIcon = c?.trailingRowOptions?.showAddIcon;
                     return {
                         kind: InnerGridCellKind.NewRow,
                         hint,
                         allowOverlay: false,
                         icon,
+                        showAddIcon,
                     };
                 }
             } else {
@@ -1689,6 +1691,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             lastRowSticky && gridSelection !== undefined && gridSelection.current?.cell[1] === rows;
 
                         if (
+                            rowSelect === "multi" &&
                             (args.shiftKey || args.isLongTouch === true) &&
                             cellCol !== undefined &&
                             cellRow !== undefined &&
