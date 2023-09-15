@@ -160,6 +160,7 @@ export interface BaseGridColumn {
         readonly targetColumn?: number | GridColumn;
         readonly themeOverride?: Partial<Theme>;
         readonly disabled?: boolean;
+        readonly showAddIcon?: boolean;
     };
 }
 
@@ -501,6 +502,7 @@ export interface NewRowCell extends BaseGridCell {
     readonly hint: string;
     readonly allowOverlay: false;
     readonly icon?: string;
+    readonly showAddIcon?: boolean;
 }
 
 /** @category Cells */

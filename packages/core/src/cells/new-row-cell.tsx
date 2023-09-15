@@ -8,11 +8,11 @@ export const newRowCellRenderer: InternalCellRenderer<NewRowCell> = {
     needsHover: true,
     needsHoverPosition: false,
     measure: () => 200,
-    draw: a => drawNewRowCell(a, a.cell.hint, a.cell.icon),
+    draw: a => drawNewRowCell(a, a.cell.hint, a.cell.showAddIcon, a.cell.icon),
     onPaste: () => undefined,
 };
 
-function drawNewRowCell(args: BaseDrawArgs, data: string, icon?: string) {
+function drawNewRowCell(args: BaseDrawArgs, data: string, showAddIcon = true, icon?: string) {
     const { ctx, rect, hoverAmount, theme, spriteManager } = args;
     const { x, y, width: w, height: h } = rect;
     ctx.beginPath();
@@ -36,9 +36,9 @@ function drawNewRowCell(args: BaseDrawArgs, data: string, icon?: string) {
         spriteManager.drawSprite(icon, "normal", ctx, px, py, size, theme, alwaysShowIcon ? 1 : hoverAmount);
         textX = size;
     } else {
-        textX = 24;
+        textX = showAddIcon ? 24 : 0;
         const finalLineSize = 12;
-        const lineSize = alwaysShowIcon ? finalLineSize : hoverAmount * finalLineSize;
+        const lineSize = showAddIcon ? (alwaysShowIcon ? finalLineSize : hoverAmount * finalLineSize) : 0;
         const xTranslate = alwaysShowIcon ? 0 : (1 - hoverAmount) * finalLineSize * 0.5;
 
         const padPlus = theme.cellHorizontalPadding + 4;
