@@ -34,7 +34,7 @@ import { intersectRect } from "../../../common/math.js";
 import type { GridMouseGroupHeaderEventArgs } from "../event-args.js";
 import { getSkipPoint, getSpanBounds, walkColumns, walkRowsInCol } from "./data-grid-render.walk.js";
 
-const loadingCell: InnerGridCell = {
+export const loadingCell: InnerGridCell = {
     kind: GridCellKind.Loading,
     allowOverlay: false,
 };

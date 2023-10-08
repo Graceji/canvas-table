@@ -336,6 +336,9 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
                 smoothScrollY={p.smoothScrollY}
                 resizeIndicator={p.resizeIndicator}
                 verticalOnly={verticalOnly}
+                showFilter={p.showFilter}
+                filterHeight={p.filterHeight}
+                getFilterCellContent={p.getFilterCellContent}
             />
         </InfiniteScroller>
     );

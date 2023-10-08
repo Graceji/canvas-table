@@ -13,6 +13,7 @@ export const DataGridOverlayEditorStyle = styled.div<Props>`
     flex-direction: column;
     overflow: hidden;
     box-sizing: border-box;
+    justify-content: center;
 
     --overlay-top: ${p => p.targetY}px;
 
@@ -49,13 +50,15 @@ export const DataGridOverlayEditorStyle = styled.div<Props>`
         animation: glide_fade_in 60ms 1;
     }
 
-    &.gdg-pad {
-        padding: ${p => Math.max(0, (p.targetHeight - 28) / 2)}px 8.5px 3px;
+    &.pad {
+        // padding: ${p => Math.max(0, (p.targetHeight - 28) / 2)}px 8.5px 3px;
+        padding: 0 8.5px;
     }
 
     .gdg-clip-region {
         display: flex;
         flex-direction: column;
+        justify-content: center;
         overflow-y: auto;
         overflow-x: hidden;
         border-radius: 2px;

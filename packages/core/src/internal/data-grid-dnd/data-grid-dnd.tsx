@@ -440,6 +440,9 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
             onMouseMoveRaw={onMouseMove}
             ref={gridRef}
             verticalOnly={verticalOnly}
+            showFilter={p.showFilter}
+            filterHeight={p.filterHeight}
+            getFilterCellContent={p.getFilterCellContent}
         />
     );
 };

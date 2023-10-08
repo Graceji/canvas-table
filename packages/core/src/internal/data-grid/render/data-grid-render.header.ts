@@ -1,11 +1,22 @@
+import type { GetCellRendererCallback, PrepResult } from "../../../cells/cell-types.js";
 import { intersectRect, pointInRect } from "../../../common/math.js";
-import { mergeAndRealizeTheme, type FullTheme } from "../../../common/styles.js";
+import type { RenderStateProvider } from "../../../common/render-state-provider.js";
+import { mergeAndRealizeTheme, type FullTheme, type Theme } from "../../../common/styles.js";
 import { direction } from "../../../common/utils.js";
 import type { HoverValues } from "../animation-manager.js";
 import type { CellSet } from "../cell-set.js";
 import { withAlpha } from "../color-parser.js";
 import type { SpriteManager, SpriteVariant } from "../data-grid-sprites.js";
-import { type DrawHeaderCallback, type Rectangle, GridColumnMenuIcon, type GridSelection } from "../data-grid-types.js";
+import {
+    type DrawHeaderCallback,
+    type Rectangle,
+    GridColumnMenuIcon,
+    type GridSelection,
+    type DrawCellCallback,
+    type InnerGridCell,
+    type Item,
+} from "../data-grid-types.js";
+import type { ImageWindowLoader } from "../image-window-loader-interface.js";
 import {
     drawMenuDots,
     getMiddleCenterBias,
@@ -14,7 +25,7 @@ import {
     measureTextCached,
     getMeasuredTextCache,
 } from "./data-grid-lib.js";
-import type { GroupDetails, GroupDetailsCallback } from "./data-grid-render.cells.js";
+import { drawCell, loadingCell, type GroupDetails, type GroupDetailsCallback } from "./data-grid-render.cells.js";
 import { walkColumns, walkGroups } from "./data-grid-render.walk.js";
 import { drawCheckbox } from "./draw-checkbox.js";
 import type { DragAndDropState, HoverInfo } from "./draw-grid-arg.js";
@@ -22,12 +33,14 @@ import type { DragAndDropState, HoverInfo } from "./draw-grid-arg.js";
 export function drawGridHeaders(
     ctx: CanvasRenderingContext2D,
     effectiveCols: readonly MappedGridColumn[],
+    allColumns: readonly MappedGridColumn[],
     enableGroups: boolean,
     hovered: HoverInfo | undefined,
     width: number,
     translateX: number,
     headerHeight: number,
     groupHeaderHeight: number,
+    filterHeight: number,
     dragAndDropState: DragAndDropState | undefined,
     isResizing: boolean,
     selection: GridSelection,
@@ -38,7 +51,15 @@ export function drawGridHeaders(
     getGroupDetails: GroupDetailsCallback,
     damage: CellSet | undefined,
     drawHeaderCallback: DrawHeaderCallback | undefined,
-    touchMode: boolean
+    touchMode: boolean,
+    drawCellCallback: DrawCellCallback | undefined,
+    imageLoader: ImageWindowLoader,
+    hyperWrapping: boolean,
+    enqueue: (item: Item) => void,
+    renderStateProvider: RenderStateProvider,
+    overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
+    getFilterCellRenderer: GetCellRendererCallback,
+    getFilterCellContent: (cell: number) => InnerGridCell
 ) {
     const totalHeaderHeight = headerHeight + groupHeaderHeight;
     if (totalHeaderHeight <= 0) return;
@@ -46,6 +67,10 @@ export function drawGridHeaders(
     ctx.fillStyle = outerTheme.bgHeader;
     ctx.fillRect(0, 0, width, totalHeaderHeight);
 
+    ctx.fillStyle = outerTheme.filterHeaderBg ?? outerTheme.bgHeader;
+    ctx.fillRect(0, totalHeaderHeight, width, filterHeight);
+
+    const frameTime = performance.now();
     const hCol = hovered?.[0]?.[0];
     const hRow = hovered?.[0]?.[1];
     const hPosX = hovered?.[1]?.[0];
@@ -59,7 +84,7 @@ export function drawGridHeaders(
         const diff = Math.max(0, clipX - x);
         ctx.save();
         ctx.beginPath();
-        ctx.rect(x + diff, groupHeaderHeight, c.width - diff, headerHeight);
+        ctx.rect(x + diff, groupHeaderHeight, c.width - diff, headerHeight + filterHeight);
         ctx.clip();
 
         const groupTheme = getGroupDetails(c.group ?? "").overrideTheme;
@@ -106,6 +131,33 @@ export function drawGridHeaders(
                 ctx.fill();
                 ctx.globalAlpha = 1;
             }
+        }
+
+        if (filterHeight > 0) {
+            // 绘制filter cell
+            // 先获取内容
+            drawFilterCell(
+                ctx,
+                allColumns,
+                x,
+                _y,
+                filterHeight,
+                c,
+                selected,
+                theme,
+                drawCellCallback,
+                spriteManager,
+                imageLoader,
+                hoverValues,
+                hovered,
+                hyperWrapping,
+                enqueue,
+                frameTime,
+                renderStateProvider,
+                overrideCursor,
+                getFilterCellRenderer,
+                getFilterCellContent
+            );
         }
 
         drawHeader(
@@ -605,6 +657,81 @@ function drawHeaderInner(
         if (!hovered) {
             ctx.globalAlpha = 1;
         }
+    }
+}
+
+export function drawFilterCell(
+    ctx: CanvasRenderingContext2D,
+    allColumns: readonly MappedGridColumn[],
+    x: number,
+    y: number,
+    filterHeight: number,
+    c: MappedGridColumn,
+    selected: boolean,
+    theme: Theme,
+    drawCellCallback: DrawCellCallback | undefined,
+    spriteManager: SpriteManager,
+    imageLoader: ImageWindowLoader,
+    hoverValues: HoverValues,
+    hoverInfo: HoverInfo | undefined,
+    hyperWrapping: boolean,
+    enqueue: (item: Item) => void,
+    frameTime: number,
+    renderStateProvider: RenderStateProvider,
+    overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
+    getFilterCellRenderer: GetCellRendererCallback,
+    getFilterCellContent: (cell: number) => InnerGridCell
+) {
+    let prepResult: PrepResult | undefined = undefined;
+    const filterCell = getFilterCellContent?.(c.sourceIndex) ?? loadingCell;
+    const fillStyle = selected ? theme.textHeaderSelected : theme.textHeader;
+    ctx.fillStyle = fillStyle;
+    const isLastColumn = c.sourceIndex === allColumns.length - 1;
+
+    let hoverValue: HoverValues[number] | undefined;
+    for (const hv of hoverValues) {
+        if (hv.item[0] === c.sourceIndex && hv.item[1] === -3) {
+            hoverValue = hv;
+            break;
+        }
+    }
+
+    // ctx.moveTo(0, totalHeaderHeight - 0.5);
+    // ctx.lineTo(width, totalHeaderHeight - 0.5);
+    // ctx.strokeStyle = blend(
+    //     theme.headerBottomBorderColor ?? theme.horizontalBorderColor ?? theme.borderColor,
+    //     theme.bgHeader
+    // );
+    // ctx.stroke();
+
+    if (c.sourceIndex !== 0) {
+        prepResult = drawCell(
+            ctx,
+            filterCell,
+            c.sourceIndex,
+            -3,
+            isLastColumn,
+            false,
+            x,
+            y,
+            c.width,
+            filterHeight,
+            false, // accentCount > 0,
+            theme,
+            "", // fill ?? theme.bgCell,
+            imageLoader,
+            spriteManager,
+            hoverValue?.hoverAmount ?? 0,
+            hoverInfo,
+            hyperWrapping,
+            frameTime,
+            drawCellCallback,
+            prepResult,
+            enqueue,
+            renderStateProvider,
+            getFilterCellRenderer,
+            overrideCursor
+        );
     }
 }
 

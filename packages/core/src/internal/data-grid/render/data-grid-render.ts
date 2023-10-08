@@ -167,6 +167,9 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         minimumCellWidth,
         resizeIndicator,
         verticalOnly,
+        filterHeight,
+        showFilter,
+        getFilterCellContent,
     } = arg;
     if (width === 0 || height === 0) return;
     const doubleBuffer = renderStrategy === "double-buffer";
@@ -186,8 +189,8 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
     }
 
     const overlayCanvas = headerCanvasCtx.canvas;
-    const totalHeaderHeight = enableGroups ? groupHeaderHeight + headerHeight : headerHeight;
-
+    const totalHeaderHeight =
+        (enableGroups ? groupHeaderHeight + headerHeight : headerHeight) + (showFilter ? filterHeight : 0);
     const overlayHeight = totalHeaderHeight + 1; // border
     if (overlayCanvas.width !== width * dpr || overlayCanvas.height !== overlayHeight * dpr) {
         overlayCanvas.width = width * dpr;
@@ -272,12 +275,14 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         drawGridHeaders(
             overlayCtx,
             effectiveCols,
+            mappedColumns,
             enableGroups,
             hoverInfo,
             width,
             translateX,
             headerHeight,
             groupHeaderHeight,
+            showFilter ? filterHeight : 0,
             dragAndDropState,
             isResizing,
             selection,
@@ -288,7 +293,15 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             getGroupDetails,
             damage,
             drawHeaderCallback,
-            touchMode
+            touchMode,
+            drawCellCallback,
+            imageLoader,
+            hyperWrapping,
+            enqueue,
+            renderStateProvider,
+            overrideCursor,
+            getCellRenderer,
+            getFilterCellContent
         );
 
         drawGridLines(
@@ -332,6 +345,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
                 translateY,
                 mappedColumns,
                 freezeColumns,
+                filterHeight,
                 headerHeight,
                 groupHeaderHeight,
                 rowHeight,
@@ -577,6 +591,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         translateY,
         mappedColumns,
         freezeColumns,
+        filterHeight,
         headerHeight,
         groupHeaderHeight,
         rowHeight,

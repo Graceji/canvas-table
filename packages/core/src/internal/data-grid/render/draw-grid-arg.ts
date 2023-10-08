@@ -59,6 +59,7 @@ export interface DrawGridArg {
     readonly hyperWrapping: boolean;
     readonly rows: number;
     readonly getCellContent: (cell: Item) => InnerGridCell;
+    readonly getFilterCellContent: (cell: number) => InnerGridCell;
     readonly overrideCursor: (cursor: React.CSSProperties["cursor"]) => void;
     readonly getGroupDetails: GroupDetailsCallback;
     readonly getRowThemeOverride: GetRowThemeCallback | undefined;
@@ -80,4 +81,6 @@ export interface DrawGridArg {
     readonly getCellRenderer: GetCellRendererCallback;
     readonly minimumCellWidth: number;
     readonly resizeIndicator: "full" | "header" | "none";
+    readonly showFilter: boolean;
+    readonly filterHeight: number;
 }

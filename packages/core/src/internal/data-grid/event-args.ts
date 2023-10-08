@@ -28,6 +28,16 @@ export interface GridMouseCellEventArgs extends BaseGridMouseEventArgs, Position
 }
 
 /** @category Types */
+export const filterHeaderKind = "filterHeader" as const;
+/** @category Types */
+export interface GridMouseFilterHeaderEventArgs extends BaseGridMouseEventArgs, PositionableMouseEventArgs {
+    readonly kind: typeof filterHeaderKind;
+    readonly location: readonly [number, -1];
+    readonly bounds: Rectangle;
+    readonly group: string;
+}
+
+/** @category Types */
 export const headerKind = "header" as const;
 /** @category Types */
 export interface GridMouseHeaderEventArgs extends BaseGridMouseEventArgs, PositionableMouseEventArgs {

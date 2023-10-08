@@ -81,11 +81,11 @@ export interface Theme {
     fontFamily: string;
     editorFontSize: string;
     lineHeight: number;
-
     resizeIndicatorColor?: string;
     horizontalBorderColor?: string;
     headerBottomBorderColor?: string;
     roundingRadius?: number;
+    filterHeaderBg?: string;
 }
 
 const dataEditorBaseTheme: Theme = {
