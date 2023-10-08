@@ -45,6 +45,8 @@ import {
     gridSelectionHasItem,
     BooleanEmpty,
     BooleanIndeterminate,
+    filterHeaderKind,
+    type GridMouseFilterHeaderEventArgs,
 } from "../data-grid/data-grid-types";
 import DataGridSearch, { type DataGridSearchProps } from "../data-grid-search/data-grid-search";
 import { browserIsOSX } from "../common/browser-detect";
@@ -620,6 +622,9 @@ export interface DataEditorProps extends Props {
      * If this function is supplied and returns false, the click event is ignored
      */
     readonly isOutsideClick?: (e: MouseEvent | TouchEvent) => boolean;
+    readonly showFilter?: boolean;
+
+    readonly filterHeight?: number;
 }
 
 type ScrollToFn = (
@@ -633,6 +638,11 @@ type ScrollToFn = (
         vAlign?: "start" | "center" | "end";
     }
 ) => void;
+
+const defaultFilterCell = {
+    kind: GridCellKind.Text,
+    allowOverlay: true,
+};
 
 /** @category DataEditor */
 export interface DataEditorRef {
@@ -707,6 +717,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         columns: columnsIn,
         rows,
         getCellContent,
+        getFilterCellContent = () => undefined,
         onCellClicked,
         onCellActivated,
         onFinishedEditing,
@@ -800,6 +811,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         theme: themeIn,
         isOutsideClick,
         verticalOnly = false,
+        showFilter = false,
+        filterHeight = 20,
     } = p;
 
     const minColumnWidth = Math.max(minColumnWidthIn, 20);
@@ -1116,6 +1129,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                           ...x,
                           location: [x.location[0] - rowMarkerOffset, x.location[1]] as const,
                       }));
+
             const r = onCellsEdited?.(mangledItems);
 
             if (r !== true) {
@@ -1190,6 +1204,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 }
             } else {
                 const outerCol = col - rowMarkerOffset;
+
                 if (forceStrict || experimental?.strict === true) {
                     const vr = visibleRegionRef.current;
                     const isOutsideMainArea =
@@ -1329,6 +1344,61 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             }
         },
         [getMangledCellContent, gridSelection, mangledOnCellsEdited, setOverlaySimple]
+    );
+
+    const reselectFilter = React.useCallback(
+        (bounds: Rectangle, fromKeyboard: boolean, initialValue?: string) => {
+            if (gridSelection.current === undefined) return;
+
+            const [col, row] = gridSelection.current.cell;
+            const c = getFilterCellContent?.(col) ?? defaultFilterCell;
+            // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+            if (c.kind !== GridCellKind.Boolean && c.allowOverlay) {
+                let content = c;
+                if (initialValue !== undefined) {
+                    switch (content.kind) {
+                        case GridCellKind.Number: {
+                            const d = maybe(() => (initialValue === "-" ? -0 : Number.parseFloat(initialValue)), 0);
+                            content = {
+                                ...content,
+                                data: Number.isNaN(d) ? 0 : d,
+                            };
+                            break;
+                        }
+                        case GridCellKind.Text:
+                        case GridCellKind.Markdown:
+                        case GridCellKind.Uri:
+                            content = {
+                                ...content,
+                                data: initialValue,
+                            };
+                            break;
+                    }
+                }
+
+                setOverlaySimple({
+                    target: bounds,
+                    content,
+                    initialValue,
+                    cell: [col, row],
+                    highlight: initialValue === undefined,
+                    forceEditMode: initialValue !== undefined,
+                });
+            } else if (c.kind === GridCellKind.Boolean && fromKeyboard && c.readonly !== true) {
+                mangledOnCellsEdited([
+                    {
+                        location: gridSelection.current.cell,
+                        value: {
+                            ...c,
+                            data: toggleBoolean(c.data),
+                        },
+                    },
+                ]);
+                gridRef.current?.damage([{ cell: gridSelection.current.cell }]);
+            }
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [getFilterCellContent, gridSelection, mangledOnCellsEdited, setOverlaySimple]
     );
 
     const focusOnRowFromTrailingBlankRow = React.useCallback(
@@ -1792,6 +1862,21 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 onSelectionCleared?.();
                 lastSelectedRowRef.current = undefined;
                 lastSelectedColRef.current = undefined;
+            } else if (args.kind === filterHeaderKind) {
+                lastSelectedColRef.current = undefined;
+                lastMouseSelectLocation.current = [col, row];
+                setCurrent(
+                    {
+                        cell: [col, row],
+                        range: { x: col, y: row, width: 1, height: 1 },
+                    },
+                    true,
+                    isMultiKey,
+                    "click"
+                );
+                lastSelectedRowRef.current = undefined;
+                setOverlay(undefined);
+                focus();
             }
         },
         [
@@ -2038,6 +2123,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 if (!isPrevented.current) {
                     const c = getMangledCellContent(args.location);
                     const r = getCellRenderer(c);
+
                     if (r !== undefined && r.onClick !== undefined && isValidClick) {
                         const newVal = r.onClick({
                             ...a,
@@ -2067,6 +2153,56 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         if (col === selectedCol && col === prevCol && row === selectedRow && row === prevRow) {
                             onCellActivated?.([col - rowMarkerOffset, row]);
                             reselect(a.bounds, false);
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            };
+
+            const handleFilterMaybeClick = (a: GridMouseFilterHeaderEventArgs): boolean => {
+                if (a.isTouch || (lastMouseDownCol === col && lastMouseDownRow === row)) {
+                    // onCellClicked?.([col - rowMarkerOffset, row], {
+                    //     ...a,
+                    //     preventDefault,
+                    // });
+                }
+                if (!isPrevented.current) {
+                    // const c = getMangledCellContent(args.location);
+                    const [activeCol] = args.location;
+                    // const outerCol = activeCol - rowMarkerOffset;
+                    const result = getFilterCellContent?.(activeCol) ?? defaultFilterCell;
+
+                    const r = getCellRenderer(result);
+
+                    if (r !== undefined && r.onClick !== undefined) {
+                        const newVal = r.onClick({
+                            ...a,
+                            cell: result,
+                            posX: a.localEventX,
+                            posY: a.localEventY,
+                            bounds: a.bounds,
+                            theme: themeForCell(result, args.location),
+                            preventDefault,
+                        });
+                        if (newVal !== undefined && !isInnerOnlyCell(newVal) && isEditableGridCell(newVal)) {
+                            mangledOnCellsEdited([{ location: a.location, value: newVal }]);
+                            gridRef.current?.damage([
+                                {
+                                    cell: a.location,
+                                },
+                            ]);
+                        }
+                    }
+                    if (
+                        !isPrevented.current &&
+                        mouse?.previousSelection?.current?.cell !== undefined &&
+                        gridSelection.current !== undefined
+                    ) {
+                        const [selectedCol, selectedRow] = gridSelection.current.cell;
+                        if (col === selectedCol && row === selectedRow) {
+                            // onCellActivated?.([col - rowMarkerOffset, row]);
+                            reselectFilter(a.bounds, false);
                             return true;
                         }
                     }
@@ -2150,13 +2286,19 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 }
             }
 
-            if (args.kind === "cell" && (args.button === 0 || args.button === 1)) {
+            if (args.kind === filterHeaderKind && args.button === 0) {
+                handleFilterMaybeClick(args);
+            }
+
+            if (args.kind === "cell" && args.button === 0 || args.button === 1) {
                 handleMaybeClick(args);
             }
 
             lastMouseSelectLocation.current = undefined;
         },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         [
+            getFilterCellContent,
             mouseState,
             rowMarkerOffset,
             gridSelection,
@@ -2176,6 +2318,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             normalSizeColumn,
             onHeaderClicked,
             handleGroupHeaderSelection,
+            reselectFilter,
+            defaultFilterCell,
         ]
     );
 
@@ -3716,6 +3860,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     getCellRenderer={getCellRenderer}
                     scrollToEnd={scrollToEnd}
                     verticalOnly={verticalOnly}
+                    showFilter={showFilter}
+                    filterHeight={filterHeight}
+                    getFilterCellContent={getFilterCellContent}
                 />
                 {renameGroupNode}
                 {overlay !== undefined && (

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { DataEditor } from "../../data-editor/data-editor";
 import {
     BeautifulWrapper,
@@ -8,6 +8,8 @@ import {
     defaultProps,
 } from "../../data-editor/stories/utils";
 import { SimpleThemeWrapper } from "../../stories/story-utils";
+import { allCells } from "../../../../cells";
+import { GridCellKind } from "../../data-grid/data-grid-types";
 
 export default {
     title: "Glide-Data-Grid/DataEditor Demos",
@@ -36,15 +38,34 @@ interface AddColumnsProps {
 
 export const AddColumns: React.FC<AddColumnsProps> = p => {
     const { cols, getCellContent } = useMockDataGenerator(p.columnsCount);
+    const [filterValue, setFilterValue] = useState("filter");
+
+    const getFilterCellContent = param => {
+        return {
+            kind: GridCellKind.Text,
+            data: filterValue,
+            displayData: filterValue,
+            allowOverlay: true,
+        };
+    };
 
     return (
         <DataEditor
             {...defaultProps}
             rowMarkers="number"
             getCellContent={getCellContent}
+            onCellEdited={(cell, newValue) => {
+                setFilterValue(newValue.data);
+            }}
+            getFilterCellContent={getFilterCellContent}
             experimental={{ strict: true }}
             columns={cols}
             rows={10_000}
+            showFilter
+            theme={{
+                filterHeaderBg: "orange",
+            }}
+            customRenderers={allCells}
         />
     );
 };

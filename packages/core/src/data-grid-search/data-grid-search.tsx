@@ -527,6 +527,9 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
                 smoothScrollY={p.smoothScrollY}
                 scrollToEnd={p.scrollToEnd}
                 verticalOnly={verticalOnly}
+                showFilter={p.showFilter}
+                filterHeight={p.filterHeight}
+                getFilterCellContent={p.getFilterCellContent}
             />
             {searchbox}
         </>

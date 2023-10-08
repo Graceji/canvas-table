@@ -32,6 +32,7 @@ import {
     headerKind,
     outOfBoundsKind,
     type ImageWindowLoader,
+    filterHeaderKind,
 } from "./data-grid-types";
 import { SpriteManager, type SpriteMap } from "./data-grid-sprites";
 import { direction, getScrollBarWidth, useDebouncedMemo, useEventListener } from "../common/utils";
@@ -59,6 +60,9 @@ import type { CellRenderer, GetCellRendererCallback } from "./cells/cell-types";
 export interface DataGridProps {
     readonly width: number;
     readonly height: number;
+
+    readonly showFilter: boolean;
+    readonly filterHeight: number;
 
     readonly cellXOffset: number;
     readonly cellYOffset: number;
@@ -106,6 +110,8 @@ export interface DataGridProps {
     readonly eventTargetRef: React.MutableRefObject<HTMLDivElement | null> | undefined;
 
     readonly getCellContent: (cell: Item, forceStrict?: boolean) => InnerGridCell;
+    readonly getFilterCellContent?: (col: number, forceStrict?: boolean) => InnerGridCell | undefined;
+
     /**
      * Provides additional details about groups to extend group functionality.
      * @group Data
@@ -359,6 +365,9 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         experimental,
         getCellRenderer,
         verticalOnly,
+        showFilter,
+        filterHeight,
+        getFilterCellContent,
     } = p;
     const translateX = p.translateX ?? 0;
     const translateY = p.translateY ?? 0;
@@ -387,7 +396,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             }),
         [headerIcons]
     );
-    const totalHeaderHeight = enableGroups ? groupHeaderHeight + headerHeight : headerHeight;
+    const totalHeaderHeight =
+        (enableGroups ? groupHeaderHeight + headerHeight : headerHeight) + (showFilter ? filterHeight : 0);
 
     const scrollingStopRef = React.useRef(-1);
     const disableFirefoxRescaling = experimental?.enableFirefoxRescaling !== true;
@@ -406,7 +416,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
 
     const mappedColumns = useMappedColumns(columns, freezeColumns);
 
-    // row: -1 === columnHeader, -2 === groupHeader
+    // row: -1 === columnHeader, -2 === groupHeader, -3 === filterHeader
     const getBoundsForItem = React.useCallback(
         (canvas: HTMLCanvasElement, col: number, row: number): Rectangle | undefined => {
             const rect = canvas.getBoundingClientRect();
@@ -424,6 +434,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 height,
                 groupHeaderHeight,
                 totalHeaderHeight,
+                filterHeight,
                 cellXOffset,
                 cellYOffset,
                 translateX,
@@ -448,18 +459,19 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             return result;
         },
         [
+            mappedColumns,
+            rows,
             width,
             height,
             groupHeaderHeight,
             totalHeaderHeight,
+            filterHeight,
             cellXOffset,
             cellYOffset,
             translateX,
             translateY,
-            rows,
             freezeColumns,
             trailingRowType,
-            mappedColumns,
             rowHeight,
         ]
     );
@@ -490,6 +502,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 enableGroups,
                 headerHeight,
                 groupHeaderHeight,
+                showFilter ? filterHeight : 0,
                 rows,
                 rowHeight,
                 cellYOffset,
@@ -540,6 +553,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     isMaybeScrollbar,
                 };
             } else if (row <= -1) {
+                // 头部区域
                 let bounds = getBoundsForItem(canvas, col, row);
                 assert(bounds !== undefined);
                 let isEdge = bounds !== undefined && bounds.x + bounds.width - posX <= edgeDetectionBuffer;
@@ -550,7 +564,12 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     bounds = getBoundsForItem(canvas, previousCol, row);
                     assert(bounds !== undefined);
                     result = {
-                        kind: enableGroups && row === -2 ? groupHeaderKind : headerKind,
+                        kind:
+                            enableGroups && row === -2
+                                ? groupHeaderKind
+                                : showFilter && row === -3
+                                ? filterHeaderKind
+                                : headerKind,
                         location: [previousCol, row] as any,
                         bounds: bounds,
                         group: mappedColumns[previousCol].group ?? "",
@@ -566,7 +585,12 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     };
                 } else {
                     result = {
-                        kind: enableGroups && row === -2 ? groupHeaderKind : headerKind,
+                        kind:
+                            enableGroups && row === -2
+                                ? groupHeaderKind
+                                : showFilter && row === -3
+                                ? filterHeaderKind
+                                : headerKind,
                         group: mappedColumns[col].group ?? "",
                         location: [col, row] as any,
                         bounds: bounds,
@@ -624,6 +648,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             trailingRowType,
             getBoundsForItem,
             fillHandle,
+            showFilter,
+            filterHeight,
         ]
     );
 
@@ -679,6 +705,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             headerCanvas: overlay,
             width,
             height,
+            showFilter,
+            filterHeight,
             cellXOffset,
             cellYOffset,
             translateX: Math.round(translateX),
@@ -701,6 +729,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             rows,
             drawFocus: drawFocusRing,
             getCellContent,
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+            getFilterCellContent: getFilterCellContent!,
             getGroupDetails: getGroupDetails ?? (name => ({ name })),
             getRowThemeOverride,
             drawCustomCell,
@@ -740,6 +770,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         bufferB,
         width,
         height,
+        showFilter,
+        filterHeight,
         cellXOffset,
         cellYOffset,
         translateX,
@@ -762,6 +794,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         rows,
         drawFocusRing,
         getCellContent,
+        getFilterCellContent,
         getGroupDetails,
         getRowThemeOverride,
         drawCustomCell,

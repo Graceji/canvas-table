@@ -808,6 +808,64 @@ export function drawHeader(
     }
 }
 
+function drawFilterCell(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    filterHeight: number,
+    c: MappedGridColumn,
+    hover: number,
+    selected: boolean,
+    theme: Theme,
+    drawCustomCell: DrawCustomCellCallback | undefined,
+    spriteManager: SpriteManager,
+    imageLoader: ImageWindowLoader,
+    hoverInfo: HoverInfo | undefined,
+    hyperWrapping: boolean,
+    enqueue: (item: Item) => void,
+    frameTime: number,
+    getFilterCellRenderer: GetCellRendererCallback,
+    getFilterCellContent: (cell: number) => InnerGridCell
+) {
+    let prepResult: PrepResult | undefined = undefined;
+    const filterCell = getFilterCellContent?.(c.sourceIndex) ?? loadingCell;
+    const fillStyle = selected ? theme.textHeaderSelected : theme.textHeader;
+    ctx.fillStyle = fillStyle;
+
+    // ctx.moveTo(0, totalHeaderHeight - 0.5);
+    // ctx.lineTo(width, totalHeaderHeight - 0.5);
+    // ctx.strokeStyle = blend(
+    //     theme.headerBottomBorderColor ?? theme.horizontalBorderColor ?? theme.borderColor,
+    //     theme.bgHeader
+    // );
+    // ctx.stroke();
+
+    if (c.sourceIndex !== 0) {
+        prepResult = drawCell(
+            ctx,
+            -3,
+            filterCell,
+            c.sourceIndex,
+            x,
+            y,
+            c.width,
+            filterHeight,
+            false, // accentCount > 0,
+            theme,
+            drawCustomCell,
+            imageLoader,
+            spriteManager,
+            hover,
+            hoverInfo,
+            hyperWrapping,
+            frameTime,
+            prepResult,
+            enqueue,
+            getFilterCellRenderer
+        );
+    }
+}
+
 function drawGridHeaders(
     ctx: CanvasRenderingContext2D,
     effectiveCols: readonly MappedGridColumn[],
@@ -817,6 +875,7 @@ function drawGridHeaders(
     translateX: number,
     headerHeight: number,
     groupHeaderHeight: number,
+    filterHeight: number,
     dragAndDropState: DragAndDropState | undefined,
     isResizing: boolean,
     selection: GridSelection,
@@ -827,7 +886,14 @@ function drawGridHeaders(
     getGroupDetails: GroupDetailsCallback,
     damage: CellList | undefined,
     drawHeaderCallback: DrawHeaderCallback | undefined,
-    touchMode: boolean
+    touchMode: boolean,
+    drawCustomCell: DrawCustomCellCallback | undefined,
+    imageLoader: ImageWindowLoader,
+    hoverInfo: HoverInfo | undefined,
+    hyperWrapping: boolean,
+    enqueue: (item: Item) => void,
+    getFilterCellRenderer: GetCellRendererCallback,
+    getFilterCellContent: (cell: number) => InnerGridCell
 ) {
     const totalHeaderHeight = headerHeight + groupHeaderHeight;
     if (totalHeaderHeight <= 0) return;
@@ -835,6 +901,10 @@ function drawGridHeaders(
     ctx.fillStyle = outerTheme.bgHeader;
     ctx.fillRect(0, 0, width, totalHeaderHeight);
 
+    ctx.fillStyle = outerTheme.filterHeaderBg ?? outerTheme.bgHeader;
+    ctx.fillRect(0, totalHeaderHeight, width, filterHeight);
+
+    const frameTime = performance.now();
     const [hCol, hRow] = hovered?.[0] ?? [];
 
     const font = `${outerTheme.headerFontStyle} ${outerTheme.fontFamily}`;
@@ -845,7 +915,7 @@ function drawGridHeaders(
         const diff = Math.max(0, clipX - x);
         ctx.save();
         ctx.beginPath();
-        ctx.rect(x + diff, groupHeaderHeight, c.width - diff, headerHeight);
+        ctx.rect(x + diff, groupHeaderHeight, c.width - diff, headerHeight + filterHeight);
         ctx.clip();
 
         const groupTheme = getGroupDetails(c.group ?? "").overrideTheme;
@@ -895,6 +965,30 @@ function drawGridHeaders(
             }
         }
 
+        if (filterHeight > 0) {
+            // 绘制filter cell
+            // 先获取内容
+            drawFilterCell(
+                ctx,
+                x,
+                _y,
+                filterHeight,
+                c,
+                hover,
+                selected,
+                theme,
+                drawCustomCell,
+                spriteManager,
+                imageLoader,
+                hoverInfo,
+                hyperWrapping,
+                enqueue,
+                frameTime,
+                getFilterCellRenderer,
+                getFilterCellContent
+            );
+        }
+
         drawHeader(
             ctx,
             x,
@@ -911,6 +1005,7 @@ function drawGridHeaders(
             drawHeaderCallback,
             touchMode
         );
+
         ctx.restore();
     });
 
@@ -1862,6 +1957,8 @@ export interface DrawGridArg {
     readonly bufferB: HTMLCanvasElement;
     readonly width: number;
     readonly height: number;
+    readonly showFilter: boolean;
+    readonly filterHeight: number;
     readonly cellXOffset: number;
     readonly cellYOffset: number;
     readonly translateX: number;
@@ -1886,6 +1983,7 @@ export interface DrawGridArg {
     readonly hyperWrapping: boolean;
     readonly rows: number;
     readonly getCellContent: (cell: Item) => InnerGridCell;
+    readonly getFilterCellContent: (cell: number) => InnerGridCell;
     readonly getGroupDetails: GroupDetailsCallback;
     readonly getRowThemeOverride: GetRowThemeCallback | undefined;
     readonly drawCustomCell: DrawCustomCellCallback | undefined;
@@ -2012,7 +2110,11 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         bufferA,
         bufferB,
         verticalOnly,
+        filterHeight,
+        showFilter,
+        getFilterCellContent,
     } = arg;
+
     let { damage } = arg;
     if (width === 0 || height === 0) return;
     const doubleBuffer = renderStrategy === "double-buffer";
@@ -2029,7 +2131,8 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
     }
 
     const overlayCanvas = headerCanvas;
-    const totalHeaderHeight = enableGroups ? groupHeaderHeight + headerHeight : headerHeight;
+    const totalHeaderHeight =
+        (enableGroups ? groupHeaderHeight + headerHeight : headerHeight) + (showFilter ? filterHeight : 0);
 
     const overlayHeight = totalHeaderHeight + 1; // border
     if (overlayCanvas.width !== width * dpr || overlayCanvas.height !== overlayHeight * dpr) {
@@ -2114,6 +2217,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             translateX,
             headerHeight,
             groupHeaderHeight,
+            showFilter ? filterHeight : 0,
             dragAndDropState,
             isResizing,
             selection,
@@ -2124,7 +2228,14 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             getGroupDetails,
             damage,
             drawHeaderCallback,
-            touchMode
+            touchMode,
+            drawCustomCell,
+            imageLoader,
+            hoverInfo,
+            hyperWrapping,
+            enqueue,
+            getCellRenderer,
+            getFilterCellContent
         );
 
         drawGridLines(

@@ -75,6 +75,7 @@ export interface Theme {
     fontFamily: string;
     editorFontSize: string;
     lineHeight: number;
+    filterHeaderBg?: string;
 }
 
 const dataEditorBaseTheme: Theme = {
