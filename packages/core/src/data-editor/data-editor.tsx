@@ -47,6 +47,7 @@ import {
     BooleanIndeterminate,
     filterHeaderKind,
     type GridMouseFilterHeaderEventArgs,
+    type CellContextEventArgs,
 } from "../data-grid/data-grid-types";
 import DataGridSearch, { type DataGridSearchProps } from "../data-grid-search/data-grid-search";
 import { browserIsOSX } from "../common/browser-detect";
@@ -252,7 +253,7 @@ export interface DataEditorProps extends Props {
     /** Emitted when a cell should show a context menu. Usually right click.
      * @group Events
      */
-    readonly onCellContextMenu?: (cell: Item, event: CellClickedEventArgs) => void;
+    readonly onCellContextMenu?: (cell: Item, event: CellContextEventArgs) => void;
     /** Used for validating cell values during editing.
      * @group Editing
      * @param cell The cell which is being validated.
@@ -303,6 +304,8 @@ export interface DataEditorProps extends Props {
      * @group Data
      */
     readonly rows: number;
+
+    readonly rowMarkerIcon?: string;
 
     /** Determines if row markers should be automatically added to the grid.
      * Interactive row markers allow the user to select a row.
@@ -709,6 +712,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const {
         rowMarkers = "none",
         rowMarkerWidth: rowMarkerWidthRaw,
+        rowMarkerIcon,
         imageEditorOverride,
         getRowThemeOverride,
         markdownDivCreateNode,
@@ -1174,6 +1178,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 }
                 return {
                     kind: InnerGridCellKind.Marker,
+                    icon: rowMarkerIcon,
                     allowOverlay: false,
                     checked: gridSelection?.rows.hasIndex(row) === true,
                     markerKind: rowMarkers === "clickable-number" ? "number" : rowMarkers,
@@ -1246,6 +1251,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             experimental?.strict,
             getCellContent,
             rowMarkerStartIndex,
+            rowMarkerIcon,
         ]
     );
 
@@ -1354,7 +1360,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             const c = getFilterCellContent?.(col) ?? defaultFilterCell;
             // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
             if (c.kind !== GridCellKind.Boolean && c.allowOverlay) {
-                let content = c;
+                let content = c as any;
                 if (initialValue !== undefined) {
                     switch (content.kind) {
                         case GridCellKind.Number: {
@@ -1362,7 +1368,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             content = {
                                 ...content,
                                 data: Number.isNaN(d) ? 0 : d,
-                            };
+                            } as any;
                             break;
                         }
                         case GridCellKind.Text:
@@ -1371,7 +1377,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             content = {
                                 ...content,
                                 data: initialValue,
-                            };
+                            } as any;
                             break;
                     }
                 }
@@ -1384,14 +1390,14 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     highlight: initialValue === undefined,
                     forceEditMode: initialValue !== undefined,
                 });
-            } else if (c.kind === GridCellKind.Boolean && fromKeyboard && c.readonly !== true) {
+            } else if (c.kind === GridCellKind.Boolean && fromKeyboard && (c as any).readonly !== true) {
                 mangledOnCellsEdited([
                     {
                         location: gridSelection.current.cell,
                         value: {
                             ...c,
-                            data: toggleBoolean(c.data),
-                        },
+                            data: toggleBoolean((c as any).data),
+                        } as any,
                     },
                 ]);
                 gridRef.current?.damage([{ cell: gridSelection.current.cell }]);
@@ -2091,7 +2097,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const [scrollDir, setScrollDir] = React.useState<GridMouseEventArgs["scrollEdge"]>();
 
     const onMouseUp = React.useCallback(
-        (args: GridMouseEventArgs, isOutside: boolean) => {
+        (args: GridMouseEventArgs, isOutside: boolean, sourceEvent: MouseEvent | TouchEvent) => {
             const mouse = mouseState;
             setMouseState(undefined);
             setScrollDir(undefined);
@@ -2171,7 +2177,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     // const c = getMangledCellContent(args.location);
                     const [activeCol] = args.location;
                     // const outerCol = activeCol - rowMarkerOffset;
-                    const result = getFilterCellContent?.(activeCol) ?? defaultFilterCell;
+                    const result = getFilterCellContent?.(activeCol) ?? (defaultFilterCell as any);
 
                     const r = getCellRenderer(result);
 
@@ -2228,6 +2234,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         onCellContextMenu?.([clickLocation, args.location[1]], {
                             ...args,
                             preventDefault,
+                            sourceEvent,
                         });
                         return;
                     } else if (args.kind === "header" && gridSelection.columns.hasIndex(col)) {
@@ -2290,8 +2297,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 handleFilterMaybeClick(args);
             }
 
-            if (args.kind === "cell" && args.button === 0 || args.button === 1) {
-                handleMaybeClick(args);
+            if ((args.kind === "cell" && args.button === 0) || args.button === 1) {
+                handleMaybeClick(args as any);
             }
 
             lastMouseSelectLocation.current = undefined;
@@ -3155,7 +3162,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     );
 
     const onContextMenu = React.useCallback(
-        (args: GridMouseEventArgs, preventDefault: () => void) => {
+        (args: GridMouseEventArgs, preventDefault: () => void, sourceEvent: MouseEvent) => {
             const adjustedCol = args.location[0] - rowMarkerOffset;
             if (args.kind === "header") {
                 onHeaderContextMenu?.(adjustedCol, { ...args, preventDefault });
@@ -3173,6 +3180,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 onCellContextMenu?.([adjustedCol, row], {
                     ...args,
                     preventDefault,
+                    sourceEvent,
                 });
 
                 if (!gridSelectionHasItem(gridSelection, args.location)) {
@@ -3588,23 +3596,22 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 return gridRef.current?.damage(damageList);
             },
             getBounds: (col, row) => {
-
                 if (canvasRef?.current === null || scrollRef?.current === null) {
-                    return undefined
+                    return undefined;
                 }
 
                 if (col === undefined && row === undefined) {
                     // Return the bounds of the entire scroll area:
-                    const rect = canvasRef.current.getBoundingClientRect()
-                    const scale = rect.width / scrollRef.current.clientWidth
-                    return {   
-                         x: rect.x - scrollRef.current.scrollLeft * scale,
-                         y: rect.y - scrollRef.current.scrollTop * scale,
-                         width: scrollRef.current.scrollWidth * scale,
-                         height: scrollRef.current.scrollHeight * scale,
-                     };
+                    const rect = canvasRef.current.getBoundingClientRect();
+                    const scale = rect.width / scrollRef.current.clientWidth;
+                    return {
+                        x: rect.x - scrollRef.current.scrollLeft * scale,
+                        y: rect.y - scrollRef.current.scrollTop * scale,
+                        width: scrollRef.current.scrollWidth * scale,
+                        height: scrollRef.current.scrollHeight * scale,
+                    };
                 }
-                return gridRef.current?.getBounds( col ?? 0 + rowMarkerOffset, row);
+                return gridRef.current?.getBounds(col ?? 0 + rowMarkerOffset, row);
             },
             focus: () => gridRef.current?.focus(),
             emit: async e => {

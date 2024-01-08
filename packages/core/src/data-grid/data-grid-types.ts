@@ -50,6 +50,11 @@ interface PreventableEvent {
     preventDefault: () => void;
 }
 /** @category Types */
+export interface CellContextEventArgs extends CellClickedEventArgs {
+    sourceEvent: MouseEvent | TouchEvent;
+}
+
+/** @category Types */
 export interface CellClickedEventArgs extends GridMouseCellEventArgs, PreventableEvent {}
 
 /** @category Types */
@@ -605,6 +610,7 @@ export interface MarkerCell extends BaseGridCell {
     readonly drawHandle: boolean;
     readonly checked: boolean;
     readonly markerKind: "checkbox" | "number" | "both" | "checkbox-visible";
+    readonly icon?: string;
 }
 
 /** @category Selection */

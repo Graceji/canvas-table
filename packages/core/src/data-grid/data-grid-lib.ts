@@ -10,6 +10,7 @@ import {
     type BaseGridCell,
     BooleanEmpty,
     BooleanIndeterminate,
+    type MarkerCell,
 } from "./data-grid-types";
 import {
     degreesToRadians,
@@ -677,14 +678,9 @@ export function deprepMarkerRowCell(args: Pick<BaseDrawArgs, "ctx">) {
     ctx.textAlign = "start";
 }
 
-export function drawMarkerRowCell(
-    args: BaseDrawArgs,
-    index: number,
-    checked: boolean,
-    markerKind: "checkbox" | "both" | "number" | "checkbox-visible",
-    drawHandle: boolean
-) {
-    const { ctx, rect, hoverAmount, theme } = args;
+export function drawMarkerRowCell(args: BaseDrawArgs, cell: MarkerCell) {
+    const { ctx, rect, hoverAmount, theme, spriteManager } = args;
+    const { row: index, checked, markerKind, drawHandle, icon } = cell;
     const { x, y, width, height } = rect;
     const checkedboxAlpha = checked ? 1 : markerKind === "checkbox-visible" ? 0.6 + 0.4 * hoverAmount : hoverAmount;
     if (markerKind !== "number" && checkedboxAlpha > 0) {
@@ -729,8 +725,14 @@ export function drawMarkerRowCell(
         ctx.fillStyle = theme.textLight;
         ctx.font = fontStyle;
         ctx.fillText(text, start, y + height / 2 + getMiddleCenterBias(ctx, fontStyle));
-        if (hoverAmount !== 0) {
-            ctx.globalAlpha = 1;
+
+        if (icon !== undefined) {
+            const iconSize = 16;
+            const iconStart = x + width / 2 + (width / 2 - theme.cellHorizontalPadding) / 2 - iconSize / 2;
+            spriteManager.drawSprite(icon, "normal", ctx, iconStart, y + (height - iconSize) / 2, iconSize, theme, 1);
+            if (hoverAmount !== 0) {
+                ctx.globalAlpha = 1;
+            }
         }
     }
 }
