@@ -216,7 +216,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
     }, []);
 
     const onMouseUpImpl = React.useCallback(
-        (args: GridMouseEventArgs, isOutside: boolean) => {
+        (args: GridMouseEventArgs, isOutside: boolean, sourceEvent: MouseEvent | TouchEvent) => {
             if (args.button === 0) {
                 if (resizeCol !== undefined) {
                     // if the column is in selection, the selection may contain extra cols, so lets just re-send the last
@@ -260,7 +260,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
                     onRowMoved?.(dragRow, dropRow);
                 }
             }
-            onMouseUp?.(args, isOutside);
+            onMouseUp?.(args, isOutside, sourceEvent);
         },
         [
             onMouseUp,

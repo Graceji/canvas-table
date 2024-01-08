@@ -166,8 +166,8 @@ export interface DataGridProps {
     readonly onItemHovered: (args: GridMouseEventArgs) => void;
     readonly onMouseMove: (args: GridMouseEventArgs) => void;
     readonly onMouseDown: (args: GridMouseEventArgs) => void;
-    readonly onMouseUp: (args: GridMouseEventArgs, isOutside: boolean) => void;
-    readonly onContextMenu: (args: GridMouseEventArgs, preventDefault: () => void) => void;
+    readonly onMouseUp: (args: GridMouseEventArgs, isOutside: boolean, sourceEvent: MouseEvent | TouchEvent) => void;
+    readonly onContextMenu: (args: GridMouseEventArgs, preventDefault: () => void, sourceEvent: MouseEvent) => void;
 
     readonly onCanvasFocused: () => void;
     readonly onCanvasBlur: () => void;
@@ -854,10 +854,10 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         // Dear future Jason, I'm sorry. It was expedient, it worked, and had almost zero perf overhead. THe universe
         // basically made me do it. What choice did I have?
         if (current.damage === undefined) {
-            lastArgsRef.current = current;
-            drawGrid(current, last);
+            lastArgsRef.current = current as any;
+            drawGrid(current as any, last);
         } else {
-            drawGrid(current, undefined);
+            drawGrid(current as any, undefined);
         }
 
         // don't reset on damage events
@@ -1192,7 +1192,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             if (args.kind === headerKind && headerBounds !== undefined) {
                 if (args.button !== 0 || downPosition.current?.[0] !== col || downPosition.current?.[1] !== -1) {
                     // force outside so that click will not process
-                    onMouseUp(args, true);
+                    onMouseUp(args, true, ev);
                 }
                 return;
             } else if (args.kind === groupHeaderKind) {
@@ -1205,7 +1205,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 }
             }
 
-            onMouseUp(args, isOutside);
+            onMouseUp(args, isOutside, ev);
         },
         [onMouseUp, eventTargetRef, getMouseArgsForPosition, isOverHeaderElement, groupHeaderActionForEvent]
     );
@@ -1282,9 +1282,13 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             if (canvas === null || (ev.target !== canvas && ev.target !== eventTarget) || onContextMenu === undefined)
                 return;
             const args = getMouseArgsForPosition(canvas, ev.clientX, ev.clientY, ev);
-            onContextMenu(args, () => {
-                if (ev.cancelable) ev.preventDefault();
-            });
+            onContextMenu(
+                args,
+                () => {
+                    if (ev.cancelable) ev.preventDefault();
+                },
+                ev
+            );
         },
         [eventTargetRef, getMouseArgsForPosition, onContextMenu]
     );

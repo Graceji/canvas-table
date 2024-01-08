@@ -261,7 +261,7 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
     /** Emitted when a cell should show a context menu. Usually right click.
      * @group Events
      */
-    readonly onCellContextMenu?: (cell: Item, event: CellClickedEventArgs) => void;
+    readonly onCellContextMenu?: (cell: Item, event: CellContextEventArgs) => void;
     /** Used for validating cell values during editing.
      * @group Editing
      * @param cell The cell which is being validated.
@@ -1484,7 +1484,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             const c = getFilterCellContent?.(col) ?? defaultFilterCell;
             // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
             if (c.kind !== GridCellKind.Boolean && c.allowOverlay) {
-                let content = c;
+                let content = c as any;
                 if (initialValue !== undefined) {
                     switch (content.kind) {
                         case GridCellKind.Number: {
@@ -1492,7 +1492,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             content = {
                                 ...content,
                                 data: Number.isNaN(d) ? 0 : d,
-                            };
+                            } as any;
                             break;
                         }
                         case GridCellKind.Text:
@@ -1501,7 +1501,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             content = {
                                 ...content,
                                 data: initialValue,
-                            };
+                            } as any;
                             break;
                     }
                 }
@@ -1514,14 +1514,14 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     highlight: initialValue === undefined,
                     forceEditMode: initialValue !== undefined,
                 });
-            } else if (c.kind === GridCellKind.Boolean && fromKeyboard && c.readonly !== true) {
+            } else if (c.kind === GridCellKind.Boolean && fromKeyboard && (c as any).readonly !== true) {
                 mangledOnCellsEdited([
                     {
                         location: gridSelection.current.cell,
                         value: {
                             ...c,
-                            data: toggleBoolean(c.data),
-                        },
+                            data: toggleBoolean((c as any).data),
+                        } as any,
                     },
                 ]);
                 gridRef.current?.damage([{ cell: gridSelection.current.cell }]);
@@ -2301,7 +2301,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     }, [fillPattern, gridSelection]);
 
     const onMouseUp = React.useCallback(
-        (args: GridMouseEventArgs, isOutside: boolean) => {
+        (args: GridMouseEventArgs, isOutside: boolean, sourceEvent: MouseEvent | TouchEvent) => {
             const mouse = mouseState;
             setMouseState(undefined);
             setFillHighlightRegion(undefined);
@@ -2408,7 +2408,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     // const c = getMangledCellContent(args.location);
                     const [activeCol] = args.location;
                     // const outerCol = activeCol - rowMarkerOffset;
-                    const result = getFilterCellContent?.(activeCol) ?? defaultFilterCell;
+                    const result = getFilterCellContent?.(activeCol) ?? (defaultFilterCell as any);
 
                     const r = getCellRenderer(result);
 
@@ -2461,6 +2461,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         onCellContextMenu?.([clickLocation, args.location[1]], {
                             ...args,
                             preventDefault,
+                            sourceEvent,
                         });
                         return;
                     } else if (args.kind === "header" && gridSelection.columns.hasIndex(col)) {
@@ -3520,7 +3521,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     );
 
     const onContextMenu = React.useCallback(
-        (args: GridMouseEventArgs, preventDefault: () => void) => {
+        (args: GridMouseEventArgs, preventDefault: () => void, sourceEvent: MouseEvent) => {
             const adjustedCol = args.location[0] - rowMarkerOffset;
             if (args.kind === "header") {
                 onHeaderContextMenu?.(adjustedCol, { ...args, preventDefault });
@@ -3538,6 +3539,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 onCellContextMenu?.([adjustedCol, row], {
                     ...args,
                     preventDefault,
+                    sourceEvent,
                 });
 
                 if (!gridSelectionHasItem(gridSelection, args.location)) {
