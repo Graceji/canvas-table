@@ -12,11 +12,13 @@ import LinksCellRenderer, { type LinksCell } from "./cells/links-cell.js";
 import ButtonCellRenderer, { type ButtonCell } from "./cells/button-cell.js";
 import TreeViewCellRenderer, { type TreeViewCell } from "./cells/tree-view-cell.js";
 import MultiSelectCellRenderer, { type MultiSelectCell } from "./cells/multi-select-cell.js";
+import TreeCellRenderer, { type TreeCell } from "./cells/tree-cell";
 
 const cells = [
     StarCellRenderer,
     SparklineCellRenderer,
     TagsCellRenderer,
+    TreeCellRenderer,
     UserProfileCellRenderer,
     DropdownCellRenderer,
     ArticleCellRenderer,
@@ -33,6 +35,7 @@ export {
     StarCellRenderer as StarCell,
     SparklineCellRenderer as SparklineCell,
     TagsCellRenderer as TagsCell,
+    TreeCellRenderer as TreeCell,
     UserProfileCellRenderer as UserProfileCell,
     DropdownCellRenderer as DropdownCell,
     ArticleCellRenderer as ArticleCell,
@@ -50,6 +53,7 @@ export type {
     StarCell as StarCellType,
     SparklineCell as SparklineCellType,
     TagsCell as TagsCellType,
+    TreeCell as TreeCellType,
     UserProfileCell as UserProfileCellType,
     DropdownCell as DropdownCellType,
     ArticleCell as ArticleCellType,
