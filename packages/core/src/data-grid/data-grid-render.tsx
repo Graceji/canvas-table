@@ -825,69 +825,36 @@ function drawFilterCell(
     enqueue: (item: Item) => void,
     frameTime: number,
     getFilterCellRenderer: GetCellRendererCallback,
-    getFilterCellContent?: (cell: number) => InnerGridCell,
-    hasRowMarkers?: boolean
+    getFilterCellContent?: (cell: number) => InnerGridCell
 ) {
     let prepResult: PrepResult | undefined = undefined;
     const filterCell = getFilterCellContent?.(c.sourceIndex) ?? loadingCell;
+
     const fillStyle = selected ? theme.textHeaderSelected : theme.textHeader;
     ctx.fillStyle = fillStyle;
 
-    // 是否是marker列filter行位置
-    const isRowMarkerCol = hasRowMarkers === true && c.sourceIndex === 0;
-
-    if (!isRowMarkerCol) {
-        prepResult = drawCell(
-            ctx,
-            -3,
-            filterCell,
-            c.sourceIndex,
-            x,
-            y,
-            c.width,
-            filterHeight,
-            false, // accentCount > 0,
-            theme,
-            drawCustomCell,
-            imageLoader,
-            spriteManager,
-            hover,
-            hoverInfo,
-            hyperWrapping,
-            frameTime,
-            prepResult,
-            enqueue,
-            getFilterCellRenderer
-        );
-    } else {
-        // filter行索引列单元格由外部控制绘制
-        let hoverX: number | undefined;
-        let hoverY: number | undefined;
-        if (hoverInfo !== undefined && hoverInfo[0][0] === c.sourceIndex && hoverInfo[0][1] === -3) {
-            hoverX = hoverInfo[1][0];
-            hoverY = hoverInfo[1][1];
-        }
-        const args: FilterDrawArgs<typeof filterCell> = {
-            ctx,
-            theme,
-            col: c.sourceIndex,
-            row: -3,
-            cell: filterCell,
-            rect: { x, y, width: c.width, height: filterHeight },
-            highlighted: false,
-            hoverAmount: hover,
-            hoverX,
-            hoverY,
-            imageLoader,
-            spriteManager,
-            hyperWrapping,
-            isRowMarkerCol,
-            requestAnimationFrame: () => {
-                // forceAnim = true;
-            },
-        };
-        drawCustomCell?.(args as DrawArgs<GridCell>);
-    }
+    prepResult = drawCell(
+        ctx,
+        -3,
+        filterCell,
+        c.sourceIndex,
+        x,
+        y,
+        c.width,
+        filterHeight,
+        false, // accentCount > 0,
+        theme,
+        drawCustomCell,
+        imageLoader,
+        spriteManager,
+        hover,
+        hoverInfo,
+        hyperWrapping,
+        frameTime,
+        prepResult,
+        enqueue,
+        getFilterCellRenderer
+    );
 }
 
 function drawGridHeaders(
@@ -1011,8 +978,7 @@ function drawGridHeaders(
                 enqueue,
                 frameTime,
                 getFilterCellRenderer,
-                getFilterCellContent,
-                hasRowMarkers
+                getFilterCellContent
             );
         }
 
