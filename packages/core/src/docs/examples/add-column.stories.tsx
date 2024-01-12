@@ -9,7 +9,7 @@ import {
 } from "../../data-editor/stories/utils";
 import { SimpleThemeWrapper } from "../../stories/story-utils";
 import { allCells } from "../../../../cells";
-import { GridCellKind } from "../../data-grid/data-grid-types";
+import { GridCellKind, type GridCell } from "../../data-grid/data-grid-types";
 
 export default {
     title: "Glide-Data-Grid/DataEditor Demos",
@@ -42,7 +42,7 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
     const { cols, getCellContent } = useMockDataGenerator(p.columnsCount);
     const [filterValue, setFilterValue] = useState("filter");
 
-    const getFilterCellContent = param => {
+    const getFilterCellContent = (col: number): GridCell => {
         return {
             kind: GridCellKind.Text,
             data: filterValue,
@@ -72,14 +72,14 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
             rowMarkerIcon={markerIcon}
             rowMarkerWidth={75}
             getCellContent={getCellContent}
-            onCellEdited={(cell, newValue) => {
-                if (newValue.kind === "marker") {
-                    console.log(cell, newValue);
+            // onCellEdited={(cell, newValue) => {
+            //     if (newValue.kind === "marker") {
+            //         console.log(cell, newValue);
 
-                    return;
-                }
-                setFilterValue(newValue.data);
-            }}
+            //         return;
+            //     }
+            //     setFilterValue(newValue.data);
+            // }}
             getFilterCellContent={getFilterCellContent}
             experimental={{ strict: true }}
             columns={cols}

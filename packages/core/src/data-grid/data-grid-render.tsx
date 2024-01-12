@@ -825,7 +825,7 @@ function drawFilterCell(
     enqueue: (item: Item) => void,
     frameTime: number,
     getFilterCellRenderer: GetCellRendererCallback,
-    getFilterCellContent: (cell: number) => InnerGridCell,
+    getFilterCellContent?: (cell: number) => InnerGridCell,
     hasRowMarkers?: boolean
 ) {
     let prepResult: PrepResult | undefined = undefined;
