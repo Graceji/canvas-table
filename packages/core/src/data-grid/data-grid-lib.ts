@@ -680,41 +680,12 @@ export function deprepMarkerRowCell(args: Pick<BaseDrawArgs, "ctx">) {
 
 export function drawMarkerRowCell(args: BaseDrawArgs, cell: MarkerCell) {
     const { ctx, rect, hoverAmount, theme, spriteManager } = args;
-    const { row: index, checked, markerKind, drawHandle, icon } = cell;
+    // const { row: index, checked, markerKind, drawHandle, icon, node } = cell;
+    const { row: index, markerKind, icon, node } = cell;
     const { x, y, width, height } = rect;
-    const checkedboxAlpha = checked ? 1 : markerKind === "checkbox-visible" ? 0.6 + 0.4 * hoverAmount : hoverAmount;
-    if (markerKind !== "number" && checkedboxAlpha > 0) {
-        ctx.globalAlpha = checkedboxAlpha;
-        const offsetAmount = 7 * (checked ? hoverAmount : 1);
-        drawCheckbox(
-            ctx,
-            theme,
-            checked,
-            drawHandle ? x + offsetAmount : x,
-            y,
-            drawHandle ? width - offsetAmount : width,
-            height,
-            true,
-            undefined,
-            undefined,
-            18
-        );
-        if (drawHandle) {
-            ctx.globalAlpha = hoverAmount;
-            ctx.beginPath();
-            for (const xOffset of [3, 6]) {
-                for (const yOffset of [-5, -1, 3]) {
-                    ctx.rect(x + xOffset, y + height / 2 + yOffset, 2, 2);
-                }
-            }
+    // const checkedboxAlpha = checked ? 1 : markerKind === "checkbox-visible" ? 0.6 + 0.4 * hoverAmount : hoverAmount;
 
-            ctx.fillStyle = theme.textLight;
-            ctx.fill();
-            ctx.beginPath();
-        }
-        ctx.globalAlpha = 1;
-    }
-    if (markerKind === "number" || (markerKind === "both" && !checked)) {
+    const drawIndexNumber = () => {
         const text = index.toString();
         const fontStyle = `${theme.markerFontStyle} ${theme.fontFamily}`;
 
@@ -725,7 +696,64 @@ export function drawMarkerRowCell(args: BaseDrawArgs, cell: MarkerCell) {
         ctx.fillStyle = theme.textLight;
         ctx.font = fontStyle;
         ctx.fillText(text, start, y + height / 2 + getMiddleCenterBias(ctx, fontStyle));
+    };
 
+    const drawExpand = () => {
+        if (node !== undefined) {
+            const { children, collapsed, pid, isLast } = node;
+
+            ctx.save();
+
+            if (children?.length) {
+                // 父元素，绘制expand icon
+                ctx.fillStyle = "none";
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = theme.textDark;
+                ctx.beginPath();
+                // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+                if (collapsed) {
+                    ctx.moveTo(x + 8, y + height / 2 - 4);
+                    ctx.lineTo(x + 8, y + height / 2 + 4);
+                    ctx.lineTo(x + 14, y + height / 2);
+                } else {
+                    ctx.moveTo(x + 15, y + height / 2 - 3);
+                    ctx.lineTo(x + 7, y + height / 2 - 3);
+                    ctx.lineTo(x + 11, y + height / 2 + 3);
+                }
+                ctx.closePath();
+                ctx.stroke();
+            } else if (pid !== undefined) {
+                // 子元素绘制刻度线
+                ctx.fillStyle = "none";
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = theme.textDark;
+                ctx.beginPath();
+
+                if (isLast === true) {
+                    ctx.moveTo(x + 11, y);
+                    ctx.lineTo(x + 11, y + height / 2);
+                    ctx.lineTo(x + 20, y + height / 2);
+                } else {
+                    ctx.moveTo(x + 11, y);
+                    ctx.lineTo(x + 11, y + height);
+                    ctx.moveTo(x + 11, y + height / 2);
+                    ctx.lineTo(x + 20, y + height / 2);
+                }
+
+                ctx.stroke();
+            }
+
+            ctx.restore();
+
+            return true;
+        }
+    };
+
+    const drawIcon = () => {
         if (icon !== undefined) {
             const iconSize = 16;
             const iconStart = x + width / 2 + (width / 2 - theme.cellHorizontalPadding) / 2 - iconSize / 2;
@@ -734,6 +762,57 @@ export function drawMarkerRowCell(args: BaseDrawArgs, cell: MarkerCell) {
                 ctx.globalAlpha = 1;
             }
         }
+    };
+
+    // if (markerKind !== "number" && checkedboxAlpha > 0) {
+    //     ctx.globalAlpha = checkedboxAlpha;
+    //     const offsetAmount = 7 * (checked ? hoverAmount : 1);
+    //     drawCheckbox(
+    //         ctx,
+    //         theme,
+    //         checked,
+    //         drawHandle ? x + offsetAmount : x,
+    //         y,
+    //         drawHandle ? width - offsetAmount : width,
+    //         height,
+    //         true,
+    //         undefined,
+    //         undefined,
+    //         18
+    //     );
+    //     if (drawHandle) {
+    //         ctx.globalAlpha = hoverAmount;
+    //         ctx.beginPath();
+    //         for (const xOffset of [3, 6]) {
+    //             for (const yOffset of [-5, -1, 3]) {
+    //                 ctx.rect(x + xOffset, y + height / 2 + yOffset, 2, 2);
+    //             }
+    //         }
+
+    //         ctx.fillStyle = theme.textLight;
+    //         ctx.fill();
+    //         ctx.beginPath();
+    //     }
+    //     ctx.globalAlpha = 1;
+    // }
+    // 暂不考虑所有组合共存的情况
+    // 如果共存，需要确定好顺序，以及各部分大小
+    const markerElements = markerKind.split("-");
+
+    if (markerElements.includes("number")) {
+        drawIndexNumber();
+    }
+
+    if (markerElements.includes("expand")) {
+        drawExpand();
+    }
+
+    if (markerElements.includes("checkbox")) {
+        //
+    }
+
+    if (markerElements.includes("icon")) {
+        drawIcon();
     }
 }
 

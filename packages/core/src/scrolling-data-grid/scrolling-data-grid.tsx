@@ -116,6 +116,7 @@ const MinimapStyle = styled.div`
 
 const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
     const {
+        hasRowMarkers,
         columns,
         rows,
         rowHeight,
@@ -140,6 +141,7 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
         smoothScrollY = false,
         isDraggable,
         verticalOnly,
+        rowMarkerWidth,
     } = p;
     const { paddingRight, paddingBottom } = experimental ?? {};
 
@@ -372,6 +374,8 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
             initialSize={initialSize}
             scrollToEnd={scrollToEnd}>
             <DataGridDnd
+                rowMarkerWidth={rowMarkerWidth}
+                hasRowMarkers={hasRowMarkers}
                 eventTargetRef={scrollRef}
                 width={clientWidth}
                 height={clientHeight}

@@ -7,10 +7,13 @@ import {
 } from "@glideapps/glide-data-grid";
 
 export type TreeNode = {
+    pid?: string;
+    id: string;
     name: string;
     depth?: number;
     collapsed?: boolean;
     children: TreeNode[];
+    isLast?: boolean;
 };
 
 interface TreeCellProps {

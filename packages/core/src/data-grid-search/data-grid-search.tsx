@@ -105,6 +105,8 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
         showSearch = false,
         onSearchClose,
         verticalOnly,
+        hasRowMarkers,
+        rowMarkerWidth,
     } = p;
 
     const [searchID] = React.useState(() => "search-box-" + Math.round(Math.random() * 1000));
@@ -450,6 +452,8 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
     return (
         <>
             <ScrollingDataGrid
+                rowMarkerWidth={rowMarkerWidth}
+                hasRowMarkers={hasRowMarkers}
                 prelightCells={searchResults}
                 accessibilityHeight={p.accessibilityHeight}
                 canvasRef={p.canvasRef}

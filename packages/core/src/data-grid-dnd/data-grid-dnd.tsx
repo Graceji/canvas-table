@@ -88,6 +88,8 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
     const [dragStartY, setDragStartY] = React.useState<number>();
 
     const {
+        rowMarkerWidth,
+        hasRowMarkers,
         onHeaderMenuClick,
         getCellContent,
         onColumnMoved,
@@ -346,6 +348,8 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
 
     return (
         <DataGrid
+            rowMarkerWidth={rowMarkerWidth}
+            hasRowMarkers={hasRowMarkers}
             accessibilityHeight={p.accessibilityHeight}
             canvasRef={p.canvasRef}
             cellXOffset={p.cellXOffset}

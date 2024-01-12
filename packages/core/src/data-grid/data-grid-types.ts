@@ -188,6 +188,7 @@ export type DrawCustomCellCallback = (args: {
     highlighted: boolean;
     imageLoader: ImageWindowLoader;
     requestAnimationFrame: () => void;
+    isRowMarkerCol?: boolean;
 }) => boolean;
 
 /** @category Types */
@@ -377,7 +378,8 @@ export function isTextEditableGridCell(cell: GridCell): cell is ReadWriteGridCel
 
 /** @category Cells */
 export function isInnerOnlyCell(cell: InnerGridCell): cell is InnerOnlyGridCell {
-    return cell.kind === InnerGridCellKind.Marker || cell.kind === InnerGridCellKind.NewRow;
+    return cell.kind === InnerGridCellKind.NewRow;
+    // return cell.kind === InnerGridCellKind.Marker || cell.kind === InnerGridCellKind.NewRow;
 }
 
 /** @category Cells */
@@ -602,6 +604,15 @@ export interface NewRowCell extends BaseGridCell {
     readonly showAddIcon?: boolean;
 }
 
+export type TreeNode = {
+    name: string;
+    depth?: number;
+    collapsed?: boolean;
+    children: TreeNode[];
+    isLast?: boolean;
+    pid?: number | string;
+};
+
 /** @category Cells */
 export interface MarkerCell extends BaseGridCell {
     readonly kind: InnerGridCellKind.Marker;
@@ -611,6 +622,7 @@ export interface MarkerCell extends BaseGridCell {
     readonly checked: boolean;
     readonly markerKind: "checkbox" | "number" | "both" | "checkbox-visible";
     readonly icon?: string;
+    node?: TreeNode;
 }
 
 /** @category Selection */

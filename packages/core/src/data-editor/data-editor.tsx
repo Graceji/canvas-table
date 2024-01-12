@@ -318,7 +318,16 @@ export interface DataEditorProps extends Props {
      * @defaultValue `none`
      * @group Style
      */
-    readonly rowMarkers?: "checkbox" | "number" | "clickable-number" | "checkbox-visible" | "both" | "none";
+    readonly rowMarkers?:
+        | "checkbox"
+        | "number"
+        | "clickable-number"
+        | "checkbox-visible"
+        | "both"
+        | "none"
+        | "expand-number-icon"
+        | "expand-number"
+        | "number-icon";
     /**
      * Sets the width of row markers in pixels, if unset row markers will automatically size.
      * @group Style
@@ -515,6 +524,15 @@ export interface DataEditorProps extends Props {
      * @returns A valid GridCell to be rendered by the Grid.
      */
     readonly getCellContent: (cell: Item) => GridCell;
+
+    /**
+     * The primary callback for getting marker cell data into the data grid.
+     * @group Data
+     * @param row The location of the row.
+     * @returns row data.
+     */
+    readonly getMarkerContent?: (row: number) => { node: any };
+
     /**
      * Determines if row selection requires a modifier key to enable multi-selection or not. In auto mode it adapts to
      * touch or mouse environments automatically, in multi-mode it always acts as if the multi key (Ctrl) is pressed.
@@ -721,6 +739,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         columns: columnsIn,
         rows,
         getCellContent,
+        getMarkerContent,
         getFilterCellContent = () => undefined,
         onCellClicked,
         onCellActivated,
@@ -1176,7 +1195,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 if (isTrailing) {
                     return loadingCell;
                 }
-                return {
+
+                const result = {
                     kind: InnerGridCellKind.Marker,
                     icon: rowMarkerIcon,
                     allowOverlay: false,
@@ -1185,7 +1205,15 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     row: rowMarkerStartIndex + row,
                     drawHandle: onRowMoved !== undefined,
                     cursor: rowMarkers === "clickable-number" ? "pointer" : undefined,
-                };
+                } as MarkerCell;
+
+                const outerResult = getMarkerContent?.(row);
+
+                if (outerResult?.node !== undefined) {
+                    result.node = outerResult.node;
+                }
+
+                return result;
             } else if (isTrailing) {
                 //If the grid is empty, we will return text
                 const isFirst = col === rowMarkerOffset;
@@ -1242,16 +1270,17 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             showTrailingBlankRow,
             mangledRows,
             hasRowMarkers,
+            rowMarkerIcon,
             gridSelection?.rows,
-            onRowMoved,
             rowMarkers,
+            rowMarkerStartIndex,
+            onRowMoved,
+            getMarkerContent,
             rowMarkerOffset,
             trailingRowOptions?.hint,
             trailingRowOptions?.addIcon,
             experimental?.strict,
             getCellContent,
-            rowMarkerStartIndex,
-            rowMarkerIcon,
         ]
     );
 
@@ -3781,6 +3810,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 inWidth={width ?? idealWidth}
                 inHeight={height ?? idealHeight}>
                 <DataGridSearch
+                    rowMarkerWidth={rowMarkerWidth}
+                    hasRowMarkers={hasRowMarkers}
                     fillHandle={fillHandle}
                     drawFocusRing={drawFocusRing}
                     experimental={experimental}

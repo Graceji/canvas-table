@@ -38,7 +38,7 @@ import {
 import type { SpriteManager, SpriteVariant } from "./data-grid-sprites";
 import type { Theme } from "../common/styles";
 import { blend, withAlpha } from "./color-parser";
-import type { DrawArgs, GetCellRendererCallback, PrepResult } from "./cells/cell-types";
+import type { DrawArgs, FilterDrawArgs, GetCellRendererCallback, PrepResult } from "./cells/cell-types";
 import { assert, deepEqual } from "../common/support";
 import { direction } from "../common/utils";
 
@@ -673,7 +673,7 @@ export function drawHeader(
         if (isCheckboxHeader) {
             passCol = {
                 ...c,
-                title: "",
+                title: "#",
             };
         }
         if (
@@ -825,22 +825,18 @@ function drawFilterCell(
     enqueue: (item: Item) => void,
     frameTime: number,
     getFilterCellRenderer: GetCellRendererCallback,
-    getFilterCellContent: (cell: number) => InnerGridCell
+    getFilterCellContent: (cell: number) => InnerGridCell,
+    hasRowMarkers?: boolean
 ) {
     let prepResult: PrepResult | undefined = undefined;
     const filterCell = getFilterCellContent?.(c.sourceIndex) ?? loadingCell;
     const fillStyle = selected ? theme.textHeaderSelected : theme.textHeader;
     ctx.fillStyle = fillStyle;
 
-    // ctx.moveTo(0, totalHeaderHeight - 0.5);
-    // ctx.lineTo(width, totalHeaderHeight - 0.5);
-    // ctx.strokeStyle = blend(
-    //     theme.headerBottomBorderColor ?? theme.horizontalBorderColor ?? theme.borderColor,
-    //     theme.bgHeader
-    // );
-    // ctx.stroke();
+    // 是否是marker列filter行位置
+    const isRowMarkerCol = hasRowMarkers === true && c.sourceIndex === 0;
 
-    if (c.sourceIndex !== 0) {
+    if (!isRowMarkerCol) {
         prepResult = drawCell(
             ctx,
             -3,
@@ -863,6 +859,34 @@ function drawFilterCell(
             enqueue,
             getFilterCellRenderer
         );
+    } else {
+        // filter行索引列单元格由外部控制绘制
+        let hoverX: number | undefined;
+        let hoverY: number | undefined;
+        if (hoverInfo !== undefined && hoverInfo[0][0] === c.sourceIndex && hoverInfo[0][1] === -3) {
+            hoverX = hoverInfo[1][0];
+            hoverY = hoverInfo[1][1];
+        }
+        const args: FilterDrawArgs<typeof filterCell> = {
+            ctx,
+            theme,
+            col: c.sourceIndex,
+            row: -3,
+            cell: filterCell,
+            rect: { x, y, width: c.width, height: filterHeight },
+            highlighted: false,
+            hoverAmount: hover,
+            hoverX,
+            hoverY,
+            imageLoader,
+            spriteManager,
+            hyperWrapping,
+            isRowMarkerCol,
+            requestAnimationFrame: () => {
+                // forceAnim = true;
+            },
+        };
+        drawCustomCell?.(args as DrawArgs<GridCell>);
     }
 }
 
@@ -893,7 +917,9 @@ function drawGridHeaders(
     hyperWrapping: boolean,
     enqueue: (item: Item) => void,
     getFilterCellRenderer: GetCellRendererCallback,
-    getFilterCellContent: (cell: number) => InnerGridCell
+    getFilterCellContent: (cell: number) => InnerGridCell,
+    hasRowMarkers?: boolean,
+    rowMarkerWidth?: number
 ) {
     const totalHeaderHeight = headerHeight + groupHeaderHeight;
     if (totalHeaderHeight <= 0) return;
@@ -902,7 +928,7 @@ function drawGridHeaders(
     ctx.fillRect(0, 0, width, totalHeaderHeight);
 
     ctx.fillStyle = outerTheme.filterHeaderBg ?? outerTheme.bgHeader;
-    ctx.fillRect(0, totalHeaderHeight, width, filterHeight);
+    ctx.fillRect(hasRowMarkers === true ? rowMarkerWidth ?? 0 : 0, totalHeaderHeight, width, filterHeight);
 
     const frameTime = performance.now();
     const [hCol, hRow] = hovered?.[0] ?? [];
@@ -985,7 +1011,8 @@ function drawGridHeaders(
                 enqueue,
                 frameTime,
                 getFilterCellRenderer,
-                getFilterCellContent
+                getFilterCellContent,
+                hasRowMarkers
             );
         }
 
@@ -2006,6 +2033,8 @@ export interface DrawGridArg {
     readonly renderStrategy: "single-buffer" | "double-buffer" | "direct";
     readonly enqueue: (item: Item) => void;
     readonly getCellRenderer: GetCellRendererCallback;
+    readonly hasRowMarkers?: boolean;
+    readonly rowMarkerWidth?: number;
 }
 
 function computeCanBlit(current: DrawGridArg, last: DrawGridArg | undefined): boolean | number {
@@ -2118,6 +2147,8 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         filterHeight,
         showFilter,
         getFilterCellContent,
+        hasRowMarkers,
+        rowMarkerWidth,
     } = arg;
 
     let { damage } = arg;
@@ -2240,7 +2271,9 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             hyperWrapping,
             enqueue,
             getCellRenderer,
-            getFilterCellContent
+            getFilterCellContent,
+            hasRowMarkers,
+            rowMarkerWidth
         );
 
         drawGridLines(

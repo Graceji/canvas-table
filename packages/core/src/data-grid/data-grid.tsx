@@ -282,6 +282,10 @@ export interface DataGridProps {
     readonly theme: Theme;
 
     readonly getCellRenderer: <T extends InnerGridCell>(cell: T) => CellRenderer<T> | undefined;
+
+    readonly hasRowMarkers?: boolean;
+
+    readonly rowMarkerWidth?: number;
 }
 
 type DamageUpdateList = readonly {
@@ -368,6 +372,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         showFilter,
         filterHeight,
         getFilterCellContent,
+        hasRowMarkers,
+        rowMarkerWidth,
     } = p;
     const translateX = p.translateX ?? 0;
     const translateY = p.translateY ?? 0;
@@ -750,7 +756,9 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             renderStrategy: experimental?.renderStrategy ?? (browserIsSafari.value ? "double-buffer" : "single-buffer"),
             getCellRenderer,
             verticalOnly,
-        };
+            hasRowMarkers,
+            rowMarkerWidth,
+        } as DrawGridArg;
 
         // This confusing bit of code due to some poor design. Long story short, the damage property is only used
         // with what is effectively the "last args" for the last normal draw anyway. We don't want the drawing code
@@ -761,9 +769,9 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         // basically made me do it. What choice did I have?
         if (current.damage === undefined) {
             lastArgsRef.current = current as any;
-            drawGrid(current as any, last);
+            drawGrid(current, last);
         } else {
-            drawGrid(current as any, undefined);
+            drawGrid(current, undefined);
         }
     }, [
         bufferA,
@@ -809,6 +817,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         lastWasTouch,
         getCellRenderer,
         verticalOnly,
+        hasRowMarkers,
+        rowMarkerWidth,
     ]);
 
     const lastDrawRef = React.useRef(draw);

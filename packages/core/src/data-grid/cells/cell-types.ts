@@ -28,6 +28,10 @@ export interface BaseDrawArgs {
     requestAnimationFrame: () => void;
 }
 
+export interface FilterDrawArgs<T extends InnerGridCell> extends DrawArgs<T> {
+    isRowMarkerCol: boolean;
+}
+
 /** @category Drawing */
 export interface DrawArgs<T extends InnerGridCell> extends BaseDrawArgs {
     cell: T;
