@@ -71,6 +71,7 @@ export interface ScrollingDataGridProps extends Props {
 
 const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
     const {
+        hasRowMarkers,
         columns,
         rows,
         rowHeight,
@@ -94,6 +95,7 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
         smoothScrollY = false,
         isDraggable,
         verticalOnly,
+        rowMarkerWidth,
     } = p;
     const { paddingRight, paddingBottom } = experimental ?? {};
 
@@ -264,6 +266,8 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
             update={onScrollUpdate}
             initialSize={initialSize}>
             <DataGridDnd
+                rowMarkerWidth={rowMarkerWidth}
+                hasRowMarkers={hasRowMarkers}
                 eventTargetRef={scrollRef}
                 width={clientWidth}
                 height={clientHeight}

@@ -30,6 +30,10 @@ export interface BaseDrawArgs {
     cell: InnerGridCell;
 }
 
+export interface FilterDrawArgs<T extends InnerGridCell> extends DrawArgs<T> {
+    isRowMarkerCol: boolean;
+}
+
 /** @category Drawing */
 
 export type DrawStateTuple = [any, (state: any) => void];

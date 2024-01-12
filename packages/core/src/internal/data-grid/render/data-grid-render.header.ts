@@ -1,4 +1,4 @@
-import type { GetCellRendererCallback, PrepResult } from "../../../cells/cell-types.js";
+import type { DrawArgs, FilterDrawArgs, GetCellRendererCallback, PrepResult } from "../../../cells/cell-types.js";
 import { intersectRect, pointInRect } from "../../../common/math.js";
 import type { RenderStateProvider } from "../../../common/render-state-provider.js";
 import { mergeAndRealizeTheme, type FullTheme, type Theme } from "../../../common/styles.js";
@@ -15,6 +15,7 @@ import {
     type DrawCellCallback,
     type InnerGridCell,
     type Item,
+    type GridCell,
 } from "../data-grid-types.js";
 import type { ImageWindowLoader } from "../image-window-loader-interface.js";
 import {
@@ -59,7 +60,9 @@ export function drawGridHeaders(
     renderStateProvider: RenderStateProvider,
     overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
     getFilterCellRenderer: GetCellRendererCallback,
-    getFilterCellContent: (cell: number) => InnerGridCell
+    getFilterCellContent: (cell: number) => InnerGridCell,
+    hasRowMarkers?: boolean,
+    rowMarkerWidth?: number
 ) {
     const totalHeaderHeight = headerHeight + groupHeaderHeight;
     if (totalHeaderHeight <= 0) return;
@@ -68,7 +71,7 @@ export function drawGridHeaders(
     ctx.fillRect(0, 0, width, totalHeaderHeight);
 
     ctx.fillStyle = outerTheme.filterHeaderBg ?? outerTheme.bgHeader;
-    ctx.fillRect(0, totalHeaderHeight, width, filterHeight);
+    ctx.fillRect(hasRowMarkers === true ? rowMarkerWidth ?? 0 : 0, totalHeaderHeight, width, filterHeight);
 
     const frameTime = performance.now();
     const hCol = hovered?.[0]?.[0];
@@ -156,7 +159,8 @@ export function drawGridHeaders(
                 renderStateProvider,
                 overrideCursor,
                 getFilterCellRenderer,
-                getFilterCellContent
+                getFilterCellContent,
+                hasRowMarkers
             );
         }
 
@@ -680,7 +684,8 @@ export function drawFilterCell(
     renderStateProvider: RenderStateProvider,
     overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
     getFilterCellRenderer: GetCellRendererCallback,
-    getFilterCellContent: (cell: number) => InnerGridCell
+    getFilterCellContent: (cell: number) => InnerGridCell,
+    hasRowMarkers?: boolean
 ) {
     let prepResult: PrepResult | undefined = undefined;
     const filterCell = getFilterCellContent?.(c.sourceIndex) ?? loadingCell;
@@ -705,33 +710,67 @@ export function drawFilterCell(
     // ctx.stroke();
 
     if (c.sourceIndex !== 0) {
-        prepResult = drawCell(
-            ctx,
-            filterCell,
-            c.sourceIndex,
-            -3,
-            isLastColumn,
-            false,
-            x,
-            y,
-            c.width,
-            filterHeight,
-            false, // accentCount > 0,
-            theme,
-            "", // fill ?? theme.bgCell,
-            imageLoader,
-            spriteManager,
-            hoverValue?.hoverAmount ?? 0,
-            hoverInfo,
-            hyperWrapping,
-            frameTime,
-            drawCellCallback,
-            prepResult,
-            enqueue,
-            renderStateProvider,
-            getFilterCellRenderer,
-            overrideCursor
-        );
+        // 是否是marker列filter行位置
+        const isRowMarkerCol = hasRowMarkers === true && c.sourceIndex === 0;
+
+        if (!isRowMarkerCol) {
+            prepResult = drawCell(
+                ctx,
+                filterCell,
+                c.sourceIndex,
+                -3,
+                isLastColumn,
+                false,
+                x,
+                y,
+                c.width,
+                filterHeight,
+                false, // accentCount > 0,
+                theme,
+                "", // fill ?? theme.bgCell,
+                imageLoader,
+                spriteManager,
+                hoverValue?.hoverAmount ?? 0,
+                hoverInfo,
+                hyperWrapping,
+                frameTime,
+                drawCellCallback,
+                prepResult,
+                enqueue,
+                renderStateProvider,
+                getFilterCellRenderer,
+                overrideCursor
+            );
+        } else {
+            // filter行索引列单元格由外部控制绘制
+            let hoverX: number | undefined;
+            let hoverY: number | undefined;
+            if (hoverInfo !== undefined && hoverInfo[0][0] === c.sourceIndex && hoverInfo[0][1] === -3) {
+                hoverX = hoverInfo[1][0];
+                hoverY = hoverInfo[1][1];
+            }
+            const r = getFilterCellRenderer(filterCell);
+            const args: FilterDrawArgs<typeof filterCell> = {
+                ctx,
+                theme,
+                col: c.sourceIndex,
+                row: -3,
+                cell: filterCell,
+                rect: { x, y, width: c.width, height: filterHeight },
+                highlighted: false,
+                hoverAmount: hoverValue?.hoverAmount ?? 0,
+                hoverX,
+                hoverY,
+                imageLoader,
+                spriteManager,
+                hyperWrapping,
+                isRowMarkerCol,
+                requestAnimationFrame: () => {
+                    // forceAnim = true;
+                },
+            };
+            drawCellCallback?.(args as DrawArgs<GridCell>, () => r?.draw(args, filterCell));
+        }
     }
 }
 

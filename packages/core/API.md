@@ -589,7 +589,7 @@ rowHeight: number | ((index: number) => number);
 ## rowMarkers
 
 ```ts
-rowMarkers?: "checkbox" | "number" | "both" | "none";
+rowMarkers?: "checkbox" | "number" | "both" | "none" | "expand-number-icon" | "expand-number" | "number-icon";
 ```
 
 `rowMarkers` determines whether to display the marker column on the very left. It defaults to `none`. Note that this column doesn't count as a table column, i.e. it has no index, and doesn't change column indexes.

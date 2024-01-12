@@ -20,6 +20,7 @@ import type { LinksCell } from "./cells/links-cell.js";
 import type { ButtonCell } from "./cells/button-cell.js";
 import type { TreeViewCell } from "./cells/tree-view-cell.js";
 import type { MultiSelectCell } from "./cells/multi-select-cell.js";
+import { createSampleTree, useCollapsingTreeRows } from "@glideapps/glide-data-grid-source";
 
 const SimpleWrapper = styled.div`
     box-sizing: border-box;
@@ -670,6 +671,10 @@ export const CustomTreeCell: React.VFC = () => {
     const columns = React.useMemo<GridColumn[]>(
         () => [
             {
+                title: "index",
+                width: 100,
+            },
+            {
                 title: "Name",
                 width: 250,
                 themeOverride: {
@@ -686,11 +691,11 @@ export const CustomTreeCell: React.VFC = () => {
     const getCellContent = React.useCallback(
         ([col, row]: readonly [number, number]): GridCell => {
             const node = rows[row];
+
             const field = columns[col].title;
 
             const {
                 name,
-                depth,
                 children: { length },
                 collapsed,
             } = node;
@@ -698,7 +703,7 @@ export const CustomTreeCell: React.VFC = () => {
             const collapsedString = node.children.length > 0 ? (collapsed ? "YES" : "NO") : "N/A";
 
             switch (field) {
-                case "Name":
+                case "index": {
                     return {
                         kind: GridCellKind.Custom,
                         data: {
@@ -706,14 +711,31 @@ export const CustomTreeCell: React.VFC = () => {
                             node,
                         },
                         allowOverlay: false,
+                    };
+                }
+                case "Name":
+                    return {
+                        kind: GridCellKind.Text,
+                        data: name,
+                        // data: {
+                        //     kind: "tree-cell",
+                        //     node,
+                        // },
+                        displayData: name,
+                        allowOverlay: false,
                         copyData: name,
                     };
 
                 case "Depth":
                     return {
-                        kind: GridCellKind.Number,
-                        data: depth,
-                        displayData: `${depth}`,
+                        // kind: GridCellKind.Number,
+                        // data: depth,
+                        kind: GridCellKind.Custom,
+                        data: {
+                            kind: "tree-cell",
+                            node,
+                        },
+                        // displayData: `${depth}`,
                         allowOverlay: false,
                     };
 
@@ -765,13 +787,22 @@ export const CustomTreeCell: React.VFC = () => {
                 {...cellProps}
                 getCellContent={getCellContent}
                 onCellEdited={(_, item) => {
+                    if (item.kind === "marker" && item.markerKind === "expand-number") {
+                        setRoot({ ...root });
+                    }
                     if (item.kind !== GridCellKind.Custom) return;
                     if (item.data.kind !== "tree-cell") return;
                     setRoot({ ...root });
                 }}
                 columns={columns}
-                rowMarkers={"none"}
+                rowMarkers={"expand-number"}
                 rows={rows.length}
+                rowMarkerWidth={100}
+                getMarkerContent={row => {
+                    return {
+                        node: rows[row],
+                    };
+                }}
             />
         </BeautifulWrapper>
     );

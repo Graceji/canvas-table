@@ -83,4 +83,6 @@ export interface DrawGridArg {
     readonly resizeIndicator: "full" | "header" | "none";
     readonly showFilter: boolean;
     readonly filterHeight: number;
+    readonly hasRowMarkers?: boolean;
+    readonly rowMarkerWidth?: number;
 }
