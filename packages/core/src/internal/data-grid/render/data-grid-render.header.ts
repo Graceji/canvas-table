@@ -159,8 +159,7 @@ export function drawGridHeaders(
                 renderStateProvider,
                 overrideCursor,
                 getFilterCellRenderer,
-                getFilterCellContent,
-                hasRowMarkers
+                getFilterCellContent
             );
         }
 
@@ -684,8 +683,7 @@ export function drawFilterCell(
     renderStateProvider: RenderStateProvider,
     overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
     getFilterCellRenderer: GetCellRendererCallback,
-    getFilterCellContent?: (cell: number) => InnerGridCell,
-    hasRowMarkers?: boolean
+    getFilterCellContent?: (cell: number) => InnerGridCell
 ) {
     let prepResult: PrepResult | undefined = undefined;
     const filterCell = getFilterCellContent?.(c.sourceIndex) ?? loadingCell;
@@ -701,77 +699,33 @@ export function drawFilterCell(
         }
     }
 
-    // ctx.moveTo(0, totalHeaderHeight - 0.5);
-    // ctx.lineTo(width, totalHeaderHeight - 0.5);
-    // ctx.strokeStyle = blend(
-    //     theme.headerBottomBorderColor ?? theme.horizontalBorderColor ?? theme.borderColor,
-    //     theme.bgHeader
-    // );
-    // ctx.stroke();
-
-    if (c.sourceIndex !== 0) {
-        // 是否是marker列filter行位置
-        const isRowMarkerCol = hasRowMarkers === true && c.sourceIndex === 0;
-
-        if (!isRowMarkerCol) {
-            prepResult = drawCell(
-                ctx,
-                filterCell,
-                c.sourceIndex,
-                -3,
-                isLastColumn,
-                false,
-                x,
-                y,
-                c.width,
-                filterHeight,
-                false, // accentCount > 0,
-                theme,
-                "", // fill ?? theme.bgCell,
-                imageLoader,
-                spriteManager,
-                hoverValue?.hoverAmount ?? 0,
-                hoverInfo,
-                hyperWrapping,
-                frameTime,
-                drawCellCallback,
-                prepResult,
-                enqueue,
-                renderStateProvider,
-                getFilterCellRenderer,
-                overrideCursor
-            );
-        } else {
-            // filter行索引列单元格由外部控制绘制
-            let hoverX: number | undefined;
-            let hoverY: number | undefined;
-            if (hoverInfo !== undefined && hoverInfo[0][0] === c.sourceIndex && hoverInfo[0][1] === -3) {
-                hoverX = hoverInfo[1][0];
-                hoverY = hoverInfo[1][1];
-            }
-            const r = getFilterCellRenderer(filterCell);
-            const args: FilterDrawArgs<typeof filterCell> = {
-                ctx,
-                theme,
-                col: c.sourceIndex,
-                row: -3,
-                cell: filterCell,
-                rect: { x, y, width: c.width, height: filterHeight },
-                highlighted: false,
-                hoverAmount: hoverValue?.hoverAmount ?? 0,
-                hoverX,
-                hoverY,
-                imageLoader,
-                spriteManager,
-                hyperWrapping,
-                isRowMarkerCol,
-                requestAnimationFrame: () => {
-                    // forceAnim = true;
-                },
-            };
-            drawCellCallback?.(args as DrawArgs<GridCell>, () => r?.draw(args, filterCell));
-        }
-    }
+    prepResult = drawCell(
+        ctx,
+        filterCell,
+        c.sourceIndex,
+        -3,
+        isLastColumn,
+        false,
+        x,
+        y,
+        c.width,
+        filterHeight,
+        false, // accentCount > 0,
+        theme,
+        "", // fill ?? theme.bgCell,
+        imageLoader,
+        spriteManager,
+        hoverValue?.hoverAmount ?? 0,
+        hoverInfo,
+        hyperWrapping,
+        frameTime,
+        drawCellCallback,
+        prepResult,
+        enqueue,
+        renderStateProvider,
+        getFilterCellRenderer,
+        overrideCursor
+    );
 }
 
 export function drawHeader(

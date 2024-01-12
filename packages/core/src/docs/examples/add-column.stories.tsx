@@ -41,12 +41,16 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
     const [filterValue, setFilterValue] = useState("filter");
 
     const getFilterCellContent = (col: number): GridCell => {
-        return {
-            kind: GridCellKind.Text,
-            data: filterValue,
-            displayData: filterValue,
-            allowOverlay: true,
-        };
+        if (col !== 0) {
+            return {
+                kind: GridCellKind.Text,
+                data: filterValue,
+                displayData: filterValue,
+                allowOverlay: true,
+            };
+        }
+
+        return null;
     };
 
     return (
