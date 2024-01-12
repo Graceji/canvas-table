@@ -793,7 +793,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         rows: rowsIn,
         getCellContent,
         getMarkerContent,
-        getFilterCellContent = () => undefined,
+        getFilterCellContent,
         onCellClicked,
         onCellActivated,
         onFillPattern,
@@ -4199,6 +4199,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 inWidth={width ?? idealWidth}
                 inHeight={height ?? idealHeight}>
                 <DataGridSearch
+                    showFilter={showFilter}
+                    filterHeight={filterHeight}
                     rowMarkerWidth={rowMarkerWidth}
                     hasRowMarkers={hasRowMarkers}
                     fillHandle={fillHandle}
@@ -4291,8 +4293,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     resizeIndicator={resizeIndicator}
                     scrollToEnd={scrollToEnd}
                     verticalOnly={verticalOnly}
-                    showFilter={showFilter}
-                    filterHeight={filterHeight}
                     getFilterCellContent={getFilterCellContent}
                 />
                 {renameGroupNode}

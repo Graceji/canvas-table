@@ -113,7 +113,7 @@ export interface DataGridProps {
     readonly eventTargetRef: React.MutableRefObject<HTMLDivElement | null> | undefined;
 
     readonly getCellContent: (cell: Item, forceStrict?: boolean) => InnerGridCell;
-    readonly getFilterCellContent?: (col: number, forceStrict?: boolean) => InnerGridCell | undefined;
+    readonly getFilterCellContent?: (col: number) => InnerGridCell;
 
     /**
      * Provides additional details about groups to extend group functionality.
@@ -826,8 +826,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             rows,
             drawFocus: drawFocusRing,
             getCellContent,
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            getFilterCellContent: getFilterCellContent!,
+            getFilterCellContent,
             getGroupDetails: getGroupDetails ?? (name => ({ name })),
             getRowThemeOverride,
             drawHeaderCallback,

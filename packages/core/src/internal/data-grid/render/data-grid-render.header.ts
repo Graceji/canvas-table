@@ -684,7 +684,7 @@ export function drawFilterCell(
     renderStateProvider: RenderStateProvider,
     overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
     getFilterCellRenderer: GetCellRendererCallback,
-    getFilterCellContent: (cell: number) => InnerGridCell,
+    getFilterCellContent?: (cell: number) => InnerGridCell,
     hasRowMarkers?: boolean
 ) {
     let prepResult: PrepResult | undefined = undefined;

@@ -40,7 +40,7 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
     const { cols, getCellContent } = useMockDataGenerator(p.columnsCount);
     const [filterValue, setFilterValue] = useState("filter");
 
-    const getFilterCellContent = param => {
+    const getFilterCellContent = (col: number): GridCell => {
         return {
             kind: GridCellKind.Text,
             data: filterValue,
@@ -67,14 +67,14 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
             rowMarkers="number-icon"
             rowMarkerWidth={75}
             getCellContent={getCellContent}
-            onCellEdited={(cell, newValue) => {
-                if (newValue.kind === "marker") {
-                    console.log(cell, newValue);
+            // onCellEdited={(cell, newValue) => {
+            //     if (newValue.kind === "marker") {
+            //         console.log(cell, newValue);
 
-                    return;
-                }
-                setFilterValue(newValue.data);
-            }}
+            //         return;
+            //     }
+            //     setFilterValue(newValue.data);
+            // }}
             getFilterCellContent={getFilterCellContent}
             experimental={{ strict: true }}
             columns={cols}

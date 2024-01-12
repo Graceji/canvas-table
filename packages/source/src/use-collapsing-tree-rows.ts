@@ -28,12 +28,14 @@ const flattenTree = (tree: TreeNode): TreeNode[] => {
 
 export function createSampleTree(): TreeNode {
     const root = createNode("Root");
+    root.collapsed = true;
 
     names.forEach((nameX, idx) => {
         const nodeX = createNode(nameX);
         nodeX.pid = root.id;
         nodeX.isLast = idx === names.length - 1;
         root.children.push(nodeX);
+        nodeX.collapsed = true;
         names.forEach((nameY, subIdx) => {
             const nameXY = `${nameX} ${nameY}`;
             const nodeY = createNode(nameXY);

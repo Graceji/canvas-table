@@ -96,6 +96,8 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
         isDraggable,
         verticalOnly,
         rowMarkerWidth,
+        filterHeight,
+        showFilter,
     } = p;
     const { paddingRight, paddingBottom } = experimental ?? {};
 
@@ -107,7 +109,9 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
 
     const width = nonGrowWidth + Math.max(0, overscrollX ?? 0);
 
-    let height = enableGroups ? headerHeight + groupHeaderHeight : headerHeight;
+    const totalHeaderHeight = showFilter ? headerHeight + filterHeight : headerHeight;
+
+    let height = enableGroups ? totalHeaderHeight + groupHeaderHeight : totalHeaderHeight;
     if (typeof rowHeight === "number") {
         height += rows * rowHeight;
     } else {
