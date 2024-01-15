@@ -525,6 +525,8 @@ export interface DataEditorProps extends Props {
      */
     readonly getCellContent: (cell: Item) => GridCell;
 
+    readonly getFilterCellContent?: (col: number) => GridCell;
+
     /**
      * The primary callback for getting marker cell data into the data grid.
      * @group Data
@@ -904,6 +906,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const [getCellsForSelection, getCellsForSeletionDirect] = useCellsForSelection(
         getCellsForSelectionIn,
         getCellContent,
+        getFilterCellContent,
         rowMarkerOffset,
         abortControllerRef.current,
         rows

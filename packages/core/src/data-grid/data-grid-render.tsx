@@ -38,7 +38,7 @@ import {
 import type { SpriteManager, SpriteVariant } from "./data-grid-sprites";
 import type { Theme } from "../common/styles";
 import { blend, withAlpha } from "./color-parser";
-import type { DrawArgs, FilterDrawArgs, GetCellRendererCallback, PrepResult } from "./cells/cell-types";
+import type { DrawArgs, GetCellRendererCallback, PrepResult } from "./cells/cell-types";
 import { assert, deepEqual } from "../common/support";
 import { direction } from "../common/utils";
 
