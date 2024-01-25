@@ -107,7 +107,8 @@ export function drawCells(
     renderStateProvider: RenderStateProvider,
     getCellRenderer: GetCellRendererCallback,
     overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
-    minimumCellWidth: number
+    minimumCellWidth: number,
+    showAccent?: boolean
 ): Rectangle[] | undefined {
     let toDraw = damage?.size ?? Number.MAX_SAFE_INTEGER;
     const frameTime = performance.now();
@@ -290,7 +291,7 @@ export function drawCells(
                     }
                     if (!isSelected) {
                         if (rowSelected) accentCount++;
-                        if (colSelected && !isTrailingRow) accentCount++;
+                        if (showAccent === true && colSelected && !isTrailingRow) accentCount++;
                     }
 
                     const bgCell = cell.kind === GridCellKind.Protected ? theme.bgCellMedium : theme.bgCell;
@@ -301,7 +302,7 @@ export function drawCells(
 
                     if (accentCount > 0 || rowDisabled) {
                         if (rowDisabled) {
-                            fill = blend(theme.bgHeader, fill);
+                            fill = blend(theme.bgHeaderDisabled, fill);
                         }
                         for (let i = 0; i < accentCount; i++) {
                             fill = blend(theme.accentLight, fill);

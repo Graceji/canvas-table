@@ -32,6 +32,7 @@ import {
     type FillHandleDirection,
     type EditListItem,
     type CellActiviationBehavior,
+    type MarkerFn,
 } from "../internal/data-grid/data-grid-types.js";
 import DataGridSearch, { type DataGridSearchProps } from "../internal/data-grid-search/data-grid-search.js";
 import { browserIsOSX } from "../common/browser-detect.js";
@@ -259,6 +260,12 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
      * @group Editing
      */
     readonly onFinishedEditing?: (newValue: GridCell | undefined, movement: Item) => void;
+
+    /** Emitted editing, regardless of data changing or not.
+     * @group Editing
+     */
+    readonly onEditing?: (newValue: GridCell | undefined) => void;
+
     /** Emitted when a column header should show a context menu. Usually right click.
      * @group Events
      */
@@ -304,6 +311,8 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
         readonly addIcon?: string;
         /** Overrides the column to focus when a new row is created. */
         readonly targetColumn?: number | GridColumn;
+        /** hint 是否显示在marker列 */
+        readonly marker?: boolean;
     };
     /** Controls the height of the header row
      * @defaultValue 36
@@ -334,6 +343,7 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
      * @group Style
      */
     readonly rowMarkers?: RowMarkerOptions["kind"] | RowMarkerOptions;
+    readonly rowMarkerFns?: MarkerFn[];
     /**
      * Sets the width of row markers in pixels, if unset row markers will automatically size.
      * @group Style
@@ -766,6 +776,8 @@ const emptyGridSelection: GridSelection = {
     current: undefined,
 };
 
+const emptyMarkerFns = [] as MarkerFn[];
+
 const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorProps> = (p, forwardedRef) => {
     const [gridSelectionInner, setGridSelectionInner] = React.useState<GridSelection>(emptyGridSelection);
 
@@ -786,6 +798,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const safeWindow = typeof window === "undefined" ? null : window;
 
     const {
+        rowMarkerFns = emptyMarkerFns,
         imageEditorOverride,
         getRowThemeOverride: getRowThemeOverrideIn,
         markdownDivCreateNode,
@@ -799,6 +812,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         onCellClicked,
         onCellActivated,
         onFillPattern,
+        onEditing,
         onFinishedEditing,
         coercePasteValue,
         drawHeader: drawHeaderIn,
@@ -901,6 +915,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         verticalOnly = false,
         showFilter = false,
         filterHeight = 20,
+        showAccent = false,
     } = p;
 
     const drawFocusRing = drawFocusRingIn === "no-editor" ? overlay === undefined : drawFocusRingIn;
@@ -1311,6 +1326,27 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             const isRowMarkerCol = col === 0 && hasRowMarkers;
             if (isRowMarkerCol) {
                 if (isTrailing) {
+                    if (trailingRowOptions?.marker === true) {
+                        const isFirst = col === 0;
+
+                        const maybeFirstColumnHint = isFirst ? trailingRowOptions?.hint ?? "" : "";
+                        const c = mangledColsRef.current[col];
+
+                        if (c?.trailingRowOptions?.disabled === true) {
+                            return loadingCell;
+                        } else {
+                            const hint = c?.trailingRowOptions?.hint ?? maybeFirstColumnHint;
+                            const icon = c?.trailingRowOptions?.addIcon ?? trailingRowOptions?.addIcon;
+                            const showAddIcon = c?.trailingRowOptions?.showAddIcon;
+                            return {
+                                kind: InnerGridCellKind.NewRow,
+                                hint,
+                                allowOverlay: false,
+                                icon,
+                                showAddIcon,
+                            };
+                        }
+                    }
                     return loadingCell;
                 }
                 const mappedRow = rowNumberMapper(row);
@@ -1324,7 +1360,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     markerKind: rowMarkers === "clickable-number" ? "number" : rowMarkers,
                     row: rowMarkerStartIndex + mappedRow,
                     drawHandle: onRowMoved !== undefined,
-                    cursor: rowMarkers === "clickable-number" ? "pointer" : undefined,
+                    cursor: "pointer", // rowMarkers === "clickable-number" ? "pointer" : undefined,
+                    functions: rowMarkerFns,
                 } as MarkerCell;
 
                 const outerResult = getMarkerContent?.(row);
@@ -1338,7 +1375,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 //If the grid is empty, we will return text
                 const isFirst = col === rowMarkerOffset;
 
-                const maybeFirstColumnHint = isFirst ? trailingRowOptions?.hint ?? "" : "";
+                const maybeFirstColumnHint =
+                    // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+                    isFirst && !trailingRowOptions?.marker ? trailingRowOptions?.hint ?? "" : "";
                 const c = mangledColsRef.current[col];
 
                 if (c?.trailingRowOptions?.disabled === true) {
@@ -1381,7 +1420,10 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         return loadingCell;
                     }
                 }
-                let result = getCellContent([outerCol, row]);
+                let result =
+                    row === -3 && getFilterCellContent
+                        ? getFilterCellContent(outerCol)
+                        : getCellContent([outerCol, row]);
                 if (rowMarkerOffset !== 0 && result.span !== undefined) {
                     result = {
                         ...result, // FIXME: Mutate
@@ -1401,11 +1443,14 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             rowMarkers,
             rowMarkerStartIndex,
             onRowMoved,
+            rowMarkerFns,
             getMarkerContent,
-            rowMarkerOffset,
+            trailingRowOptions?.marker,
             trailingRowOptions?.hint,
             trailingRowOptions?.addIcon,
+            rowMarkerOffset,
             experimental?.strict,
+            getFilterCellContent,
             getCellContent,
         ]
     );
@@ -1950,6 +1995,41 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         const startedFromLastSticky =
                             lastRowSticky && gridSelection !== undefined && gridSelection.current?.cell[1] === rows;
 
+                        // const isSelected = selectedRows.hasIndex(row);
+                        // let newRows: CompactSelection;
+
+                        // const lastHighlighted = lastSelectedRowRef.current;
+                        // if (
+                        //     rowSelect === "multi" &&
+                        //     (args.shiftKey || args.isLongTouch === true) &&
+                        //     lastHighlighted !== undefined &&
+                        //     selectedRows.hasIndex(lastHighlighted)
+                        // ) {
+                        //     const newSlice: Slice = [
+                        //         Math.min(lastHighlighted, row),
+                        //         Math.max(lastHighlighted, row) + 1,
+                        //     ];
+
+                        //     // eslint-disable-next-line unicorn/prefer-ternary
+                        //     if (isMultiRow || rowSelectionMode === "multi") {
+                        //         newRows = getSelectedRows(undefined, newSlice);
+                        //     } else {
+                        //         newRows = getSelectedRows(CompactSelection.fromSingleSelection(newSlice), undefined);
+                        //     }
+                        // } else if (isMultiRow || args.isTouch || rowSelectionMode === "multi") {
+                        //     if (isSelected) {
+                        //         newRows = getSelectedRows(selectedRows.remove(row), undefined);
+                        //     } else {
+                        //         newRows = getSelectedRows(undefined, row);
+                        //         lastSelectedRowRef.current = row;
+                        //     }
+                        // } else if (isSelected && selectedRows.length === 1) {
+                        //     newRows = getSelectedRows(CompactSelection.empty(), undefined);
+                        // } else {
+                        //     newRows = getSelectedRows(CompactSelection.fromSingleSelection(row), undefined);
+                        //     lastSelectedRowRef.current = row;
+                        // }
+
                         if (
                             rowSelect === "multi" &&
                             (args.shiftKey || args.isLongTouch === true) &&
@@ -1982,7 +2062,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                                 isMultiKey,
                                 "click"
                             );
-                            lastSelectedRowRef.current = undefined;
+                            // lastSelectedRowRef.current = undefined;
                             focus();
                         } else {
                             setCurrent(
@@ -1994,7 +2074,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                                 isMultiKey,
                                 "click"
                             );
-                            lastSelectedRowRef.current = undefined;
+                            // lastSelectedRowRef.current = undefined;
                             setOverlay(undefined);
                             focus();
                         }
@@ -2528,9 +2608,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             }
 
             if (args.kind === "header") {
-                if (clickLocation < 0) {
-                    return;
-                }
+                // if (clickLocation < 0) {
+                //     return;
+                // }
 
                 if (args.isEdge) {
                     if (args.isDoubleClick === true) {
@@ -3123,6 +3203,16 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             setGridSelection,
             setCurrent,
         ]
+    );
+
+    const onEditingIn = React.useCallback(
+        (newValue: GridCell | undefined) => {
+            if (overlay?.cell !== undefined && newValue !== undefined && isEditableGridCell(newValue)) {
+                mangledOnCellsEdited([{ location: overlay.cell, value: newValue }]);
+            }
+            onEditing?.(newValue);
+        },
+        [overlay?.cell, onEditing, mangledOnCellsEdited]
     );
 
     const onFinishEditing = React.useCallback(
@@ -4297,6 +4387,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     scrollToEnd={scrollToEnd}
                     verticalOnly={verticalOnly}
                     getFilterCellContent={getFilterCellContent}
+                    showAccent={showAccent}
                 />
                 {renameGroupNode}
                 {overlay !== undefined && (
@@ -4313,6 +4404,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             onFinishEditing={onFinishEditing}
                             markdownDivCreateNode={markdownDivCreateNode}
                             isOutsideClick={isOutsideClick}
+                            onEditing={onEditingIn}
                         />
                     </React.Suspense>
                 )}

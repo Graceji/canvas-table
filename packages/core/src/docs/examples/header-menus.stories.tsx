@@ -128,9 +128,9 @@ export const HeaderMenus: React.VFC = () => {
         setMenu({ col, bounds });
     }, []);
 
-    const onHeaderClicked = React.useCallback(() => {
+    const onHeaderClicked = React.useCallback((location, event) => {
         // eslint-disable-next-line no-console
-        console.log("Header clicked");
+        console.log("Header clicked", location, event);
     }, []);
 
     return (

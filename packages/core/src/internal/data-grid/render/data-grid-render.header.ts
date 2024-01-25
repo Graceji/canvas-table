@@ -62,7 +62,8 @@ export function drawGridHeaders(
     getFilterCellRenderer: GetCellRendererCallback,
     getFilterCellContent: (cell: number) => InnerGridCell,
     hasRowMarkers?: boolean,
-    rowMarkerWidth?: number
+    rowMarkerWidth?: number,
+    showAccent?: boolean
 ) {
     const totalHeaderHeight = headerHeight + groupHeaderHeight;
     if (totalHeaderHeight <= 0) return;
@@ -118,7 +119,7 @@ export function drawGridHeaders(
         const y = enableGroups ? groupHeaderHeight : 0;
         const xOffset = c.sourceIndex === 0 ? 0 : 1;
 
-        if (selected) {
+        if (selected && showAccent === true) {
             ctx.fillStyle = bgFillStyle;
             ctx.fillRect(x + xOffset, y, c.width - xOffset, headerHeight);
         } else if (hasSelectedCell || hover > 0) {
@@ -176,6 +177,7 @@ export function drawGridHeaders(
             hoveredBoolean ? hPosX : undefined,
             hoveredBoolean ? hPosY : undefined,
             hasSelectedCell,
+            hovered,
             hover,
             spriteManager,
             drawHeaderCallback,
@@ -741,6 +743,7 @@ export function drawHeader(
     posX: number | undefined,
     posY: number | undefined,
     hasSelectedCell: boolean,
+    hoverInfo: HoverInfo | undefined,
     hoverAmount: number,
     spriteManager: SpriteManager,
     drawHeaderCallback: DrawHeaderCallback | undefined,
@@ -748,6 +751,13 @@ export function drawHeader(
 ) {
     const isRtl = direction(c.title) === "rtl";
     const headerLayout = computeHeaderLayout(ctx, c, x, y, width, height, theme, isRtl);
+
+    let hoverX: number | undefined;
+    let hoverY: number | undefined;
+    if (hoverInfo !== undefined && hoverInfo[0][0] === 0 && hoverInfo[0][1] === -1) {
+        hoverX = hoverInfo[1][0];
+        hoverY = hoverInfo[1][1];
+    }
 
     if (drawHeaderCallback !== undefined) {
         drawHeaderCallback(
@@ -763,6 +773,8 @@ export function drawHeader(
                 hasSelectedCell,
                 spriteManager,
                 menuBounds: headerLayout?.menuBounds ?? { x: 0, y: 0, height: 0, width: 0 },
+                hoverX,
+                hoverY,
             },
             () =>
                 drawHeaderInner(

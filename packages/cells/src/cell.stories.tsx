@@ -798,6 +798,26 @@ export const CustomTreeCell: React.VFC = () => {
                 rowMarkers={"expand-number"}
                 rows={rows.length}
                 rowMarkerWidth={100}
+                rowMarkerFns={[
+                    {
+                        type: "number",
+                        order: 2,
+                        start: 0,
+                        end: 0,
+                    },
+                    {
+                        type: "number",
+                        order: 3,
+                        start: 0,
+                        end: 0,
+                    },
+                    {
+                        type: "expand",
+                        order: 1,
+                        start: 0,
+                        end: 0,
+                    },
+                ]}
                 getMarkerContent={row => {
                     return {
                         node: rows[row],

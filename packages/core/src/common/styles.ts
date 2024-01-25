@@ -50,6 +50,7 @@ export function makeCSSStyle(theme: Theme): Record<string, string> {
 /** @category Theme */
 export interface Theme {
     accentColor: string;
+    accentWidth: number;
     accentFg: string;
     accentLight: string;
     textDark: string;
@@ -58,14 +59,18 @@ export interface Theme {
     textBubble: string;
     bgIconHeader: string;
     fgIconHeader: string;
+    bgIconHeaderHovered: string;
+    fgIconHeaderHovered: string;
     textHeader: string;
     textGroupHeader?: string;
     textHeaderSelected: string;
     bgCell: string;
     bgCellMedium: string;
     bgHeader: string;
+    bgHeaderDisabled: string;
     bgHeaderHasFocus: string;
     bgHeaderHovered: string;
+    bgNewRowHovered: string;
     bgBubble: string;
     bgBubbleSelected: string;
     bgSearchResult: string;
@@ -76,6 +81,7 @@ export interface Theme {
     cellVerticalPadding: number;
     headerFontStyle: string;
     headerIconSize: number;
+    markerIconSize: number;
     baseFontStyle: string;
     markerFontStyle: string;
     fontFamily: string;
@@ -86,9 +92,12 @@ export interface Theme {
     headerBottomBorderColor?: string;
     roundingRadius?: number;
     filterHeaderBg?: string;
+    markLine: string;
+    markerTextLight: string;
 }
 
 const dataEditorBaseTheme: Theme = {
+    accentWidth: 1,
     accentColor: "#4F5DFF",
     accentFg: "#FFFFFF",
     accentLight: "rgba(62, 116, 253, 0.1)",
@@ -97,9 +106,12 @@ const dataEditorBaseTheme: Theme = {
     textMedium: "#737383",
     textLight: "#B2B2C0",
     textBubble: "#313139",
+    markerTextLight: "#B2B2C0",
 
     bgIconHeader: "#737383",
     fgIconHeader: "#FFFFFF",
+    bgIconHeaderHovered: "#000000",
+    fgIconHeaderHovered: "#f3f4ef",
     textHeader: "#313139",
     textGroupHeader: "#313139BB",
     textHeaderSelected: "#FFFFFF",
@@ -107,8 +119,10 @@ const dataEditorBaseTheme: Theme = {
     bgCell: "#FFFFFF",
     bgCellMedium: "#FAFAFB",
     bgHeader: "#F7F7F8",
+    bgHeaderDisabled: "#F7F7F8",
     bgHeaderHasFocus: "#E9E9EB",
     bgHeaderHovered: "#EFEFF1",
+    bgNewRowHovered: "#EFEFF1",
 
     bgBubble: "#EDEDF3",
     bgBubbleSelected: "#FFFFFF",
@@ -120,18 +134,20 @@ const dataEditorBaseTheme: Theme = {
 
     linkColor: "#353fb5",
 
-    cellHorizontalPadding: 8,
+    cellHorizontalPadding: 3,
     cellVerticalPadding: 3,
 
     headerIconSize: 18,
+    markerIconSize: 18,
 
     headerFontStyle: "600 13px",
     baseFontStyle: "13px",
-    markerFontStyle: "9px",
+    markerFontStyle: "13px",
     fontFamily:
         "Inter, Roboto, -apple-system, BlinkMacSystemFont, avenir next, avenir, segoe ui, helvetica neue, helvetica, Ubuntu, noto, arial, sans-serif",
     editorFontSize: "13px",
     lineHeight: 1.4, //unitless scaler depends on your font
+    markLine: "#313139",
 };
 
 export interface FullTheme extends Theme {

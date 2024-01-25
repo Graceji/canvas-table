@@ -18,7 +18,7 @@ function drawNewRowCell(args: BaseDrawArgs, data: string, showAddIcon = true, ic
     ctx.beginPath();
     ctx.globalAlpha = hoverAmount;
     ctx.rect(x + 1, y + 1, w, h - 2);
-    ctx.fillStyle = theme.bgHeaderHovered;
+    ctx.fillStyle = theme.bgNewRowHovered;
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.beginPath();

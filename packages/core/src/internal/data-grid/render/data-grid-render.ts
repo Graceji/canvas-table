@@ -172,6 +172,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         getFilterCellContent,
         hasRowMarkers,
         rowMarkerWidth,
+        showAccent,
     } = arg;
     if (width === 0 || height === 0) return;
     const doubleBuffer = renderStrategy === "double-buffer";
@@ -305,7 +306,8 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             getCellRenderer,
             getFilterCellContent,
             hasRowMarkers,
-            rowMarkerWidth
+            rowMarkerWidth,
+            showAccent
         );
 
         drawGridLines(
@@ -456,7 +458,8 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
                 renderStateProvider,
                 getCellRenderer,
                 overrideCursor,
-                minimumCellWidth
+                minimumCellWidth,
+                showAccent
             );
 
             const selectionCurrent = selection.current;
@@ -641,103 +644,117 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         targetCtx.fillRect(0, 0, width, height);
     }
 
-    const spans = drawCells(
-        targetCtx,
-        effectiveCols,
-        mappedColumns,
-        height,
-        totalHeaderHeight,
-        translateX,
-        translateY,
-        cellYOffset,
-        rows,
-        getRowHeight,
-        getCellContent,
-        getGroupDetails,
-        getRowThemeOverride,
-        disabledRows,
-        isFocused,
-        drawFocus,
-        freezeTrailingRows,
-        hasAppendRow,
-        drawRegions,
-        damage,
-        selection,
-        prelightCells,
-        highlightRegions,
-        imageLoader,
-        spriteManager,
-        hoverValues,
-        hoverInfo,
-        drawCellCallback,
-        hyperWrapping,
-        theme,
-        enqueue,
-        renderStateProvider,
-        getCellRenderer,
-        overrideCursor,
-        minimumCellWidth
-    );
+    if (rows > 0) {
+        const spans = drawCells(
+            targetCtx,
+            effectiveCols,
+            mappedColumns,
+            height,
+            totalHeaderHeight,
+            translateX,
+            translateY,
+            cellYOffset,
+            rows,
+            getRowHeight,
+            getCellContent,
+            getGroupDetails,
+            getRowThemeOverride,
+            disabledRows,
+            isFocused,
+            drawFocus,
+            freezeTrailingRows,
+            hasAppendRow,
+            drawRegions,
+            damage,
+            selection,
+            prelightCells,
+            highlightRegions,
+            imageLoader,
+            spriteManager,
+            hoverValues,
+            hoverInfo,
+            drawCellCallback,
+            hyperWrapping,
+            theme,
+            enqueue,
+            renderStateProvider,
+            getCellRenderer,
+            overrideCursor,
+            minimumCellWidth,
+            showAccent
+        );
+        drawBlanks(
+            targetCtx,
+            effectiveCols,
+            mappedColumns,
+            width,
+            height,
+            totalHeaderHeight,
+            translateX,
+            translateY,
+            cellYOffset,
+            rows,
+            getRowHeight,
+            getRowThemeOverride,
+            selection.rows,
+            disabledRows,
+            freezeTrailingRows,
+            hasAppendRow,
+            drawRegions,
+            damage,
+            theme
+        );
 
-    drawBlanks(
-        targetCtx,
-        effectiveCols,
-        mappedColumns,
-        width,
-        height,
-        totalHeaderHeight,
-        translateX,
-        translateY,
-        cellYOffset,
-        rows,
-        getRowHeight,
-        getRowThemeOverride,
-        selection.rows,
-        disabledRows,
-        freezeTrailingRows,
-        hasAppendRow,
-        drawRegions,
-        damage,
-        theme
-    );
+        drawExtraRowThemes(
+            targetCtx,
+            effectiveCols,
+            cellYOffset,
+            translateX,
+            translateY,
+            width,
+            height,
+            drawRegions,
+            totalHeaderHeight,
+            getRowHeight,
+            getRowThemeOverride,
+            verticalBorder,
+            freezeTrailingRows,
+            rows,
+            theme
+        );
 
-    drawExtraRowThemes(
-        targetCtx,
-        effectiveCols,
-        cellYOffset,
-        translateX,
-        translateY,
-        width,
-        height,
-        drawRegions,
-        totalHeaderHeight,
-        getRowHeight,
-        getRowThemeOverride,
-        verticalBorder,
-        freezeTrailingRows,
-        rows,
-        theme
-    );
+        drawGridLines(
+            targetCtx,
+            effectiveCols,
+            cellYOffset,
+            translateX,
+            translateY,
+            width,
+            height,
+            drawRegions,
+            spans,
+            groupHeaderHeight,
+            totalHeaderHeight,
+            getRowHeight,
+            getRowThemeOverride,
+            verticalBorder,
+            freezeTrailingRows,
+            rows,
+            theme
+        );
+    } else {
+        targetCtx.fillStyle = "#000";
 
-    drawGridLines(
-        targetCtx,
-        effectiveCols,
-        cellYOffset,
-        translateX,
-        translateY,
-        width,
-        height,
-        drawRegions,
-        spans,
-        groupHeaderHeight,
-        totalHeaderHeight,
-        getRowHeight,
-        getRowThemeOverride,
-        verticalBorder,
-        freezeTrailingRows,
-        rows,
-        theme
-    );
+        spriteManager.addAdditionalIcon("noData", () => {
+            return `<svg class="ant-empty-img-simple" width="64" height="41" viewBox="0 0 64 41" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0 1)" fill="none" fill-rule="evenodd"><ellipse fill="#232323" class="ant-empty-img-simple-ellipse" cx="32" cy="33" rx="32" ry="7"></ellipse><g class="ant-empty-img-simple-g" fill-rule="nonzero"><path stroke="#7b7d80" d="M55 12.76L44.854 1.258C44.367.474 43.656 0 42.907 0H21.093c-.749 0-1.46.474-1.947 1.257L9 12.761V22h46v-9.24z"></path><path fill="#232323" d="M41.613 15.931c0-1.605.994-2.93 2.227-2.931H55v18.137C55 33.26 53.68 35 52.05 35h-40.1C10.32 35 9 33.259 9 31.137V13h11.16c1.233 0 2.227 1.323 2.227 2.928v.022c0 1.605 1.005 2.901 2.237 2.901h14.752c1.232 0 2.237-1.308 2.237-2.913v-.007z" class="ant-empty-img-simple-path"></path></g></g></svg>`;
+        });
+        spriteManager.drawSprite("noData", "normal", targetCtx, width / 2 - 32, height / 2 - 20.5, 64, theme, 1, 41);
+
+        targetCtx.fillStyle = "#7b7d80";
+        targetCtx.font = `13px ${theme.fontFamily}`;
+        const textWidth = targetCtx.measureText("暂无数据").width;
+        targetCtx.fillText("暂无数据", width / 2 - textWidth / 2, height / 2 + 41);
+    }
 
     highlightRedraw?.();
     focusRedraw?.();

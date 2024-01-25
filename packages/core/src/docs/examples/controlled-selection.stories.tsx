@@ -31,6 +31,26 @@ export const ControlledSelection: React.VFC = () => {
         rows: CompactSelection.empty(),
     });
 
+    const onSelectionChange = (newSel: GridSelection) => {
+        let newRows = CompactSelection.empty();
+        if (newSel.current !== undefined) {
+            const newSelection: Slice = [newSel.current.range.y, newSel.current.range.y + newSel.current.range.height];
+            // eslint-disable-next-line unicorn/prefer-ternary
+            if (selection.rows.hasAll(newSelection)) {
+                newRows = newRows.remove(newSelection);
+            } else {
+                newRows = newRows.add([newSel.current.range.y, newSel.current.range.y + newSel.current.range.height]);
+            }
+        }
+        for (const b of newSel.current?.rangeStack ?? []) {
+            newRows = newRows.add([b.y, b.y + b.height]);
+        }
+        setSelection({
+            ...newSel,
+            rows: newRows,
+        });
+    };
+
     return (
         <BeautifulWrapper
             title="Controlled Selection"
@@ -67,6 +87,7 @@ export const ControlledSelection: React.VFC = () => {
                         value={selection.current?.cell[1] ?? 0}
                         onChange={e => {
                             const newRow = e.target.valueAsNumber;
+
                             setSelection(cv => ({
                                 ...cv,
                                 current: {
@@ -88,7 +109,7 @@ export const ControlledSelection: React.VFC = () => {
                 {...defaultProps}
                 getCellContent={getCellContent}
                 gridSelection={selection}
-                onGridSelectionChange={setSelection}
+                onGridSelectionChange={onSelectionChange}
                 columns={cols}
                 rows={100}
                 rowMarkers="both"

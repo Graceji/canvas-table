@@ -312,6 +312,9 @@ export interface DataGridProps {
     readonly hasRowMarkers?: boolean;
 
     readonly rowMarkerWidth?: number;
+
+    // 点击头部是否显示高亮
+    readonly showAccent?: boolean;
 }
 
 type DamageUpdateList = readonly {
@@ -406,6 +409,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         getFilterCellContent,
         hasRowMarkers,
         rowMarkerWidth,
+        showAccent = true,
     } = p;
     const translateX = p.translateX ?? 0;
     const translateY = p.translateY ?? 0;
@@ -850,6 +854,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             verticalOnly,
             hasRowMarkers,
             rowMarkerWidth,
+            showAccent,
         } as DrawGridArg;
 
         // This confusing bit of code due to some poor design. Long story short, the damage property is only used
@@ -922,6 +927,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         verticalOnly,
         hasRowMarkers,
         rowMarkerWidth,
+        showAccent,
     ]);
 
     const lastDrawRef = React.useRef(draw);
@@ -963,6 +969,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     const [hCol, hRow] = hoveredItem ?? [];
     const headerHovered = hCol !== undefined && hRow === -1;
     const groupHeaderHovered = hCol !== undefined && hRow === -2;
+    const filterHovered = hCol !== undefined && hRow === -3;
+
     let clickableInnerCellHovered = false;
     let editableBoolHovered = false;
     let cursorOverride: React.CSSProperties["cursor"] | undefined = drawCursorOverride;
@@ -985,6 +993,10 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         ? cursorOverride
         : headerHovered || clickableInnerCellHovered || editableBoolHovered || groupHeaderHovered
         ? "pointer"
+        : filterHovered
+        ? hasRowMarkers === true && hCol === 0
+            ? "pointer"
+            : "text"
         : "default";
     const style = React.useMemo(
         () => ({
@@ -1570,6 +1582,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                                     undefined,
                                     undefined,
                                     false,
+                                    undefined,
                                     0,
                                     spriteManager,
                                     drawHeaderCallback,

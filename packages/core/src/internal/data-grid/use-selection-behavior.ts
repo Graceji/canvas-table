@@ -85,6 +85,18 @@ export function useSelectionBehavior(
         ]
     );
 
+    const getSelectedRows = React.useCallback(
+        (rows: CompactSelection | undefined, append: Slice | number | undefined) => {
+            let newRows = rows ?? gridSelection.rows;
+            if (append !== undefined) {
+                newRows = newRows.add(append);
+            }
+
+            return newRows;
+        },
+        [gridSelection]
+    );
+
     const setSelectedRows = React.useCallback(
         (newRows: CompactSelection | undefined, append: Slice | number | undefined, allowMixed: boolean): void => {
             newRows = newRows ?? gridSelection.rows;
@@ -141,5 +153,5 @@ export function useSelectionBehavior(
         [columnBehavior, gridSelection, rangeBehavior, rowBehavior, setGridSelection]
     );
 
-    return [setCurrent, setSelectedRows, setSelectedColumns] as const;
+    return [setCurrent, setSelectedRows, setSelectedColumns, getSelectedRows] as const;
 }

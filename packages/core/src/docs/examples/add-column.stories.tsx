@@ -68,6 +68,30 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
                 cancelOrder: () =>
                     `<svg t="1703831014587" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9556" width="16" height="16"><path d="M175.616 220.672C22.528 395.776 30.72 662.016 196.096 827.904c167.424 167.424 431.616 173.568 607.232 20.48L175.616 220.672zM849.408 803.84c151.552-175.104 144.896-441.344-22.528-607.232C659.968 29.184 395.264 23.04 220.16 174.08l629.248 629.76z" p-id="9557"></path></svg>`,
             }}
+            rowMarkerFns={[
+                {
+                    type: "number",
+                    order: 2,
+                    start: 0,
+                    end: 0,
+                },
+
+                {
+                    type: "icon",
+                    content: "workingOrder",
+                    order: 1,
+                    start: 0,
+                    end: 0,
+                },
+
+                {
+                    type: "icon",
+                    order: 3,
+                    content: "newOrder",
+                    start: 0,
+                    end: 0,
+                },
+            ]}
             rowMarkers="number-icon"
             rowMarkerWidth={75}
             getCellContent={getCellContent}
@@ -97,6 +121,7 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
                 // draw
                 return true;
             }}
+            onHeaderClicked={onHeaderClicked}
         />
     );
 };

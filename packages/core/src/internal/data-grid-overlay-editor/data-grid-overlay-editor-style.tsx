@@ -52,7 +52,7 @@ export const DataGridOverlayEditorStyle = styled.div<Props>`
 
     &.pad {
         // padding: ${p => Math.max(0, (p.targetHeight - 28) / 2)}px 8.5px 3px;
-        padding: 0 8.5px;
+        padding: 0 6px;
     }
 
     .gdg-clip-region {

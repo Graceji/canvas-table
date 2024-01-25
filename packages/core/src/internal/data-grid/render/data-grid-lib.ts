@@ -493,6 +493,19 @@ export function getEmHeight(ctx: CanvasRenderingContext2D, fontStyle: string): n
     return textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
 }
 
+export function truncateTextToFit(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
+    let truncatedText = "";
+    for (let i = 0; i < text.length; i++) {
+        const width = ctx.measureText(truncatedText + text[i]).width;
+        if (width <= maxWidth) {
+            truncatedText += text[i];
+        } else {
+            break;
+        }
+    }
+    return truncatedText;
+}
+
 function truncateString(data: string, w: number): string {
     if (data.includes("\n")) {
         // new lines are rare and split is relatively expensive compared to the search
@@ -590,6 +603,13 @@ export function drawTextCell(
         }
 
         if (!allowWrapping) {
+            const textWidth = ctx.measureText(data).width;
+            const padding = theme.cellHorizontalPadding * 2;
+            if (textWidth > rect.width - padding) {
+                const ellipsisWidth = ctx.measureText("...").width;
+                const truncatedText = truncateTextToFit(ctx, data, rect.width - padding - ellipsisWidth);
+                data = truncatedText + "...";
+            }
             drawSingleTextLine(ctx, data, x, y, w, h, bias, theme, contentAlign);
         } else {
             drawMultiLineText(ctx, data, x, y, w, h, bias, theme, contentAlign, hyperWrapping);
