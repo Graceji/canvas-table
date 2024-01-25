@@ -42,7 +42,9 @@ export const DataGridOverlayEditorStyle = styled.div<Props>`
         border-radius: 2px;
         background-color: var(--gdg-bg-cell);
 
-        box-shadow: 0 0 0 1px var(--gdg-accent-color), 0px 0px 1px rgba(62, 65, 86, 0.4),
+        box-shadow:
+            0 0 0 1px var(--gdg-accent-color),
+            0px 0px 1px rgba(62, 65, 86, 0.4),
             0px 6px 12px rgba(62, 65, 86, 0.15);
 
         animation: glide_fade_in 60ms 1;
@@ -50,7 +52,7 @@ export const DataGridOverlayEditorStyle = styled.div<Props>`
 
     &.pad {
         // padding: ${p => Math.max(0, (p.targetHeight - 28) / 2)}px 8.5px 3px;
-        padding: 0 8.5px;
+        padding: 0 6px;
     }
 
     .clip-region {

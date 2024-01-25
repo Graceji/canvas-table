@@ -31,6 +31,7 @@ interface DataGridOverlayEditorProps {
     readonly initialValue?: string;
     readonly theme: Theme;
     readonly onFinishEditing: (newCell: GridCell | undefined, movement: readonly [-1 | 0 | 1, -1 | 0 | 1]) => void;
+    readonly onEditing: (newCell: GridCell | undefined) => void;
     readonly forceEditMode: boolean;
     readonly highlight: boolean;
     readonly imageEditorOverride?: ImageEditorType;
@@ -50,6 +51,7 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
         target,
         content,
         onFinishEditing: onFinishEditingIn,
+        onEditing: onEditingIn,
         forceEditMode,
         initialValue,
         imageEditorOverride,
@@ -95,8 +97,9 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
                 }
             }
             setTempValueRaw(newVal);
+            onEditingIn(newVal);
         },
-        [cell, validateCell]
+        [cell, validateCell, onEditingIn]
     );
 
     const finished = React.useRef(false);

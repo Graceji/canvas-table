@@ -18,6 +18,8 @@ export {
     measureTextCached,
     getMiddleCenterBias,
     drawTextCellExternal as drawTextCell,
+    drawTextCell as drawTextCellInner,
+    prepTextCell,
 } from "./data-grid/data-grid-lib";
 export { getDataEditorTheme as getDefaultTheme, useTheme } from "./common/styles";
 export { useColumnSizer } from "./data-editor/use-column-sizer";

@@ -33,7 +33,9 @@ const SimpleMenu = styled.div`
     width: 175px;
     padding: 8px 0;
     border-radius: 6px;
-    box-shadow: 0px 0px 1px rgba(62, 65, 86, 0.7), 0px 6px 12px rgba(62, 65, 86, 0.35);
+    box-shadow:
+        0px 0px 1px rgba(62, 65, 86, 0.7),
+        0px 6px 12px rgba(62, 65, 86, 0.35);
 
     display: flex;
     flex-direction: column;
@@ -73,11 +75,10 @@ export const HeaderMenus: React.VFC = () => {
         }));
     }, [cols]);
 
-    const [menu, setMenu] =
-        React.useState<{
-            col: number;
-            bounds: Rectangle;
-        }>();
+    const [menu, setMenu] = React.useState<{
+        col: number;
+        bounds: Rectangle;
+    }>();
 
     const isOpen = menu !== undefined;
 
@@ -103,9 +104,9 @@ export const HeaderMenus: React.VFC = () => {
         setMenu({ col, bounds });
     }, []);
 
-    const onHeaderClicked = React.useCallback(() => {
+    const onHeaderClicked = React.useCallback((location, event) => {
         // eslint-disable-next-line no-console
-        console.log("Header clicked");
+        console.log("Header clicked", location, event);
     }, []);
 
     return (

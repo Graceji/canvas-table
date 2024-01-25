@@ -65,6 +65,11 @@ export const AddData: React.VFC = () => {
                 sticky: true,
                 tint: true,
                 hint: "New row...",
+                marker: true,
+                themeOverride: {
+                    bgHeader: "#001232",
+                    bgHeaderHovered: "#001232",
+                },
             }}
             rows={numRows}
             onRowAppended={onRowAppended}

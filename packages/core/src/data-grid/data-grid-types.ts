@@ -3,7 +3,7 @@ import { assertNever, proveType } from "../common/support";
 import has from "lodash/has.js";
 import type React from "react";
 import type { CSSProperties } from "react";
-import type { SpriteManager } from "./data-grid-sprites";
+import type { Sprite, SpriteManager } from "./data-grid-sprites";
 import type { OverlayImageEditorProps } from "../data-grid-overlay-editor/private/image-overlay-editor";
 
 // Thoughts:
@@ -204,6 +204,8 @@ export type DrawHeaderCallback = (args: {
     hasSelectedCell: boolean;
     spriteManager: SpriteManager;
     menuBounds: Rectangle;
+    hoverX?: number;
+    hoverY?: number;
 }) => boolean;
 
 /** @category Cells */
@@ -295,6 +297,7 @@ interface BaseGridColumn {
         readonly themeOverride?: Partial<Theme>;
         readonly disabled?: boolean;
         readonly showAddIcon?: boolean;
+        readonly marker?: boolean;
     };
 }
 
@@ -613,6 +616,17 @@ export type TreeNode = {
     pid?: number | string;
 };
 
+export interface MarkerFn {
+    type: "icon" | "checkbox" | "delete" | "expand" | "number";
+    start: number;
+    end: number;
+    onClick?: (node?: any) => void;
+    content?: string | ((node?: any) => string);
+    spriteCbMap?: { [key: string]: Sprite };
+    order: number;
+    size?: number;
+}
+
 /** @category Cells */
 export interface MarkerCell extends BaseGridCell {
     readonly kind: InnerGridCellKind.Marker;
@@ -620,8 +634,16 @@ export interface MarkerCell extends BaseGridCell {
     readonly row: number;
     readonly drawHandle: boolean;
     readonly checked: boolean;
-    readonly markerKind: "checkbox" | "number" | "both" | "checkbox-visible";
-    readonly icon?: string;
+    readonly markerKind:
+        | "checkbox"
+        | "number"
+        | "both"
+        | "checkbox-visible"
+        | "none"
+        | "expand-number-icon"
+        | "expand-number"
+        | "number-icon";
+    readonly functions: MarkerFn[];
     node?: TreeNode;
 }
 

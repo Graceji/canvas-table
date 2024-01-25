@@ -98,7 +98,7 @@ const Editor: ReturnType<ProvideEditorCallback<DatePickerCell>> = cell => {
 
     return (
         <StyledInputBox
-            data-testid={"date-picker-cell"}
+            // data-testid={"date-picker-cell"}
             required
             type={format}
             defaultValue={value}

@@ -659,6 +659,7 @@ export function drawHeader(
     theme: Theme,
     isHovered: boolean,
     hasSelectedCell: boolean,
+    hoverInfo: HoverInfo | undefined,
     hoverAmount: number,
     spriteManager: SpriteManager,
     drawHeaderCallback: DrawHeaderCallback | undefined,
@@ -667,6 +668,12 @@ export function drawHeader(
     const isCheckboxHeader = c.title.startsWith(headerCellCheckboxPrefix);
     const isRtl = direction(c.title) === "rtl";
     const menuBounds = getHeaderMenuBounds(x, y, width, height, isRtl);
+    let hoverX: number | undefined;
+    let hoverY: number | undefined;
+    if (hoverInfo !== undefined && hoverInfo[0][0] === 0 && hoverInfo[0][1] === -1) {
+        hoverX = hoverInfo[1][0];
+        hoverY = hoverInfo[1][1];
+    }
 
     if (drawHeaderCallback !== undefined) {
         let passCol = c;
@@ -689,6 +696,8 @@ export function drawHeader(
                 hasSelectedCell,
                 spriteManager,
                 menuBounds,
+                hoverX,
+                hoverY,
             })
         ) {
             return;
@@ -880,13 +889,13 @@ function drawGridHeaders(
     touchMode: boolean,
     drawCustomCell: DrawCustomCellCallback | undefined,
     imageLoader: ImageWindowLoader,
-    hoverInfo: HoverInfo | undefined,
     hyperWrapping: boolean,
     enqueue: (item: Item) => void,
     getFilterCellRenderer: GetCellRendererCallback,
     getFilterCellContent: (cell: number) => InnerGridCell,
     hasRowMarkers?: boolean,
-    rowMarkerWidth?: number
+    rowMarkerWidth?: number,
+    showAccent?: boolean
 ) {
     const totalHeaderHeight = headerHeight + groupHeaderHeight;
     if (totalHeaderHeight <= 0) return;
@@ -940,7 +949,7 @@ function drawGridHeaders(
         const y = enableGroups ? groupHeaderHeight : 0;
         const xOffset = c.sourceIndex === 0 ? 0 : 1;
 
-        if (selected) {
+        if (selected && showAccent === true) {
             ctx.fillStyle = bgFillStyle;
             ctx.fillRect(x + xOffset, y, c.width - xOffset, headerHeight);
         } else if (hasSelectedCell || hover > 0) {
@@ -973,7 +982,7 @@ function drawGridHeaders(
                 drawCustomCell,
                 spriteManager,
                 imageLoader,
-                hoverInfo,
+                hovered,
                 hyperWrapping,
                 enqueue,
                 frameTime,
@@ -993,6 +1002,7 @@ function drawGridHeaders(
             theme,
             hoveredBoolean,
             hasSelectedCell,
+            hovered,
             hover,
             spriteManager,
             drawHeaderCallback,
@@ -1209,7 +1219,8 @@ function drawCells(
     hyperWrapping: boolean,
     outerTheme: Theme,
     enqueue: (item: Item) => void,
-    getCellRenderer: GetCellRendererCallback
+    getCellRenderer: GetCellRendererCallback,
+    showAccent?: boolean
 ): Rectangle[] | undefined {
     let toDraw = damage?.length ?? Number.MAX_SAFE_INTEGER;
     const frameTime = performance.now();
@@ -1388,7 +1399,7 @@ function drawCells(
                     }
                     if (!isSelected) {
                         if (rowSelected) accentCount++;
-                        if (colSelected && !isSticky) accentCount++;
+                        if (showAccent === true && colSelected && !isSticky) accentCount++;
                     }
 
                     const bgCell = cell.kind === GridCellKind.Protected ? theme.bgCellMedium : theme.bgCell;
@@ -1399,7 +1410,7 @@ function drawCells(
 
                     if (accentCount > 0 || rowDisabled) {
                         if (rowDisabled) {
-                            fill = blend(theme.bgHeader, fill);
+                            fill = blend(theme.bgHeaderDisabled, fill);
                         }
                         for (let i = 0; i < accentCount; i++) {
                             fill = blend(theme.accentLight, fill);
@@ -1429,6 +1440,7 @@ function drawCells(
                         if (prepResult !== undefined) {
                             prepResult.fillStyle = fill;
                         }
+
                         ctx.fillRect(cellX, drawY, cellWidth, rh);
                     }
 
@@ -1874,7 +1886,7 @@ function drawFocusRing(
                     ctx.beginPath();
                     ctx.rect(cellX + 0.5, drawY + 0.5, cellWidth, rh);
                     ctx.strokeStyle = col.themeOverride?.accentColor ?? theme.accentColor;
-                    ctx.lineWidth = 1;
+                    ctx.lineWidth = theme.accentWidth;
                     ctx.stroke();
 
                     if (fillHandle) {
@@ -2001,6 +2013,7 @@ export interface DrawGridArg {
     readonly getCellRenderer: GetCellRendererCallback;
     readonly hasRowMarkers?: boolean;
     readonly rowMarkerWidth?: number;
+    readonly showAccent?: boolean;
 }
 
 function computeCanBlit(current: DrawGridArg, last: DrawGridArg | undefined): boolean | number {
@@ -2115,6 +2128,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         getFilterCellContent,
         hasRowMarkers,
         rowMarkerWidth,
+        showAccent,
     } = arg;
 
     let { damage } = arg;
@@ -2233,13 +2247,13 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             touchMode,
             drawCustomCell,
             imageLoader,
-            hoverInfo,
             hyperWrapping,
             enqueue,
             getCellRenderer,
             getFilterCellContent,
             hasRowMarkers,
-            rowMarkerWidth
+            rowMarkerWidth,
+            showAccent
         );
 
         drawGridLines(
@@ -2359,7 +2373,8 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
                 hyperWrapping,
                 theme,
                 enqueue,
-                getCellRenderer
+                getCellRenderer,
+                showAccent
             );
 
             if (
@@ -2534,81 +2549,96 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         targetCtx.fillRect(0, 0, width, height);
     }
 
-    const spans = drawCells(
-        targetCtx,
-        effectiveCols,
-        mappedColumns,
-        height,
-        totalHeaderHeight,
-        translateX,
-        translateY,
-        cellYOffset,
-        rows,
-        getRowHeight,
-        getCellContent,
-        getGroupDetails,
-        getRowThemeOverride,
-        disabledRows,
-        isFocused,
-        drawFocus,
-        trailingRowType,
-        drawRegions,
-        damage,
-        selection,
-        prelightCells,
-        highlightRegions,
-        drawCustomCell,
-        imageLoader,
-        spriteManager,
-        hoverValues,
-        hoverInfo,
-        hyperWrapping,
-        theme,
-        enqueue,
-        getCellRenderer
-    );
+    if (rows > 0) {
+        const spans = drawCells(
+            targetCtx,
+            effectiveCols,
+            mappedColumns,
+            height,
+            totalHeaderHeight,
+            translateX,
+            translateY,
+            cellYOffset,
+            rows,
+            getRowHeight,
+            getCellContent,
+            getGroupDetails,
+            getRowThemeOverride,
+            disabledRows,
+            isFocused,
+            drawFocus,
+            trailingRowType,
+            drawRegions,
+            damage,
+            selection,
+            prelightCells,
+            highlightRegions,
+            drawCustomCell,
+            imageLoader,
+            spriteManager,
+            hoverValues,
+            hoverInfo,
+            hyperWrapping,
+            theme,
+            enqueue,
+            getCellRenderer,
+            showAccent
+        );
 
-    drawBlanks(
-        targetCtx,
-        effectiveCols,
-        mappedColumns,
-        width,
-        height,
-        totalHeaderHeight,
-        translateX,
-        translateY,
-        cellYOffset,
-        rows,
-        getRowHeight,
-        getRowThemeOverride,
-        selection.rows,
-        disabledRows,
-        trailingRowType,
-        drawRegions,
-        damage,
-        theme
-    );
+        drawBlanks(
+            targetCtx,
+            effectiveCols,
+            mappedColumns,
+            width,
+            height,
+            totalHeaderHeight,
+            translateX,
+            translateY,
+            cellYOffset,
+            rows,
+            getRowHeight,
+            getRowThemeOverride,
+            selection.rows,
+            disabledRows,
+            trailingRowType,
+            drawRegions,
+            damage,
+            theme
+        );
 
-    drawGridLines(
-        targetCtx,
-        effectiveCols,
-        cellYOffset,
-        translateX,
-        translateY,
-        width,
-        height,
-        drawRegions,
-        spans,
-        groupHeaderHeight,
-        totalHeaderHeight,
-        getRowHeight,
-        getRowThemeOverride,
-        verticalBorder,
-        trailingRowType,
-        rows,
-        theme,
-        verticalOnly
-    );
+        drawGridLines(
+            targetCtx,
+            effectiveCols,
+            cellYOffset,
+            translateX,
+            translateY,
+            width,
+            height,
+            drawRegions,
+            spans,
+            groupHeaderHeight,
+            totalHeaderHeight,
+            getRowHeight,
+            getRowThemeOverride,
+            verticalBorder,
+            trailingRowType,
+            rows,
+            theme,
+            verticalOnly
+        );
+    } else {
+        targetCtx.fillStyle = "#000";
+
+        spriteManager.addAdditionalIcon("noData", () => {
+            return `<svg class="ant-empty-img-simple" width="64" height="41" viewBox="0 0 64 41" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0 1)" fill="none" fill-rule="evenodd"><ellipse fill="#232323" class="ant-empty-img-simple-ellipse" cx="32" cy="33" rx="32" ry="7"></ellipse><g class="ant-empty-img-simple-g" fill-rule="nonzero"><path stroke="#7b7d80" d="M55 12.76L44.854 1.258C44.367.474 43.656 0 42.907 0H21.093c-.749 0-1.46.474-1.947 1.257L9 12.761V22h46v-9.24z"></path><path fill="#232323" d="M41.613 15.931c0-1.605.994-2.93 2.227-2.931H55v18.137C55 33.26 53.68 35 52.05 35h-40.1C10.32 35 9 33.259 9 31.137V13h11.16c1.233 0 2.227 1.323 2.227 2.928v.022c0 1.605 1.005 2.901 2.237 2.901h14.752c1.232 0 2.237-1.308 2.237-2.913v-.007z" class="ant-empty-img-simple-path"></path></g></g></svg>`;
+        });
+        spriteManager.drawSprite("noData", "normal", targetCtx, width / 2 - 32, height / 2 - 20.5, 64, theme, 1, 41);
+
+        targetCtx.fillStyle = "#7b7d80";
+        targetCtx.font = `13px ${theme.fontFamily}`;
+        const textWidth = targetCtx.measureText("暂无数据").width;
+        targetCtx.fillText("暂无数据", width / 2 - textWidth / 2, height / 2 + 41);
+    }
 
     focusRedraw?.();
     highlightRedraw?.();

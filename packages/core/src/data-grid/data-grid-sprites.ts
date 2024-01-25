@@ -26,13 +26,16 @@ export type Sprite = (props: SpriteProps) => string;
 export type SpriteMap = Record<string | HeaderIcon, Sprite>;
 
 /** @category Columns */
-export type SpriteVariant = "normal" | "selected" | "special";
+export type SpriteVariant = "normal" | "selected" | "special" | "hovered";
 
 function getColors(variant: SpriteVariant, theme: Theme): readonly [string, string] {
+    // eslint-disable-next-line unicorn/prefer-switch
     if (variant === "normal") {
         return [theme.bgIconHeader, theme.fgIconHeader];
     } else if (variant === "selected") {
         return ["white", theme.accentColor];
+    } else if (variant === "hovered") {
+        return [theme.bgIconHeaderHovered, theme.fgIconHeaderHovered];
     } else {
         return [theme.accentColor, theme.bgHeader];
     }
@@ -43,6 +46,7 @@ export class SpriteManager {
     private spriteMap: Map<string, HTMLCanvasElement> = new Map();
     private headerIcons: SpriteMap;
     private inFlight = 0;
+    private icons: SpriteMap = {};
 
     constructor(
         headerIcons: SpriteMap | undefined,
@@ -54,6 +58,13 @@ export class SpriteManager {
         };
     }
 
+    addAdditionalIcon(sprite: string, spriteCb: Sprite) {
+        if (this.icons[sprite] === undefined) {
+            this.icons[sprite] = spriteCb;
+        }
+        return this.icons[sprite];
+    }
+
     public drawSprite(
         sprite: HeaderIcon | string,
         variant: SpriteVariant,
@@ -62,15 +73,20 @@ export class SpriteManager {
         y: number,
         size: number,
         theme: Theme,
-        alpha: number = 1
+        alpha: number = 1,
+        height?: number,
+        fgColorOuter?: string,
+        bgColorOuter?: string
     ) {
         const [bgColor, fgColor] = getColors(variant, theme);
         const rSize = size * Math.ceil(window.devicePixelRatio);
-        const key = `${bgColor}_${fgColor}_${rSize}_${sprite}`;
+        const vSize =
+            height !== undefined && typeof height === "number" ? height * Math.ceil(window.devicePixelRatio) : rSize;
+        const key = `${bgColorOuter ?? bgColor}_${fgColorOuter ?? fgColor}_${rSize}_${sprite}`;
 
         let spriteCanvas = this.spriteMap.get(key);
         if (spriteCanvas === undefined) {
-            const spriteCb = this.headerIcons[sprite];
+            const spriteCb = this.headerIcons[sprite] ?? this.icons[sprite];
 
             if (spriteCb === undefined) return;
 
@@ -80,7 +96,9 @@ export class SpriteManager {
             if (spriteCtx === null) return;
 
             const imgSource = new Image();
-            imgSource.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(spriteCb({ fgColor, bgColor }))}`;
+            imgSource.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+                spriteCb({ fgColor: fgColorOuter ?? fgColor, bgColor: bgColorOuter ?? bgColor })
+            )}`;
             this.spriteMap.set(key, spriteCanvas);
             const promise: Promise<void> | undefined = imgSource.decode();
 
@@ -89,7 +107,7 @@ export class SpriteManager {
             this.inFlight++;
             promise
                 .then(() => {
-                    spriteCtx.drawImage(imgSource, 0, 0, rSize, rSize);
+                    spriteCtx.drawImage(imgSource, 0, 0, rSize, vSize);
                 })
                 .finally(() => {
                     this.inFlight--;
@@ -101,7 +119,17 @@ export class SpriteManager {
             if (alpha < 1) {
                 ctx.globalAlpha = alpha;
             }
-            ctx.drawImage(spriteCanvas, 0, 0, rSize, rSize, x, y, size, size);
+            ctx.drawImage(
+                spriteCanvas,
+                0,
+                0,
+                rSize,
+                vSize,
+                x,
+                y,
+                size,
+                height !== undefined && typeof height === "number" ? height : size
+            );
             if (alpha < 1) {
                 ctx.globalAlpha = 1;
             }

@@ -11,44 +11,26 @@ export const markerCellRenderer: InternalCellRenderer<MarkerCell> = {
     measure: () => 44,
     draw: a => drawMarkerRowCell(a, a.cell),
     onClick: e => {
-        const { bounds, cell, posX: x, posY: y, theme } = e;
-        const { width, height } = bounds;
+        const { bounds, cell, posX: x, posY: y } = e;
 
-        // const centerX = cell.drawHandle ? 7 + (width - 7) / 2 : width / 2;
-        // const centerY = height / 2;
+        // 计算边界时应该按照每一项的盒子来计算
+        const isOverHeaderMarkerfn = cell.functions.find(
+            item => x >= item.start && x <= item.end && y >= 0 && y <= bounds.height
+        );
 
-        const iconSize = 16;
-        const iconStart = width / 2 + (width / 2 - theme.cellHorizontalPadding) / 2 - iconSize / 2;
+        if (isOverHeaderMarkerfn && isOverHeaderMarkerfn.type !== "number") {
+            if (isOverHeaderMarkerfn.type === "expand" && cell?.node !== undefined) {
+                const { node } = cell;
 
-        if (cell?.node !== undefined) {
-            const { node } = cell;
-
-            if (x < 0 || x > 22) return;
-
-            // preventDefault();
-
-            // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-            node.collapsed = !node.collapsed;
+                // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+                node.collapsed = !node.collapsed;
+            } else {
+                isOverHeaderMarkerfn?.onClick?.(cell.node);
+            }
 
             return cell;
         }
 
-        if (
-            cell.icon !== undefined &&
-            x >= iconStart &&
-            x <= iconStart + iconSize &&
-            y >= (height - iconSize) / 2 &&
-            y <= (height - iconSize) / 2 + iconSize
-        ) {
-            return cell;
-        }
-
-        // if (Math.abs(x - centerX) <= 10 && Math.abs(y - centerY) <= 10) {
-        //     return {
-        //         ...cell,
-        //         checked: !cell.checked,
-        //     };
-        // }
         return undefined;
     },
     onPaste: () => undefined,

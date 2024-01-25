@@ -56,6 +56,7 @@ import { browserIsFirefox, browserIsSafari } from "../common/browser-detect";
 import { useAnimationQueue } from "./use-animation-queue";
 import { assert } from "../common/support";
 import type { CellRenderer, GetCellRendererCallback } from "./cells/cell-types";
+import { useTrackedEffect } from "ahooks";
 
 export interface DataGridProps {
     readonly width: number;
@@ -286,6 +287,9 @@ export interface DataGridProps {
     readonly hasRowMarkers?: boolean;
 
     readonly rowMarkerWidth?: number;
+
+    // 点击头部是否显示高亮
+    readonly showAccent?: boolean;
 }
 
 type DamageUpdateList = readonly {
@@ -374,6 +378,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         getFilterCellContent,
         hasRowMarkers,
         rowMarkerWidth,
+        showAccent = true,
     } = p;
     const translateX = p.translateX ?? 0;
     const translateY = p.translateY ?? 0;
@@ -698,6 +703,59 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     }, [bufferA, bufferB]);
 
     const lastArgsRef = React.useRef<DrawGridArg>();
+    useTrackedEffect(
+        changes => {
+            console.log(changes);
+        },
+        [
+            bufferA,
+            bufferB,
+            width,
+            height,
+            showFilter,
+            filterHeight,
+            cellXOffset,
+            cellYOffset,
+            translateX,
+            translateY,
+            mappedColumns,
+            enableGroups,
+            freezeColumns,
+            dragAndDropState,
+            theme,
+            headerHeight,
+            groupHeaderHeight,
+            disabledRows,
+            rowHeight,
+            verticalBorder,
+            isResizing,
+            isFocused,
+            selection,
+            fillHandle,
+            trailingRowType,
+            rows,
+            drawFocusRing,
+            getCellContent,
+            getFilterCellContent,
+            getGroupDetails,
+            getRowThemeOverride,
+            drawCustomCell,
+            drawHeaderCallback,
+            prelightCells,
+            highlightRegions,
+            imageLoader,
+            spriteManager,
+            scrolling,
+            experimental?.hyperWrapping,
+            experimental?.renderStrategy,
+            lastWasTouch,
+            getCellRenderer,
+            verticalOnly,
+            hasRowMarkers,
+            rowMarkerWidth,
+            showAccent,
+        ]
+    );
     const draw = React.useCallback(() => {
         const canvas = ref.current;
         const overlay = overlayRef.current;
@@ -757,6 +815,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             verticalOnly,
             hasRowMarkers,
             rowMarkerWidth,
+            showAccent,
         } as DrawGridArg;
 
         // This confusing bit of code due to some poor design. Long story short, the damage property is only used
@@ -818,6 +877,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         verticalOnly,
         hasRowMarkers,
         rowMarkerWidth,
+        showAccent,
     ]);
 
     const lastDrawRef = React.useRef(draw);
@@ -859,6 +919,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     const [hCol, hRow] = hoveredItem ?? [];
     const headerHovered = hCol !== undefined && hRow === -1;
     const groupHeaderHovered = hCol !== undefined && hRow === -2;
+    const filterHovered = hCol !== undefined && hRow === -3;
+
     let clickableInnerCellHovered = false;
     let editableBoolHovered = false;
     let cursorOverride: React.CSSProperties["cursor"] | undefined;
@@ -881,6 +943,10 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         ? cursorOverride
         : headerHovered || clickableInnerCellHovered || editableBoolHovered || groupHeaderHovered
         ? "pointer"
+        : filterHovered
+        ? hasRowMarkers === true && hCol === 0
+            ? "pointer"
+            : "text"
         : "default";
     const style = React.useMemo(
         () => ({
@@ -1375,6 +1441,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                                     theme,
                                     false,
                                     false,
+                                    undefined,
                                     0,
                                     spriteManager,
                                     drawHeaderCallback,
