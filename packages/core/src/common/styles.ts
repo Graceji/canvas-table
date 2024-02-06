@@ -80,6 +80,7 @@ export interface Theme {
     cellHorizontalPadding: number;
     cellVerticalPadding: number;
     headerFontStyle: string;
+    filterFontStyle: string;
     headerIconSize: number;
     markerIconSize: number;
     baseFontStyle: string;
@@ -94,6 +95,8 @@ export interface Theme {
     filterHeaderBg?: string;
     markLine: string;
     markerTextLight: string;
+    emptyTextLight: string;
+    emptyText: string;
 }
 
 const dataEditorBaseTheme: Theme = {
@@ -101,6 +104,8 @@ const dataEditorBaseTheme: Theme = {
     accentColor: "#4F5DFF",
     accentFg: "#FFFFFF",
     accentLight: "rgba(62, 116, 253, 0.1)",
+    emptyTextLight: " #7b7d80",
+    emptyText: "暂无数据",
 
     textDark: "#313139",
     textMedium: "#737383",
@@ -140,7 +145,8 @@ const dataEditorBaseTheme: Theme = {
     headerIconSize: 18,
     markerIconSize: 18,
 
-    headerFontStyle: "600 13px",
+    headerFontStyle: "600 14px",
+    filterFontStyle: "500 13px",
     baseFontStyle: "13px",
     markerFontStyle: "13px",
     fontFamily:

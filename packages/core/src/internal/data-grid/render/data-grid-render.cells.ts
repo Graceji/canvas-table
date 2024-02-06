@@ -87,7 +87,6 @@ export function drawCells(
     getGroupDetails: GroupDetailsCallback,
     getRowThemeOverride: GetRowThemeCallback | undefined,
     disabledRows: CompactSelection,
-    isFocused: boolean,
     drawFocus: boolean,
     freezeTrailingRows: number,
     hasAppendRow: boolean,
@@ -281,7 +280,9 @@ export function drawCells(
                         selection.columns.some(
                             index => cell.span !== undefined && index >= cell.span[0] && index <= cell.span[1] //alloc
                         );
-                    if (isSelected && !isFocused && drawFocus) {
+                    if (isSelected && drawFocus && !rowSelected) {
+                        // 绘制focus边框: 单元格选中，但是行没有选中时，不需要填充accentLight背景色；
+                        // 原本是与focus相关，foucus时不填充背景色，就会导致行选中后，cell是去焦点后，只有边框，没有背景色。
                         accentCount = 0;
                     } else if (isSelected && drawFocus) {
                         accentCount = Math.max(accentCount, 1);

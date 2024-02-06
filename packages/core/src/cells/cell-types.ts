@@ -91,7 +91,7 @@ interface BaseCellRenderer<T extends InnerGridCell> {
             readonly posY: number;
             readonly bounds: Rectangle;
             readonly theme: FullTheme;
-            readonly preventDefault: () => void;
+            readonly preventDefault: (status?: boolean) => void;
         } & BaseGridMouseEventArgs
     ) => void;
     readonly onDelete?: (cell: T) => T | undefined;

@@ -34,6 +34,20 @@ export const markerCellRenderer: InternalCellRenderer<MarkerCell> = {
         return undefined;
     },
     onPaste: () => undefined,
+    onSelect(args) {
+        const { cell, posX: x, posY: y, bounds } = args;
+
+        // 计算边界时应该按照每一项的盒子来计算
+        const isOverHeaderMarkerfn = cell.functions.find(
+            item => x >= item.start && x <= item.end && y >= 0 && y <= bounds.height
+        );
+
+        if (isOverHeaderMarkerfn && isOverHeaderMarkerfn.type !== "number") {
+            args.preventDefault();
+        } else {
+            args.preventDefault(false);
+        }
+    },
 };
 
 function prepMarkerRowCell(args: BaseDrawArgs, lastPrep: PrepResult | undefined): Partial<PrepResult> {

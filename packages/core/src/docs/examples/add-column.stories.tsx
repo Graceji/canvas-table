@@ -53,6 +53,10 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
         return null;
     };
 
+    const onHeaderClicked = React.useCallback((location, event) => {
+        // eslint-disable-next-line no-console
+    }, []);
+
     return (
         <DataEditor
             {...defaultProps}

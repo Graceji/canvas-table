@@ -140,6 +140,11 @@ export function drawGridHeaders(
         if (filterHeight > 0) {
             // 绘制filter cell
             // 先获取内容
+            const f = `${theme.filterFontStyle} ${theme.fontFamily}`;
+            if (font !== f) {
+                ctx.font = f;
+            }
+
             drawFilterCell(
                 ctx,
                 allColumns,
@@ -162,6 +167,11 @@ export function drawGridHeaders(
                 getFilterCellRenderer,
                 getFilterCellContent
             );
+        }
+
+        const f = `${theme.headerFontStyle} ${theme.fontFamily}`;
+        if (font !== f) {
+            ctx.font = f;
         }
 
         drawHeader(
