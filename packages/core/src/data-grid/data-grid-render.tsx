@@ -931,10 +931,6 @@ function drawGridHeaders(
             ctx.fill();
         }
 
-        const f = `${theme.headerFontStyle} ${theme.fontFamily}`;
-        if (font !== f) {
-            ctx.font = f;
-        }
         const selected = selection.columns.hasIndex(c.sourceIndex);
         const noHover = dragAndDropState !== undefined || isResizing;
         const hoveredBoolean = !noHover && hRow === -1 && hCol === c.sourceIndex;
@@ -970,6 +966,11 @@ function drawGridHeaders(
         if (filterHeight > 0) {
             // 绘制filter cell
             // 先获取内容
+            const f = `${theme.filterFontStyle} ${theme.fontFamily}`;
+            if (font !== f) {
+                ctx.font = f;
+            }
+
             drawFilterCell(
                 ctx,
                 x,
@@ -989,6 +990,11 @@ function drawGridHeaders(
                 getFilterCellRenderer,
                 getFilterCellContent
             );
+        }
+
+        const f = `${theme.headerFontStyle} ${theme.fontFamily}`;
+        if (font !== f) {
+            ctx.font = f;
         }
 
         drawHeader(
@@ -1203,7 +1209,6 @@ function drawCells(
     getGroupDetails: GroupDetailsCallback,
     getRowThemeOverride: GetRowThemeCallback | undefined,
     disabledRows: CompactSelection,
-    isFocused: boolean,
     drawFocus: boolean,
     trailingRowType: TrailingRowType,
     drawRegions: readonly Rectangle[],
@@ -1389,7 +1394,9 @@ function drawCells(
                         selection.columns.some(
                             index => cell.span !== undefined && index >= cell.span[0] && index <= cell.span[1]
                         );
-                    if (isSelected && !isFocused && drawFocus) {
+                    if (isSelected && drawFocus && !rowSelected) {
+                        // 绘制focus边框: 单元格选中，但是行没有选中时，不需要填充accentLight背景色；
+                        // 原本是与focus相关，foucus时不填充背景色，就会导致行选中后，cell是去焦点后，只有边框，没有背景色。
                         accentCount = 0;
                     } else if (isSelected) {
                         accentCount = Math.max(accentCount, 1);
@@ -2104,7 +2111,6 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         getCellContent,
         getGroupDetails,
         getRowThemeOverride,
-        isFocused,
         drawCustomCell,
         drawHeaderCallback,
         prelightCells,
@@ -2321,7 +2327,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             );
         });
 
-        if (damage.length > 0) {
+        if (damage.length > 0 && rows > (trailingRowType !== "none" ? 1 : 0)) {
             clipDamage(
                 targetCtx,
                 effectiveCols,
@@ -2341,7 +2347,6 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
 
             targetCtx.fillStyle = theme.bgCell;
             targetCtx.fillRect(0, totalHeaderHeight + 1, width, height - totalHeaderHeight - 1);
-
             drawCells(
                 targetCtx,
                 effectiveCols,
@@ -2357,7 +2362,6 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
                 getGroupDetails,
                 getRowThemeOverride,
                 disabledRows,
-                isFocused,
                 drawFocus,
                 trailingRowType,
                 drawRegions,
@@ -2423,6 +2427,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             );
             drawHeaderTexture();
         }
+
         targetCtx.restore();
         overlayCtx.restore();
 
@@ -2483,73 +2488,73 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         );
     }
 
-    overdrawStickyBoundaries(
-        targetCtx,
-        effectiveCols,
-        width,
-        height,
-        trailingRowType === "sticky",
-        rows,
-        verticalBorder,
-        getRowHeight,
-        theme
-    );
+    if (rows > (trailingRowType !== "none" ? 1 : 0)) {
+        overdrawStickyBoundaries(
+            targetCtx,
+            effectiveCols,
+            width,
+            height,
+            trailingRowType === "sticky",
+            rows,
+            verticalBorder,
+            getRowHeight,
+            theme
+        );
 
-    // the overdraw may have nuked out our focus ring right edge.
-    const focusRedraw = drawFocus
-        ? drawFocusRing(
-              targetCtx,
-              width,
-              height,
-              cellYOffset,
-              translateX,
-              translateY,
-              effectiveCols,
-              mappedColumns,
-              theme,
-              totalHeaderHeight,
-              selection,
-              getRowHeight,
-              getCellContent,
-              trailingRowType,
-              fillHandle,
-              rows
-          )
-        : undefined;
+        // the overdraw may have nuked out our focus ring right edge.
+        const focusRedraw = drawFocus
+            ? drawFocusRing(
+                  targetCtx,
+                  width,
+                  height,
+                  cellYOffset,
+                  translateX,
+                  translateY,
+                  effectiveCols,
+                  mappedColumns,
+                  theme,
+                  totalHeaderHeight,
+                  selection,
+                  getRowHeight,
+                  getCellContent,
+                  trailingRowType,
+                  fillHandle,
+                  rows
+              )
+            : undefined;
 
-    const highlightRedraw = drawHighlightRings(
-        targetCtx,
-        width,
-        height,
-        cellXOffset,
-        cellYOffset,
-        translateX,
-        translateY,
-        mappedColumns,
-        freezeColumns,
-        filterHeight,
-        headerHeight,
-        groupHeaderHeight,
-        rowHeight,
-        trailingRowType === "sticky",
-        rows,
-        highlightRegions
-    );
+        const highlightRedraw = drawHighlightRings(
+            targetCtx,
+            width,
+            height,
+            cellXOffset,
+            cellYOffset,
+            translateX,
+            translateY,
+            mappedColumns,
+            freezeColumns,
+            filterHeight,
+            headerHeight,
+            groupHeaderHeight,
+            rowHeight,
+            trailingRowType === "sticky",
+            rows,
+            highlightRegions
+        );
 
-    targetCtx.fillStyle = theme.bgCell;
-    if (drawRegions.length > 0) {
-        targetCtx.beginPath();
-        for (const r of drawRegions) {
-            targetCtx.rect(r.x, r.y, r.width, r.height);
+        targetCtx.fillStyle = theme.bgCell;
+        if (drawRegions.length > 0) {
+            targetCtx.beginPath();
+            for (const r of drawRegions) {
+                targetCtx.rect(r.x, r.y, r.width, r.height);
+            }
+            targetCtx.clip();
+            targetCtx.fill();
+            targetCtx.beginPath();
+        } else {
+            targetCtx.fillRect(0, 0, width, height);
         }
-        targetCtx.clip();
-        targetCtx.fill();
-        targetCtx.beginPath();
-    } else {
-        targetCtx.fillRect(0, 0, width, height);
-    }
 
-    if (rows > 0) {
         const spans = drawCells(
             targetCtx,
             effectiveCols,
@@ -2565,7 +2570,6 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             getGroupDetails,
             getRowThemeOverride,
             disabledRows,
-            isFocused,
             drawFocus,
             trailingRowType,
             drawRegions,
@@ -2626,59 +2630,69 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             theme,
             verticalOnly
         );
+
+        focusRedraw?.();
+        highlightRedraw?.();
+
+        if (mainCtx !== null) {
+            mainCtx.fillStyle = theme.bgCell;
+            mainCtx.fillRect(0, 0, width, height);
+            mainCtx.drawImage(targetCtx.canvas, 0, 0);
+        }
+
+        const lastRowDrawn = getLastRow(
+            effectiveCols,
+            height,
+            totalHeaderHeight,
+            translateX,
+            translateY,
+            cellYOffset,
+            rows,
+            getRowHeight,
+            trailingRowType
+        );
+
+        imageLoader?.setWindow(
+            {
+                x: cellXOffset,
+                y: cellYOffset,
+                width: effectiveCols.length,
+                height: lastRowDrawn - cellYOffset,
+            },
+            freezeColumns
+        );
+
+        lastBlitData.current = {
+            cellXOffset,
+            cellYOffset,
+            translateX,
+            translateY,
+            mustDrawFocusOnHeader,
+            lastBuffer: doubleBuffer ? (targetBuffer === bufferA ? "a" : "b") : undefined,
+        };
     } else {
-        targetCtx.fillStyle = "#000";
+        targetCtx.fillStyle = theme.bgCell;
+        targetCtx.fillRect(0, 0, width, height);
 
         spriteManager.addAdditionalIcon("noData", () => {
-            return `<svg class="ant-empty-img-simple" width="64" height="41" viewBox="0 0 64 41" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0 1)" fill="none" fill-rule="evenodd"><ellipse fill="#232323" class="ant-empty-img-simple-ellipse" cx="32" cy="33" rx="32" ry="7"></ellipse><g class="ant-empty-img-simple-g" fill-rule="nonzero"><path stroke="#7b7d80" d="M55 12.76L44.854 1.258C44.367.474 43.656 0 42.907 0H21.093c-.749 0-1.46.474-1.947 1.257L9 12.761V22h46v-9.24z"></path><path fill="#232323" d="M41.613 15.931c0-1.605.994-2.93 2.227-2.931H55v18.137C55 33.26 53.68 35 52.05 35h-40.1C10.32 35 9 33.259 9 31.137V13h11.16c1.233 0 2.227 1.323 2.227 2.928v.022c0 1.605 1.005 2.901 2.237 2.901h14.752c1.232 0 2.237-1.308 2.237-2.913v-.007z" class="ant-empty-img-simple-path"></path></g></g></svg>`;
+            return `<svg class="ant-empty-img-simple" width="64" height="41" viewBox="0 0 64 41" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0 1)" fill="none" fill-rule="evenodd"><ellipse fill="#232323" class="ant-empty-img-simple-ellipse" cx="32" cy="33" rx="32" ry="7"></ellipse><g class="ant-empty-img-simple-g" fill-rule="nonzero"><path stroke="#7b7d80" d="M55 12.76L44.854 1.258C44.367.474 43.656 0 42.907 0H21.093c-.749 0-1.46.474-1.947 1.257L9 12.761V22h46v-9.24z"></path><path fill="#232323" stroke="#7b7d80" d="M41.613 15.931c0-1.605.994-2.93 2.227-2.931H55v18.137C55 33.26 53.68 35 52.05 35h-40.1C10.32 35 9 33.259 9 31.137V13h11.16c1.233 0 2.227 1.323 2.227 2.928v.022c0 1.605 1.005 2.901 2.237 2.901h14.752c1.232 0 2.237-1.308 2.237-2.913v-.007z" class="ant-empty-img-simple-path"></path></g></g></svg>`;
         });
         spriteManager.drawSprite("noData", "normal", targetCtx, width / 2 - 32, height / 2 - 20.5, 64, theme, 1, 41);
 
-        targetCtx.fillStyle = "#7b7d80";
+        targetCtx.fillStyle = theme.emptyTextLight;
         targetCtx.font = `13px ${theme.fontFamily}`;
-        const textWidth = targetCtx.measureText("暂无数据").width;
-        targetCtx.fillText("暂无数据", width / 2 - textWidth / 2, height / 2 + 41);
+        const textWidth = targetCtx.measureText(theme.emptyText).width;
+        targetCtx.fillText(theme.emptyText, width / 2 - textWidth / 2, height / 2 + 41);
+
+        lastBlitData.current = {
+            cellXOffset: 1,
+            cellYOffset: 1,
+            translateX: 1,
+            translateY: 1,
+            mustDrawFocusOnHeader,
+            lastBuffer: doubleBuffer ? (targetBuffer === bufferA ? "a" : "b") : undefined,
+        };
     }
-
-    focusRedraw?.();
-    highlightRedraw?.();
-
-    if (mainCtx !== null) {
-        mainCtx.fillStyle = theme.bgCell;
-        mainCtx.fillRect(0, 0, width, height);
-        mainCtx.drawImage(targetCtx.canvas, 0, 0);
-    }
-
-    const lastRowDrawn = getLastRow(
-        effectiveCols,
-        height,
-        totalHeaderHeight,
-        translateX,
-        translateY,
-        cellYOffset,
-        rows,
-        getRowHeight,
-        trailingRowType
-    );
-
-    imageLoader?.setWindow(
-        {
-            x: cellXOffset,
-            y: cellYOffset,
-            width: effectiveCols.length,
-            height: lastRowDrawn - cellYOffset,
-        },
-        freezeColumns
-    );
-
-    lastBlitData.current = {
-        cellXOffset,
-        cellYOffset,
-        translateX,
-        translateY,
-        mustDrawFocusOnHeader,
-        lastBuffer: doubleBuffer ? (targetBuffer === bufferA ? "a" : "b") : undefined,
-    };
 
     targetCtx.restore();
     overlayCtx.restore();

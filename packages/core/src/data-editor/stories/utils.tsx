@@ -299,7 +299,7 @@ function getResizableColumns(amount: number, group: boolean): GridColumnWithMock
                     kind: GridCellKind.Text,
                     displayData: firstName,
                     data: firstName,
-                    allowOverlay: true,
+                    allowOverlay: false,
                     readonly: true,
                 };
             },

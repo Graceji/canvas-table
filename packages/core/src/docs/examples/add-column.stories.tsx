@@ -55,11 +55,8 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
         return null;
     };
 
-    const [markerIcon, setMarkerIcon] = useState("actionOrder");
-
     const onHeaderClicked = React.useCallback((location, event) => {
         // eslint-disable-next-line no-console
-        console.log("Header clicked", location, event);
     }, []);
 
     return (

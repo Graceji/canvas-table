@@ -56,7 +56,7 @@ import { browserIsFirefox, browserIsSafari } from "../common/browser-detect";
 import { useAnimationQueue } from "./use-animation-queue";
 import { assert } from "../common/support";
 import type { CellRenderer, GetCellRendererCallback } from "./cells/cell-types";
-import { useTrackedEffect } from "ahooks";
+// import { useTrackedEffect } from "ahooks";
 
 export interface DataGridProps {
     readonly width: number;
@@ -703,59 +703,59 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     }, [bufferA, bufferB]);
 
     const lastArgsRef = React.useRef<DrawGridArg>();
-    useTrackedEffect(
-        changes => {
-            console.log(changes);
-        },
-        [
-            bufferA,
-            bufferB,
-            width,
-            height,
-            showFilter,
-            filterHeight,
-            cellXOffset,
-            cellYOffset,
-            translateX,
-            translateY,
-            mappedColumns,
-            enableGroups,
-            freezeColumns,
-            dragAndDropState,
-            theme,
-            headerHeight,
-            groupHeaderHeight,
-            disabledRows,
-            rowHeight,
-            verticalBorder,
-            isResizing,
-            isFocused,
-            selection,
-            fillHandle,
-            trailingRowType,
-            rows,
-            drawFocusRing,
-            getCellContent,
-            getFilterCellContent,
-            getGroupDetails,
-            getRowThemeOverride,
-            drawCustomCell,
-            drawHeaderCallback,
-            prelightCells,
-            highlightRegions,
-            imageLoader,
-            spriteManager,
-            scrolling,
-            experimental?.hyperWrapping,
-            experimental?.renderStrategy,
-            lastWasTouch,
-            getCellRenderer,
-            verticalOnly,
-            hasRowMarkers,
-            rowMarkerWidth,
-            showAccent,
-        ]
-    );
+    // useTrackedEffect(
+    //     changes => {
+    //         console.log(changes);
+    //     },
+    //     [
+    //         bufferA,
+    //         bufferB,
+    //         width,
+    //         height,
+    //         showFilter,
+    //         filterHeight,
+    //         cellXOffset,
+    //         cellYOffset,
+    //         translateX,
+    //         translateY,
+    //         mappedColumns,
+    //         enableGroups,
+    //         freezeColumns,
+    //         dragAndDropState,
+    //         theme,
+    //         headerHeight,
+    //         groupHeaderHeight,
+    //         disabledRows,
+    //         rowHeight,
+    //         verticalBorder,
+    //         isResizing,
+    //         isFocused,
+    //         selection,
+    //         fillHandle,
+    //         trailingRowType,
+    //         rows,
+    //         drawFocusRing,
+    //         getCellContent,
+    //         getFilterCellContent,
+    //         getGroupDetails,
+    //         getRowThemeOverride,
+    //         drawCustomCell,
+    //         drawHeaderCallback,
+    //         prelightCells,
+    //         highlightRegions,
+    //         imageLoader,
+    //         spriteManager,
+    //         scrolling,
+    //         experimental?.hyperWrapping,
+    //         experimental?.renderStrategy,
+    //         lastWasTouch,
+    //         getCellRenderer,
+    //         verticalOnly,
+    //         hasRowMarkers,
+    //         rowMarkerWidth,
+    //         showAccent,
+    //     ]
+    // );
     const draw = React.useCallback(() => {
         const canvas = ref.current;
         const overlay = overlayRef.current;

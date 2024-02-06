@@ -32,23 +32,24 @@ export const ControlledSelection: React.VFC = () => {
     });
 
     const onSelectionChange = (newSel: GridSelection) => {
-        let newRows = CompactSelection.empty();
-        if (newSel.current !== undefined) {
-            const newSelection: Slice = [newSel.current.range.y, newSel.current.range.y + newSel.current.range.height];
-            // eslint-disable-next-line unicorn/prefer-ternary
-            if (selection.rows.hasAll(newSelection)) {
-                newRows = newRows.remove(newSelection);
-            } else {
-                newRows = newRows.add([newSel.current.range.y, newSel.current.range.y + newSel.current.range.height]);
-            }
-        }
-        for (const b of newSel.current?.rangeStack ?? []) {
-            newRows = newRows.add([b.y, b.y + b.height]);
-        }
-        setSelection({
-            ...newSel,
-            rows: newRows,
-        });
+        setSelection(newSel);
+        // let newRows = CompactSelection.empty();
+        // if (newSel.current !== undefined) {
+        //     const newSelection: Slice = [newSel.current.range.y, newSel.current.range.y + newSel.current.range.height];
+        //     // eslint-disable-next-line unicorn/prefer-ternary
+        //     if (selection.rows.hasAll(newSelection)) {
+        //         newRows = newRows.remove(newSelection);
+        //     } else {
+        //         newRows = newRows.add([newSel.current.range.y, newSel.current.range.y + newSel.current.range.height]);
+        //     }
+        // }
+        // for (const b of newSel.current?.rangeStack ?? []) {
+        //     newRows = newRows.add([b.y, b.y + b.height]);
+        // }
+        // setSelection({
+        //     ...newSel,
+        //     rows: newRows,
+        // });
     };
 
     return (
@@ -109,7 +110,9 @@ export const ControlledSelection: React.VFC = () => {
                 {...defaultProps}
                 getCellContent={getCellContent}
                 gridSelection={selection}
+                rangeSelect="none"
                 onGridSelectionChange={onSelectionChange}
+                // onGridSelectionChange={setSelection}
                 columns={cols}
                 rows={100}
                 rowMarkers="both"

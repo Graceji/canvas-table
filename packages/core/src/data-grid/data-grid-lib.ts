@@ -528,7 +528,7 @@ export function drawTextCell(
 }
 
 export function drawNewRowCell(args: BaseDrawArgs, data: string, showAddIcon = true, icon?: string) {
-    const { ctx, rect, hoverAmount, theme, spriteManager } = args;
+    const { ctx, rect, hoverAmount, theme, spriteManager, cell } = args;
     const { x, y, width: w, height: h } = rect;
     ctx.beginPath();
     ctx.globalAlpha = hoverAmount;
@@ -569,6 +569,7 @@ export function drawNewRowCell(args: BaseDrawArgs, data: string, showAddIcon = t
         }
     }
 
+    ctx.textAlign = cell.contentAlign ?? "left";
     ctx.fillStyle = theme.textMedium;
     ctx.fillText(data, textX + x + theme.cellHorizontalPadding + 0.5, y + h / 2 + getMiddleCenterBias(ctx, theme));
     ctx.beginPath();

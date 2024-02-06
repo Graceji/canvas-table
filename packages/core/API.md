@@ -963,7 +963,7 @@ onCellClicked?: (cell: Item) => void;
 ## onCellActivated
 
 ```ts
-onCellActivated?: (cell: Item) => void;
+onCellActivated?: (cell: Item, type: 'dbclick' | 'enter' | 'space') => void;
 ```
 
 `onCellActivated` is called whenever the user double clicks, taps Enter, or taps Space on a cell in the grid.
