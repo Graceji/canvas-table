@@ -1,7 +1,7 @@
-import type { DrawArgs, FilterDrawArgs, GetCellRendererCallback, PrepResult } from "../../../cells/cell-types.js";
+import type { GetCellRendererCallback, PrepResult } from "../../../cells/cell-types.js";
 import { intersectRect, pointInRect } from "../../../common/math.js";
 import type { RenderStateProvider } from "../../../common/render-state-provider.js";
-import { mergeAndRealizeTheme, type FullTheme, type Theme } from "../../../common/styles.js";
+import { mergeAndRealizeTheme, type FullTheme } from "../../../common/styles.js";
 import { direction } from "../../../common/utils.js";
 import type { HoverValues } from "../animation-manager.js";
 import type { CellSet } from "../cell-set.js";
@@ -15,7 +15,7 @@ import {
     type DrawCellCallback,
     type InnerGridCell,
     type Item,
-    type GridCell,
+    GridCellKind,
 } from "../data-grid-types.js";
 import type { ImageWindowLoader } from "../image-window-loader-interface.js";
 import {
@@ -83,8 +83,9 @@ export function drawGridHeaders(
     const font = outerTheme.headerFontFull;
     // Assinging the context font too much can be expensive, it can be worth it to minimze this
     ctx.font = font;
+
     walkColumns(effectiveCols, 0, translateX, 0, totalHeaderHeight, (c, x, _y, clipX) => {
-        if (damage !== undefined && !damage.has([c.sourceIndex, -1])) return;
+        if (damage !== undefined && !(damage.has([c.sourceIndex, -1]) || damage.has([c.sourceIndex, -3]))) return;
         const diff = Math.max(0, clipX - x);
         ctx.save();
         ctx.beginPath();
@@ -108,6 +109,8 @@ export function drawGridHeaders(
         const selected = selection.columns.hasIndex(c.sourceIndex);
         const noHover = dragAndDropState !== undefined || isResizing;
         const hoveredBoolean = !noHover && hRow === -1 && hCol === c.sourceIndex;
+
+        const filterHoveredBoolean = !noHover && hRow === -3 && hCol === c.sourceIndex;
         const hover = noHover
             ? 0
             : hoverValues.find(s => s.item[0] === c.sourceIndex && s.item[1] === -1)?.hoverAmount ?? 0;
@@ -154,6 +157,9 @@ export function drawGridHeaders(
                 c,
                 selected,
                 theme,
+                filterHoveredBoolean,
+                filterHoveredBoolean ? hPosX : undefined,
+                filterHoveredBoolean ? hPosY : undefined,
                 drawCellCallback,
                 spriteManager,
                 imageLoader,
@@ -193,6 +199,7 @@ export function drawGridHeaders(
             drawHeaderCallback,
             touchMode
         );
+
         ctx.restore();
     });
 
@@ -252,7 +259,6 @@ export function drawGroups(
         const groupTheme =
             group?.overrideTheme === undefined ? theme : mergeAndRealizeTheme(theme, group.overrideTheme);
         const isHovered = hRow === -2 && hCol !== undefined && hCol >= span[0] && hCol <= span[1];
-
         const fillColor = isHovered ? groupTheme.bgHeaderHovered : groupTheme.bgHeader;
         if (fillColor !== theme.bgHeader) {
             ctx.fillStyle = fillColor;
@@ -337,17 +343,26 @@ export function drawGroups(
         ctx.restore();
 
         finalX = x + w;
+
+        if (group !== undefined && group.name !== "") {
+            ctx.beginPath();
+            ctx.moveTo(x, groupHeaderHeight - 0.5);
+            ctx.lineTo(finalX, groupHeaderHeight - 0.5);
+            ctx.strokeStyle = theme.borderColor;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
     });
 
-    ctx.beginPath();
-    ctx.moveTo(finalX + 0.5, 0);
-    ctx.lineTo(finalX + 0.5, groupHeaderHeight);
+    // ctx.beginPath();
+    // ctx.moveTo(finalX + 0.5, 0);
+    // ctx.lineTo(finalX + 0.5, groupHeaderHeight);
 
-    ctx.moveTo(0, groupHeaderHeight + 0.5);
-    ctx.lineTo(width, groupHeaderHeight + 0.5);
-    ctx.strokeStyle = theme.borderColor;
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    // ctx.moveTo(0, groupHeaderHeight + 0.5);
+    // ctx.lineTo(width, groupHeaderHeight + 0.5);
+    // ctx.strokeStyle = theme.borderColor;
+    // ctx.lineWidth = 1;
+    // ctx.stroke();
 }
 
 const menuButtonSize = 30;
@@ -358,6 +373,25 @@ function getHeaderMenuBounds(x: number, y: number, width: number, height: number
         y: Math.max(y, y + height / 2 - menuButtonSize / 2), // center vertically
         width: menuButtonSize,
         height: Math.min(menuButtonSize, height),
+    };
+}
+
+const filterActionButtonSize = 13;
+function getFilterActionBounds(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    padding: number,
+    isRtl: boolean
+): Rectangle {
+    const buttonWidth = filterActionButtonSize + padding;
+    if (isRtl) return { x, y, width: filterActionButtonSize, height: Math.min(buttonWidth, height) };
+    return {
+        x: x + width - buttonWidth, // right align
+        y: Math.max(y, y + height / 2 - buttonWidth / 2), // center vertically
+        width: buttonWidth,
+        height: Math.min(buttonWidth, height),
     };
 }
 
@@ -392,6 +426,7 @@ interface HeaderLayout {
     readonly iconOverlayBounds: Rectangle | undefined;
     readonly indicatorIconBounds: Rectangle | undefined;
     readonly menuBounds: Rectangle | undefined;
+    readonly filterBounds: Rectangle | undefined;
 }
 
 function flipHorizontal(
@@ -417,6 +452,7 @@ export function computeHeaderLayout(
     const xPad = theme.cellHorizontalPadding;
     const headerIconSize = theme.headerIconSize;
     const menuBounds = getHeaderMenuBounds(x, y, width, height, false);
+    const filterBounds = getFilterActionBounds(x, y, width, height, theme.cellHorizontalPadding * 2, false);
 
     let drawX = x + xPad;
     const iconBounds =
@@ -470,6 +506,7 @@ export function computeHeaderLayout(
 
     return {
         menuBounds: flipHorizontal(menuBounds, mirrorPoint, isRTL),
+        filterBounds: flipHorizontal(filterBounds, mirrorPoint, isRTL),
         iconBounds: flipHorizontal(iconBounds, mirrorPoint, isRTL),
         iconOverlayBounds: flipHorizontal(iconOverlayBounds, mirrorPoint, isRTL),
         textBounds: flipHorizontal(textBounds, mirrorPoint, isRTL),
@@ -683,7 +720,10 @@ export function drawFilterCell(
     filterHeight: number,
     c: MappedGridColumn,
     selected: boolean,
-    theme: Theme,
+    theme: FullTheme,
+    isHovered: boolean,
+    posX: number | undefined,
+    posY: number | undefined,
     drawCellCallback: DrawCellCallback | undefined,
     spriteManager: SpriteManager,
     imageLoader: ImageWindowLoader,
@@ -698,6 +738,7 @@ export function drawFilterCell(
     getFilterCellContent?: (cell: number) => InnerGridCell
 ) {
     let prepResult: PrepResult | undefined = undefined;
+    const isRtl = direction(c.title) === "rtl";
     const filterCell = getFilterCellContent?.(c.sourceIndex) ?? loadingCell;
     const fillStyle = selected ? theme.textHeaderSelected : theme.textHeader;
     ctx.fillStyle = fillStyle;
@@ -708,6 +749,37 @@ export function drawFilterCell(
         if (hv.item[0] === c.sourceIndex && hv.item[1] === -3) {
             hoverValue = hv;
             break;
+        }
+    }
+
+    const filterLayout = computeHeaderLayout(ctx, c, x, y, c.width, filterHeight, theme, isRtl);
+    const shouldDrawMenu =
+        isHovered &&
+        filterLayout.filterBounds !== undefined &&
+        filterCell?.kind === GridCellKind.Custom &&
+        (Array.isArray((filterCell.data as any)?.displayData)
+            ? (filterCell.data as any)?.displayData.length > 0
+            : // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+              !!(filterCell.data as any)?.displayData);
+
+    if (shouldDrawMenu) {
+        const filterBounds = filterLayout.filterBounds;
+        const hovered = posX !== undefined && posY !== undefined && pointInRect(filterBounds, posX + x, posY + y);
+
+        if (!hovered) {
+            ctx.globalAlpha = 0.7;
+        }
+
+        if (hovered) {
+            overrideCursor("pointer");
+        }
+
+        const startX = x + c.width - 13 - theme.cellHorizontalPadding * 2;
+        const startY = y + (filterHeight - 13) / 2;
+        spriteManager.drawSprite("clearIcon", "normal", ctx, startX, startY, 13, theme);
+
+        if (!hovered) {
+            ctx.globalAlpha = 1;
         }
     }
 
@@ -764,7 +836,7 @@ export function drawHeader(
 
     let hoverX: number | undefined;
     let hoverY: number | undefined;
-    if (hoverInfo !== undefined && hoverInfo[0][0] === 0 && hoverInfo[0][1] === -1) {
+    if (hoverInfo !== undefined && hoverInfo[0][0] === c.sourceIndex && hoverInfo[0][1] === -1) {
         hoverX = hoverInfo[1][0];
         hoverY = hoverInfo[1][1];
     }

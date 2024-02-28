@@ -48,6 +48,7 @@ import {
     groupHeaderKind,
     headerKind,
     mouseEventArgsAreEqual,
+    filterHeaderKind,
 } from "./event-args.js";
 import { pointInRect } from "../../common/math.js";
 import {
@@ -130,6 +131,12 @@ export interface DataGridProps {
      * @group Events
      */
     readonly onHeaderMenuClick: ((col: number, screenPosition: Rectangle) => void) | undefined;
+
+    /**
+     * Emitted when a filter clear icon is clicked.
+     * @group Events
+     */
+    readonly onFilterClearClick: ((col: number, screenPosition: Rectangle) => void) | undefined;
 
     /**
      * Emitted when a header indicator icon is clicked.
@@ -352,6 +359,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         getCellContent,
         getRowThemeOverride,
         onHeaderMenuClick,
+        onFilterClearClick,
         onHeaderIndicatorClick,
         enableGroups,
         isFilling,
@@ -481,7 +489,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 height,
                 groupHeaderHeight,
                 totalHeaderHeight,
-                filterHeight,
+                showFilter ? filterHeight : 0,
                 cellXOffset,
                 cellYOffset,
                 translateX,
@@ -512,6 +520,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             height,
             groupHeaderHeight,
             totalHeaderHeight,
+            showFilter,
             filterHeight,
             cellXOffset,
             cellYOffset,
@@ -519,7 +528,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             translateY,
             freezeColumns,
             freezeTrailingRows,
-            mappedColumns,
             rowHeight,
         ]
     );
@@ -1041,7 +1049,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             clientY: number
         ):
             | {
-                  area: "menu" | "indicator";
+                  area: "menu" | "indicator" | "filter";
                   bounds: Rectangle;
               }
             | undefined => {
@@ -1069,6 +1077,29 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                         area: "menu",
                         bounds: headerLayout.menuBounds,
                     };
+                } else if (showFilter) {
+                    const filterBounds = getBoundsForItem(canvas, col, -3);
+                    assert(filterBounds !== undefined);
+                    const filterLayout = computeHeaderLayout(
+                        undefined,
+                        header,
+                        filterBounds.x,
+                        filterBounds.y,
+                        filterBounds.width,
+                        filterBounds.height,
+                        theme,
+                        direction(header.title) === "rtl"
+                    );
+
+                    if (
+                        filterLayout.filterBounds !== undefined &&
+                        pointInRect(filterLayout.filterBounds, clientX, clientY)
+                    ) {
+                        return {
+                            area: "filter",
+                            bounds: filterLayout.filterBounds,
+                        };
+                    }
                 } else if (
                     header.indicatorIcon !== undefined &&
                     headerLayout.indicatorIconBounds !== undefined &&
@@ -1082,7 +1113,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             }
             return undefined;
         },
-        [mappedColumns, getBoundsForItem, hoveredOnEdge, isDragging, isResizing, theme]
+        [mappedColumns, isDragging, isResizing, hoveredOnEdge, getBoundsForItem, theme, showFilter]
     );
 
     const downTime = React.useRef(0);
@@ -1120,7 +1151,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             }
 
             if (
-                args.kind === headerKind &&
+                (args.kind === headerKind || args.kind === filterHeaderKind) &&
                 isOverHeaderElement(canvas, args.location[0], clientX, clientY) !== undefined
             ) {
                 return;
@@ -1263,18 +1294,31 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             }
 
             const [col] = args.location;
-            if (args.kind === headerKind) {
+            if (args.kind === headerKind || args.kind === filterHeaderKind) {
                 const headerBounds = isOverHeaderElement(canvas, col, clientX, clientY);
                 if (
                     headerBounds !== undefined &&
                     args.button === 0 &&
                     downPosition.current?.[0] === col &&
-                    downPosition.current?.[1] === -1
+                    downPosition.current?.[1] === (args.kind === headerKind ? -1 : -3)
                 ) {
-                    if (headerBounds.area === "menu") {
-                        onHeaderMenuClick?.(col, headerBounds.bounds);
-                    } else if (headerBounds.area === "indicator") {
-                        onHeaderIndicatorClick?.(col, headerBounds.bounds);
+                    switch (headerBounds.area) {
+                        case "menu": {
+                            onHeaderMenuClick?.(col, headerBounds.bounds);
+
+                            break;
+                        }
+                        case "indicator": {
+                            onHeaderIndicatorClick?.(col, headerBounds.bounds);
+
+                            break;
+                        }
+                        case "filter": {
+                            onFilterClearClick?.(col, headerBounds.bounds);
+
+                            break;
+                        }
+                        // No default
                     }
                 }
             } else if (args.kind === groupHeaderKind) {
@@ -1290,6 +1334,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             isOverHeaderElement,
             onHeaderMenuClick,
             onHeaderIndicatorClick,
+            onFilterClearClick,
             groupHeaderActionForEvent,
         ]
     );
@@ -1378,7 +1423,12 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     true
                 );
                 hoveredRef.current = args;
-            } else if (args.kind === "cell" || args.kind === headerKind || args.kind === groupHeaderKind) {
+            } else if (
+                args.kind === "cell" ||
+                args.kind === headerKind ||
+                args.kind === groupHeaderKind ||
+                args.kind === filterHeaderKind
+            ) {
                 let needsDamageCell = false;
                 let needsHoverPosition = true;
 

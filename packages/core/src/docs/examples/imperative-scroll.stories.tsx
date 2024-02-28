@@ -60,7 +60,6 @@ export const ImperativeScroll: React.VFC<ImperativeScrollProps> = p => {
                 {...defaultProps}
                 ref={ref}
                 rowMarkers="clickable-number"
-                rowMarkerFns={[{ order: 1, type: "number", start: 0, end: 0 }]}
                 getCellContent={getCellContent}
                 columns={cols}
                 onCellEdited={setCellValue}

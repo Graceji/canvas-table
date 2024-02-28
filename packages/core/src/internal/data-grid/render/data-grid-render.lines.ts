@@ -210,7 +210,7 @@ export function drawExtraRowThemes(
                     x: minX,
                     y: ty,
                     w: maxX - minX,
-                    h: rh,
+                    h: ty + rh > freezeY ? freezeY - ty : rh, // 余量不够时，不能将h设置为行高，否则会遮挡合计行
                     color: rowThemeBgCell,
                 });
             }
@@ -363,6 +363,7 @@ export function drawGridLines(
     }
 
     const groups = groupBy(toDraw, line => line.color);
+    ctx.lineWidth = theme.lineWidth;
     for (const g of Object.keys(groups)) {
         ctx.strokeStyle = g;
         for (const line of groups[g]) {

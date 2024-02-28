@@ -48,7 +48,7 @@ export function drawHighlightRings(
                 width,
                 height,
                 groupHeaderHeight,
-                headerHeight + groupHeaderHeight,
+                headerHeight + groupHeaderHeight + filterHeight,
                 filterHeight,
                 cellXOffset,
                 cellYOffset,
@@ -108,7 +108,7 @@ export function drawHighlightRings(
     });
 
     const drawCb = () => {
-        ctx.lineWidth = 1;
+        ctx.lineWidth = theme.accentWidth;
 
         let dashed = false;
 

@@ -12,7 +12,7 @@ import LinksCellRenderer, { type LinksCell } from "./cells/links-cell.js";
 import ButtonCellRenderer, { type ButtonCell } from "./cells/button-cell.js";
 import TreeViewCellRenderer, { type TreeViewCell } from "./cells/tree-view-cell.js";
 import MultiSelectCellRenderer, { type MultiSelectCell } from "./cells/multi-select-cell.js";
-import TreeCellRenderer, { type TreeCell } from "./cells/tree-cell";
+import TreeCellRenderer, { type TreeCell } from "./cells/tree-cell.js";
 
 const cells = [
     StarCellRenderer,

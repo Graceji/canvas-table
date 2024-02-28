@@ -54,11 +54,14 @@ export interface Theme {
     accentFg: string;
     accentLight: string;
     textDark: string;
+    textDarkAccent: string;
     textMedium: string;
     textLight: string;
     textBubble: string;
     bgIconHeader: string;
     fgIconHeader: string;
+    bgIconDisabled: string;
+    fgIconDisabled: string;
     bgIconHeaderHovered: string;
     fgIconHeaderHovered: string;
     textHeader: string;
@@ -87,6 +90,7 @@ export interface Theme {
     markerFontStyle: string;
     fontFamily: string;
     editorFontSize: string;
+    lineWidth: number;
     lineHeight: number;
     resizeIndicatorColor?: string;
     horizontalBorderColor?: string;
@@ -95,11 +99,13 @@ export interface Theme {
     filterHeaderBg?: string;
     markLine: string;
     markerTextLight: string;
+    markerTextAccent: string;
     emptyTextLight: string;
     emptyText: string;
 }
 
 const dataEditorBaseTheme: Theme = {
+    lineWidth: 1,
     accentWidth: 1,
     accentColor: "#4F5DFF",
     accentFg: "#FFFFFF",
@@ -108,13 +114,17 @@ const dataEditorBaseTheme: Theme = {
     emptyText: "暂无数据",
 
     textDark: "#313139",
+    textDarkAccent: "#FFAE3D",
     textMedium: "#737383",
     textLight: "#B2B2C0",
     textBubble: "#313139",
     markerTextLight: "#B2B2C0",
+    markerTextAccent: "#FFAE3D",
 
     bgIconHeader: "#737383",
     fgIconHeader: "#FFFFFF",
+    bgIconDisabled: "#737383",
+    fgIconDisabled: "#FFFFFF",
     bgIconHeaderHovered: "#000000",
     fgIconHeaderHovered: "#f3f4ef",
     textHeader: "#313139",

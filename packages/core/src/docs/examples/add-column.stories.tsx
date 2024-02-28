@@ -8,6 +8,7 @@ import {
     defaultProps,
 } from "../../data-editor/stories/utils.js";
 import { SimpleThemeWrapper } from "../../stories/story-utils.js";
+import { GridCellKind } from "../../internal/data-grid/data-grid-types.js";
 
 export default {
     title: "Glide-Data-Grid/DataEditor Demos",
@@ -37,11 +38,11 @@ interface AddColumnsProps {
 const iconHead = `<svg width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">`;
 
 export const AddColumns: React.FC<AddColumnsProps> = p => {
-    const { cols, getCellContent } = useMockDataGenerator(p.columnsCount);
+    const { cols, getCellContent } = useMockDataGenerator(p.columnsCount, false);
     const [filterValue, setFilterValue] = useState("filter");
 
     const getFilterCellContent = (col: number): GridCell => {
-        if (col !== 0) {
+        if (col !== -1) {
             return {
                 kind: GridCellKind.Text,
                 data: filterValue,
@@ -72,32 +73,35 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
                 cancelOrder: () =>
                     `<svg t="1703831014587" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9556" width="16" height="16"><path d="M175.616 220.672C22.528 395.776 30.72 662.016 196.096 827.904c167.424 167.424 431.616 173.568 607.232 20.48L175.616 220.672zM849.408 803.84c151.552-175.104 144.896-441.344-22.528-607.232C659.968 29.184 395.264 23.04 220.16 174.08l629.248 629.76z" p-id="9557"></path></svg>`,
             }}
-            rowMarkerFns={[
-                {
-                    type: "number",
-                    order: 2,
-                    start: 0,
-                    end: 0,
-                },
+            rowMarkers={{
+                kind: "both",
+                width: 75,
+                fns: [
+                    {
+                        type: "number",
+                        order: 2,
+                        start: 0,
+                        end: 0,
+                    },
 
-                {
-                    type: "icon",
-                    content: "workingOrder",
-                    order: 1,
-                    start: 0,
-                    end: 0,
-                },
+                    {
+                        type: "icon",
+                        content: "workingOrder",
+                        order: 1,
+                        start: 0,
+                        end: 0,
+                        disabled: true,
+                    },
 
-                {
-                    type: "icon",
-                    order: 3,
-                    content: "newOrder",
-                    start: 0,
-                    end: 0,
-                },
-            ]}
-            rowMarkers="number-icon"
-            rowMarkerWidth={75}
+                    {
+                        type: "icon",
+                        order: 3,
+                        content: "newOrder",
+                        start: 0,
+                        end: 0,
+                    },
+                ],
+            }}
             getCellContent={getCellContent}
             // onCellEdited={(cell, newValue) => {
             //     if (newValue.kind === "marker") {
@@ -115,16 +119,16 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
             theme={{
                 filterHeaderBg: "orange",
             }}
-            customRenderers={allCells}
-            drawCell={args => {
-                const isRowMarkerCol = args.row === -3 && args.isRowMarkerCol;
+            // customRenderers={allCells}
+            // drawCell={args => {
+            //     const isRowMarkerCol = args.row === -3 && args.isRowMarkerCol;
 
-                // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-                if (!isRowMarkerCol) return false;
+            //     // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+            //     if (!isRowMarkerCol) return false;
 
-                // draw
-                return true;
-            }}
+            //     // draw
+            //     return true;
+            // }}
             onHeaderClicked={onHeaderClicked}
         />
     );

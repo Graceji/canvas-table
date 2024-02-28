@@ -9,6 +9,7 @@ import {
     defaultProps,
 } from "../../data-editor/stories/utils.js";
 import { SimpleThemeWrapper } from "../../stories/story-utils.js";
+import { CompactSelection } from "../../index.js";
 
 export default {
     title: "Glide-Data-Grid/DataEditor Demos",
@@ -62,7 +63,9 @@ export const ObscuredDataGrid: React.VFC = () => {
                     rows: CompactSelection.fromSingleSelection([x[1], x[1 + 1]]),
                 });
             }}
-            // onHeaderContextMenu={x => console.log("onHeaderContextMenu", x)}
+            onHeaderContextMenu={(x, event) => {
+                event.preventDefault();
+            }}
             gridSelection={selection}
             onGridSelectionChange={setSelection}
             columns={cols}

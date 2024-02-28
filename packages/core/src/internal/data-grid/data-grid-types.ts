@@ -165,6 +165,7 @@ export interface BaseGridColumn {
         readonly showAddIcon?: boolean;
         readonly marker?: boolean;
     };
+    readonly customHeaderCell?: GridCell;
 }
 
 /** @category Columns */
@@ -176,6 +177,8 @@ export function isSizedGridColumn(c: GridColumn): c is SizedGridColumn {
 export interface SizedGridColumn extends BaseGridColumn {
     readonly width: number;
     readonly id?: string;
+    readonly minWidth?: number;
+    readonly maxWidth?: number;
 }
 
 /** @category Columns */
@@ -274,7 +277,7 @@ export function isReadWriteCell(cell: GridCell): cell is ReadWriteGridCell {
     ) {
         return cell.readonly !== true;
     }
-    assertNever(cell, "A cell was passed with an invalid kind");
+    assertNever(cell as never, "A cell was passed with an invalid kind");
 }
 
 /** @category Cells */
@@ -321,6 +324,7 @@ export interface BaseGridCell {
     readonly cursor?: CSSProperties["cursor"];
     readonly copyData?: string;
     readonly activationBehaviorOverride?: CellActiviationBehavior;
+    readonly readonly?: boolean;
 }
 
 /** @category Cells */
@@ -346,7 +350,6 @@ export interface TextCell extends BaseGridCell {
     readonly kind: GridCellKind.Text;
     readonly displayData: string;
     readonly data: string;
-    readonly readonly?: boolean;
     readonly allowWrapping?: boolean;
     readonly hoverEffect?: boolean;
     readonly hoverEffectTheme?: HoverEffectTheme;
@@ -357,7 +360,6 @@ export interface NumberCell extends BaseGridCell {
     readonly kind: GridCellKind.Number;
     readonly displayData: string;
     readonly data: number | undefined;
-    readonly readonly?: boolean;
     readonly fixedDecimals?: number;
     readonly allowNegative?: boolean;
     readonly thousandSeparator?: boolean | string;
@@ -372,7 +374,6 @@ export interface ImageCell extends BaseGridCell {
     readonly data: string[];
     readonly rounding?: number;
     readonly displayData?: string[]; // used for small images for faster scrolling
-    readonly readonly?: boolean;
 }
 
 /** @category Cells */
@@ -487,7 +488,6 @@ export interface UriCell extends BaseGridCell {
     readonly kind: GridCellKind.Uri;
     readonly data: string;
     readonly displayData?: string;
-    readonly readonly?: boolean;
     readonly onClickUri?: (args: BaseGridMouseEventArgs & { readonly preventDefault: () => void }) => void;
     readonly hoverEffect?: boolean;
 }
@@ -510,6 +510,7 @@ export interface NewRowCell extends BaseGridCell {
 }
 
 export type TreeNode = {
+    id?: string;
     name: string;
     depth?: number;
     collapsed?: boolean;
@@ -527,6 +528,10 @@ export interface MarkerFn {
     spriteCbMap?: { [key: string]: Sprite };
     order: number;
     size?: number;
+    disabled?: boolean | ((row: any) => boolean);
+    color?: string;
+    tooltip?: string;
+    placement?: string;
 }
 
 /** @category Cells */

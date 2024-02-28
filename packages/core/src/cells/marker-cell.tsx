@@ -1,12 +1,12 @@
-import { getMiddleCenterBias } from "../internal/data-grid/render/data-grid-lib.js";
-import { InnerGridCellKind, type MarkerCell } from "../internal/data-grid/data-grid-types.js";
-import type { BaseDrawArgs, InternalCellRenderer, PrepResult } from "./cell-types.js";
+import { getMiddleCenterBias, measureTextCached } from "../internal/data-grid/render/data-grid-lib.js";
+import { InnerGridCellKind, type MarkerCell, type MarkerFn } from "../internal/data-grid/data-grid-types.js";
+import type { BaseDrawArgs, DrawArgs, InternalCellRenderer, PrepResult } from "./cell-types.js";
 
 export const markerCellRenderer: InternalCellRenderer<MarkerCell> = {
     getAccessibilityString: c => c.row.toString(),
     kind: InnerGridCellKind.Marker,
     needsHover: true,
-    needsHoverPosition: false,
+    needsHoverPosition: true,
     drawPrep: prepMarkerRowCell,
     measure: () => 44,
     draw: a => drawMarkerRowCell(a, a.cell),
@@ -25,7 +25,15 @@ export const markerCellRenderer: InternalCellRenderer<MarkerCell> = {
                 // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
                 node.collapsed = !node.collapsed;
             } else {
-                isOverHeaderMarkerfn?.onClick?.(cell.node);
+                let disabled = isOverHeaderMarkerfn?.disabled;
+
+                if (typeof isOverHeaderMarkerfn?.disabled === "function") {
+                    disabled = isOverHeaderMarkerfn?.disabled?.(cell.node);
+                }
+
+                if (disabled !== true) {
+                    isOverHeaderMarkerfn?.onClick?.(cell.node);
+                }
             }
 
             return cell;
@@ -68,23 +76,27 @@ function deprepMarkerRowCell(args: Pick<BaseDrawArgs, "ctx">) {
     ctx.textAlign = "start";
 }
 
-function drawMarkerRowCell(args: BaseDrawArgs, cell: MarkerCell) {
-    const { ctx, rect, hoverAmount, theme, spriteManager } = args;
-    const { row: index, markerKind, node, functions } = cell;
-    const { x, y, height } = rect;
+function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
+    const { ctx, rect, hoverAmount, theme, spriteManager, hoverX = -100, highlighted } = args;
+    const { row: index, markerKind, node, functions, checked, drawHandle } = cell;
+    const { x, y, width, height } = rect;
     const text = index.toString();
-    const fontStyle = `${theme.markerFontStyle} ${theme.fontFamily}`;
+    const markerFontStyle = theme.markerFontFull;
+    const rectHoverX = rect.x + hoverX;
 
-    ctx.font = fontStyle;
-    const textWith = ctx.measureText(text).width;
+    const textWith = measureTextCached(text, ctx, markerFontStyle).width;
 
     const drawIndexNumber = (start: number) => {
         if (markerKind === "both" && hoverAmount !== 0) {
-            ctx.globalAlpha = 1 - hoverAmount;
+            // ctx.globalAlpha = 1 - hoverAmount;
         }
-        ctx.fillStyle = theme.markerTextLight;
-        ctx.font = fontStyle;
-        ctx.fillText(text, start, y + height / 2 + getMiddleCenterBias(ctx, fontStyle));
+        ctx.fillStyle = highlighted ? theme.markerTextAccent : theme.markerTextLight;
+        ctx.font = markerFontStyle;
+        ctx.fillText(text, start, y + height / 2 + getMiddleCenterBias(ctx, markerFontStyle));
+
+        if (hoverAmount !== 0) {
+            ctx.globalAlpha = 1;
+        }
     };
 
     const drawExpand = (start: number, size: number) => {
@@ -146,87 +158,157 @@ function drawMarkerRowCell(args: BaseDrawArgs, cell: MarkerCell) {
         }
     };
 
-    const drawIcon = (content: string | ((node: any) => string) | undefined, start: number, size: number) => {
+    const drawIcon = (item: MarkerFn, size: number, disabled?: boolean) => {
+        const { content, start, color } = item;
         const icon = typeof content === "string" ? content : content?.(node);
+
+        const variant = disabled === true ? "disabled" : "normal";
 
         if (icon !== undefined) {
             const iconSize = size;
-            spriteManager.drawSprite(icon, "normal", ctx, start, y + (height - iconSize) / 2, iconSize, theme, 1);
+            spriteManager.drawSprite(
+                icon,
+                variant,
+                ctx,
+                start,
+                y + (height - iconSize) / 2,
+                iconSize,
+                theme,
+                1,
+                iconSize,
+                color
+            );
             if (hoverAmount !== 0) {
                 ctx.globalAlpha = 1;
             }
         }
     };
 
-    let startX = x + theme.cellHorizontalPadding;
-    const contentTotalWidth = functions.reduce((prev, next) => {
-        const { type, size } = next;
-        const itemWidth =
-            type === "number" ? textWith : type === "checkbox" ? size ?? 20 : size ?? theme.markerIconSize;
-        prev += itemWidth;
-        return prev;
-    }, 0);
-    const padding = Math.floor(
-        (rect.width - theme.cellHorizontalPadding * 2 - contentTotalWidth) / (functions.length - 1)
-    );
-
-    functions
-        .sort((a, b) => a.order - b.order)
-        // eslint-disable-next-line unicorn/no-array-for-each
-        .forEach((fnItem, idx) => {
-            const { spriteCbMap, type, size } = fnItem;
-            if (spriteCbMap !== undefined) {
-                // eslint-disable-next-line unicorn/no-array-for-each
-                Object.keys(spriteCbMap).forEach(item => {
-                    spriteManager.addAdditionalIcon(item, spriteCbMap[item]);
-                });
-            }
-
+    if (functions?.length) {
+        let startX = x + theme.cellHorizontalPadding;
+        const contentTotalWidth = functions.reduce((prev, next) => {
+            const { type, size } = next;
             const itemWidth =
                 type === "number" ? textWith : type === "checkbox" ? size ?? 20 : size ?? theme.markerIconSize;
-
-            if (functions.length === 1) {
-                // 居中显示
-                fnItem.start = rect.x + rect.width / 2;
-                fnItem.end = fnItem.start + itemWidth;
-            } else if (functions.length === 2 && functions.some(item => item.type === "number")) {
-                // 数字居中，其余靠右显示
-                if (type === "number") {
-                    fnItem.start = rect.x + rect.width / 2;
-                    fnItem.end = fnItem.start + textWith;
-                } else {
-                    fnItem.start = rect.width - theme.cellHorizontalPadding - itemWidth;
-                    fnItem.end = fnItem.start + itemWidth;
+            prev += itemWidth;
+            return prev;
+        }, 0);
+        const padding = Math.floor(
+            (rect.width - theme.cellHorizontalPadding * 2 - contentTotalWidth) / (functions.length - 1)
+        );
+        functions
+            .sort((a, b) => a.order - b.order)
+            // eslint-disable-next-line unicorn/no-array-for-each
+            .forEach((fnItem, idx) => {
+                const { spriteCbMap, type, size } = fnItem;
+                if (spriteCbMap !== undefined) {
+                    // eslint-disable-next-line unicorn/no-array-for-each
+                    Object.keys(spriteCbMap).forEach(item => {
+                        spriteManager.addAdditionalIcon(item, spriteCbMap[item]);
+                    });
                 }
-            } else if (functions.length === 3) {
-                if (idx === functions.length - 1) {
-                    fnItem.start = rect.x + rect.width - itemWidth - theme.cellHorizontalPadding;
-                    fnItem.end = fnItem.start + itemWidth;
-                } else if (type === "number") {
-                    // 数字居中
+
+                const itemWidth =
+                    type === "number" ? textWith : type === "checkbox" ? size ?? 20 : size ?? theme.markerIconSize;
+
+                if (functions.length === 1) {
+                    // 居中显示
                     fnItem.start = rect.x + rect.width / 2;
-                    fnItem.end = fnItem.start + textWith;
+                    fnItem.end = fnItem.start + itemWidth;
+                } else if (functions.length === 2 && functions.some(item => item.type === "number")) {
+                    // 数字居中，其余靠右显示
+                    if (type === "number") {
+                        fnItem.start = rect.x + rect.width / 2;
+                        fnItem.end = fnItem.start + textWith;
+                    } else {
+                        fnItem.start = rect.width - theme.cellHorizontalPadding - itemWidth;
+                        fnItem.end = fnItem.start + itemWidth;
+                    }
+                } else if (functions.length === 3) {
+                    if (idx === functions.length - 1) {
+                        fnItem.start = rect.x + rect.width - itemWidth - theme.cellHorizontalPadding;
+                        fnItem.end = fnItem.start + itemWidth;
+                    } else if (type === "number") {
+                        // 数字居中
+                        fnItem.start = rect.x + rect.width / 2;
+                        fnItem.end = fnItem.start + textWith;
+                    } else {
+                        fnItem.start = startX;
+                        fnItem.end = startX + itemWidth;
+                    }
                 } else {
+                    // 平分区域
+                    // 索引数字长度很长时，如何处理？应该要设置一个最大宽度，设置为rect宽度的60%
                     fnItem.start = startX;
                     fnItem.end = startX + itemWidth;
+                    startX = fnItem.end + padding;
                 }
-            } else {
-                // 平分区域
-                // 索引数字长度很长时，如何处理？应该要设置一个最大宽度，设置为rect宽度的60%
-                fnItem.start = startX;
-                fnItem.end = startX + itemWidth;
-                startX = fnItem.end + padding;
-            }
 
-            // eslint-disable-next-line unicorn/prefer-switch
-            if (type === "number") {
-                drawIndexNumber(fnItem.start);
-            } else if (type === "checkbox") {
-                // drawCheckbox();
-            } else if (type === "expand") {
-                drawExpand(fnItem.start, itemWidth);
-            } else {
-                drawIcon(fnItem.content, fnItem.start, itemWidth);
+                const disabled =
+                    fnItem.disabled === true ||
+                    (typeof fnItem.disabled === "function" && fnItem.disabled?.(node) === true);
+
+                // eslint-disable-next-line unicorn/prefer-switch
+                if (type === "number") {
+                    drawIndexNumber(fnItem.start);
+                } else if (type === "checkbox") {
+                    // drawCheckbox();
+                } else if (type === "expand") {
+                    drawExpand(fnItem.start, itemWidth);
+                } else {
+                    drawIcon(fnItem, itemWidth, disabled);
+                }
+
+                // 找出鼠标悬浮的项，修正鼠标悬浮样式
+                const isHovered = rectHoverX > fnItem.start && rectHoverX <= fnItem.end;
+
+                if (isHovered) {
+                    if (fnItem.type === "number") {
+                        args.overrideCursor?.("default");
+                    } else if (disabled) {
+                        args.overrideCursor?.("not-allowed");
+                    }
+                }
+            });
+    } else {
+        const checkedboxAlpha = checked ? 1 : markerKind === "checkbox-visible" ? 0.6 + 0.4 * hoverAmount : hoverAmount;
+        if (markerKind !== "number" && checkedboxAlpha > 0) {
+            ctx.globalAlpha = checkedboxAlpha;
+            // const offsetAmount = 7 * (checked ? hoverAmount : 1);
+            // drawCheckbox(
+            //     ctx,
+            //     theme,
+            //     checked,
+            //     drawHandle ? x + offsetAmount : x,
+            //     y,
+            //     drawHandle ? width - offsetAmount : width,
+            //     height,
+            //     true,
+            //     undefined,
+            //     undefined,
+            //     18,
+            //     "center",
+            //     style
+            // );
+            if (drawHandle) {
+                ctx.globalAlpha = hoverAmount;
+                ctx.beginPath();
+                for (const xOffset of [3, 6]) {
+                    for (const yOffset of [-5, -1, 3]) {
+                        ctx.rect(x + xOffset, y + height / 2 + yOffset, 2, 2);
+                    }
+                }
+
+                ctx.fillStyle = theme.textLight;
+                ctx.fill();
+                ctx.beginPath();
             }
-        });
+            ctx.globalAlpha = 1;
+        }
+        if (markerKind === "number" || (markerKind === "both" && !checked)) {
+            const start = x + width / 2;
+
+            drawIndexNumber(start);
+        }
+    }
 }

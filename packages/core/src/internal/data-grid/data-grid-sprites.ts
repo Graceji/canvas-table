@@ -26,16 +26,23 @@ export type Sprite = (props: SpriteProps) => string;
 export type SpriteMap = Record<string | HeaderIcon, Sprite>;
 
 /** @category Columns */
-export type SpriteVariant = "normal" | "selected" | "special" | "hovered";
+export type SpriteVariant = "normal" | "selected" | "special" | "hovered" | "disabled";
 
-function getColors(variant: SpriteVariant, theme: Theme): readonly [string, string] {
+function getColors(
+    variant: SpriteVariant,
+    theme: Theme,
+    fgColorOuter?: string,
+    bgColorOuter?: string
+): readonly [string, string] {
     // eslint-disable-next-line unicorn/prefer-switch
     if (variant === "normal") {
-        return [theme.bgIconHeader, theme.fgIconHeader];
+        return [bgColorOuter ?? theme.bgIconHeader, fgColorOuter ?? theme.fgIconHeader];
     } else if (variant === "selected") {
         return ["white", theme.accentColor];
     } else if (variant === "hovered") {
         return [theme.bgIconHeaderHovered, theme.fgIconHeaderHovered];
+    } else if (variant === "disabled") {
+        return [theme.bgIconDisabled, theme.fgIconDisabled];
     } else {
         return [theme.accentColor, theme.bgHeader];
     }
@@ -75,11 +82,11 @@ export class SpriteManager {
         fgColorOuter?: string,
         bgColorOuter?: string
     ) {
-        const [bgColor, fgColor] = getColors(variant, theme);
+        const [bgColor, fgColor] = getColors(variant, theme, fgColorOuter, bgColorOuter);
         const rSize = size * Math.ceil(window.devicePixelRatio);
         const vSize =
             height !== undefined && typeof height === "number" ? height * Math.ceil(window.devicePixelRatio) : rSize;
-        const key = `${bgColorOuter ?? bgColor}_${fgColorOuter ?? fgColor}_${rSize}_${sprite}`;
+        const key = `${bgColor}_${fgColor}_${rSize}_${sprite}`;
 
         let spriteCanvas = this.spriteMap.get(key);
         if (spriteCanvas === undefined) {
@@ -94,7 +101,7 @@ export class SpriteManager {
 
             const imgSource = new Image();
             imgSource.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
-                spriteCb({ fgColor: fgColorOuter ?? fgColor, bgColor: bgColorOuter ?? bgColor })
+                spriteCb({ fgColor: fgColor, bgColor: bgColor })
             )}`;
             this.spriteMap.set(key, spriteCanvas);
             const promise: Promise<void> | undefined = imgSource.decode();

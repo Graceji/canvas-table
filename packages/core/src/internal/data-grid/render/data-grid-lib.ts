@@ -27,6 +27,7 @@ export function useMappedColumns(
         () =>
             columns.map(
                 (c, i): MappedGridColumn => ({
+                    ...c,
                     group: c.group,
                     grow: c.grow,
                     hasMenu: c.hasMenu,
@@ -48,6 +49,9 @@ export function useMappedColumns(
                     headerRowMarkerTheme: c.headerRowMarkerTheme,
                     headerRowMarkerAlwaysVisible: c.headerRowMarkerAlwaysVisible,
                     headerRowMarkerDisabled: c.headerRowMarkerDisabled,
+                    minWidth: c.minWidth,
+                    maxWidth: c.maxWidth,
+                    customHeaderCell: c.customHeaderCell,
                 })
             ),
         [columns, freezeColumns]
@@ -152,6 +156,14 @@ export function remapForDnDState(
     if (dndState !== undefined) {
         let writable = [...columns];
         const temp = mappedCols[dndState.src];
+
+        const srcCol = writable[dndState.src];
+        const target = writable[dndState.dest];
+
+        if (srcCol.group !== undefined && srcCol.group !== target.group) {
+            (srcCol as any).group = target.group;
+        }
+
         if (dndState.src > dndState.dest) {
             writable.splice(dndState.src, 1);
             writable.splice(dndState.dest, 0, temp);
@@ -159,6 +171,7 @@ export function remapForDnDState(
             writable.splice(dndState.dest + 1, 0, temp);
             writable.splice(dndState.src, 1);
         }
+
         writable = writable.map((c, i) => ({
             ...c,
             sticky: columns[i].sticky,
@@ -274,17 +287,12 @@ export function getRowIndexForY(
     translateY: number,
     freezeTrailingRows: number
 ): number | undefined {
-    const totalHeaderHeight = headerHeight + groupHeaderHeight + filterHeight;
+    const innerHeaderHeight = headerHeight + groupHeaderHeight;
+    const totalHeaderHeight = innerHeaderHeight + filterHeight;
     if (hasGroups && targetY <= groupHeaderHeight) return -2;
+    if (targetY <= innerHeaderHeight) return -1;
     // filter area
-    if (
-        filterHeight > 0 &&
-        (hasGroups
-            ? targetY > headerHeight && targetY < totalHeaderHeight
-            : targetY > headerHeight + groupHeaderHeight && targetY < totalHeaderHeight)
-    )
-        return -3;
-    if (targetY <= totalHeaderHeight) return -1;
+    if (filterHeight > 0 && targetY > innerHeaderHeight && targetY <= totalHeaderHeight) return -3;
 
     let y = height;
     for (let fr = 0; fr < freezeTrailingRows; fr++) {
@@ -441,10 +449,10 @@ export function prepTextCell(
     lastPrep: PrepResult | undefined,
     overrideColor?: string
 ): Partial<PrepResult> {
-    const { ctx, theme } = args;
+    const { ctx, theme, highlighted } = args;
     const result: Partial<PrepResult> = lastPrep ?? {};
 
-    const newFill = overrideColor ?? theme.textDark;
+    const newFill = overrideColor ?? (highlighted === true ? theme.textDarkAccent : theme.textDark);
     if (newFill !== result.fillStyle) {
         ctx.fillStyle = newFill;
         result.fillStyle = newFill;
@@ -568,6 +576,10 @@ export function drawTextCell(
     allowWrapping?: boolean,
     hyperWrapping?: boolean
 ): void {
+    if (!data) {
+        return;
+    }
+
     const { ctx, rect, theme } = args;
 
     const { x, y, width: w, height: h } = rect;
@@ -603,10 +615,10 @@ export function drawTextCell(
         }
 
         if (!allowWrapping) {
-            const textWidth = ctx.measureText(data).width;
+            const textWidth = measureTextCached(data, ctx).width;
             const padding = theme.cellHorizontalPadding * 2;
             if (textWidth > rect.width - padding) {
-                const ellipsisWidth = ctx.measureText("...").width;
+                const ellipsisWidth = measureTextCached("...", ctx).width;
                 const truncatedText = truncateTextToFit(ctx, data, rect.width - padding - ellipsisWidth);
                 data = truncatedText + "...";
             }
@@ -802,11 +814,11 @@ export function computeBounds(
         height: 0,
     };
 
-    if (col >= mappedColumns.length || row >= rows || row < -2 || col < 0) {
+    if (col >= mappedColumns.length || row >= rows || row < -3 || col < 0) {
         return result;
     }
 
-    const headerHeight = totalHeaderHeight - groupHeaderHeight;
+    const headerHeight = totalHeaderHeight - groupHeaderHeight - filterHeight;
 
     if (col >= freezeColumns) {
         const dir = cellXOffset > col ? -1 : 1;
@@ -830,7 +842,7 @@ export function computeBounds(
             break;
         }
         case -3: {
-            result.y = groupHeaderHeight + totalHeaderHeight - filterHeight;
+            result.y = totalHeaderHeight - filterHeight;
             result.height = filterHeight;
 
             break;

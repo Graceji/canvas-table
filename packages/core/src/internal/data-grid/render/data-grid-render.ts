@@ -62,7 +62,7 @@ function clipHeaderDamage(
 
             const finalX = drawX + diff + 1;
             const finalWidth = c.width - diff - 1;
-            if (damage.has([c.sourceIndex, -1])) {
+            if (damage.has([c.sourceIndex, -1]) || damage.has([c.sourceIndex, -3])) {
                 ctx.rect(finalX, groupHeaderHeight, finalWidth, totalHeaderHeight - groupHeaderHeight);
             }
         }
@@ -350,7 +350,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
                 translateY,
                 mappedColumns,
                 freezeColumns,
-                filterHeight,
+                showFilter ? filterHeight : 0,
                 headerHeight,
                 groupHeaderHeight,
                 rowHeight,
@@ -390,9 +390,9 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         const damageInView = damage.hasItemInRegion([
             {
                 x: cellXOffset,
-                y: -2,
+                y: -3,
                 width: viewRegionWidth,
-                height: 2,
+                height: 3,
             },
             {
                 x: cellXOffset,
@@ -408,9 +408,9 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             },
             {
                 x: 0,
-                y: -2,
+                y: -3,
                 width: freezeColumns,
-                height: 2,
+                height: 3,
             },
             {
                 x: cellXOffset,
@@ -491,7 +491,9 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         };
 
         if (damageInView) {
-            doDamage(targetCtx);
+            if (rows > (freezeTrailingRows > 0 ? freezeTrailingRows : 0)) {
+                doDamage(targetCtx);
+            }
             if (mainCtx !== null) {
                 mainCtx.save();
                 mainCtx.scale(dpr, dpr);
@@ -574,7 +576,10 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         );
     }
 
-    if (rows > (freezeTrailingRows > 0 ? 1 : 0)) {
+    const scrollX = last !== undefined && (cellXOffset !== last.cellXOffset || translateX !== last.translateX);
+    const scrollY = last !== undefined && (cellYOffset !== last.cellYOffset || translateY !== last.translateY);
+
+    if (rows > (freezeTrailingRows > 0 ? freezeTrailingRows : 0)) {
         overdrawStickyBoundaries(
             targetCtx,
             effectiveCols,
@@ -596,7 +601,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             translateY,
             mappedColumns,
             freezeColumns,
-            filterHeight,
+            showFilter ? filterHeight : 0,
             headerHeight,
             groupHeaderHeight,
             rowHeight,
@@ -734,13 +739,14 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             verticalBorder,
             freezeTrailingRows,
             rows,
-            theme
+            theme,
+            verticalOnly
         );
 
         highlightRedraw?.();
         focusRedraw?.();
 
-        if (isResizing) {
+        if (isResizing && resizeIndicator !== "none") {
             walkColumns(effectiveCols, 0, translateX, 0, totalHeaderHeight, (c, x) => {
                 if (c.sourceIndex === resizeCol) {
                     drawColumnResizeOutline(
@@ -750,13 +756,15 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
                         totalHeaderHeight + 1,
                         blend(theme.resizeIndicatorColor ?? theme.accentLight, theme.bgHeader)
                     );
-                    drawColumnResizeOutline(
-                        targetCtx,
-                        x + c.width,
-                        totalHeaderHeight,
-                        height,
-                        blend(theme.resizeIndicatorColor ?? theme.accentLight, theme.bgCell)
-                    );
+                    if (resizeIndicator === "full") {
+                        drawColumnResizeOutline(
+                            targetCtx,
+                            x + c.width,
+                            totalHeaderHeight,
+                            height,
+                            blend(theme.resizeIndicatorColor ?? theme.accentLight, theme.bgCell)
+                        );
+                    }
                     return true;
                 }
                 return false;
@@ -792,9 +800,6 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             freezeColumns,
             Array.from({ length: freezeTrailingRows }, (_, i) => rows - 1 - i)
         );
-
-        const scrollX = last !== undefined && (cellXOffset !== last.cellXOffset || translateX !== last.translateX);
-        const scrollY = last !== undefined && (cellYOffset !== last.cellYOffset || translateY !== last.translateY);
 
         lastBlitData.current = {
             cellXOffset,

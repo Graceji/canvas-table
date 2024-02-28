@@ -1,4 +1,4 @@
-import type { TreeNode } from "@glideapps/glide-data-grid-cells/src/cells/tree-cell";
+import type { TreeNode } from "@glideapps/glide-data-grid";
 import React from "react";
 
 const names = ["Alfa", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"];

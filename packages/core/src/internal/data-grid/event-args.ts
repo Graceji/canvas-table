@@ -97,19 +97,30 @@ export type GridMouseEventArgs =
     | GridMouseCellEventArgs
     | GridMouseHeaderEventArgs
     | GridMouseOutOfBoundsEventArgs
-    | GridMouseGroupHeaderEventArgs;
+    | GridMouseGroupHeaderEventArgs
+    | GridMouseFilterHeaderEventArgs;
 
 export interface PreventableEvent {
     preventDefault: () => void;
 }
+
+/** @category Types */
+export interface CellContextEventArgs extends CellClickedEventArgs {
+    sourceEvent: MouseEvent | TouchEvent;
+}
+
 /** @category Types */
 export interface CellClickedEventArgs extends GridMouseCellEventArgs, PreventableEvent {}
 
 /** @category Types */
-export interface HeaderClickedEventArgs extends GridMouseHeaderEventArgs, PreventableEvent {}
+export interface HeaderClickedEventArgs extends GridMouseHeaderEventArgs, PreventableEvent {
+    sourceEvent: MouseEvent | TouchEvent;
+}
 
 /** @category Types */
-export interface GroupHeaderClickedEventArgs extends GridMouseGroupHeaderEventArgs, PreventableEvent {}
+export interface GroupHeaderClickedEventArgs extends GridMouseGroupHeaderEventArgs, PreventableEvent {
+    sourceEvent: MouseEvent | TouchEvent;
+}
 
 export interface FillPatternEventArgs extends PreventableEvent {
     patternSource: Rectangle;

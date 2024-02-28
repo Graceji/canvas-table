@@ -27,7 +27,6 @@ import {
     type ValidatedGridCell,
     type ImageEditorType,
     type CustomCell,
-    headerKind,
     BooleanEmpty,
     BooleanIndeterminate,
     type FillHandleDirection,
@@ -51,7 +50,7 @@ import {
     isGroupEqual,
     itemsAreEqual,
     itemIsInRect,
-    gridSelectionHasItem,
+    // gridSelectionHasItem,
     getFreezeTrailingHeight,
 } from "../internal/data-grid/render/data-grid-lib.js";
 import { GroupRename } from "./group-rename.js";
@@ -81,6 +80,8 @@ import {
     type GridKeyEventArgs,
     type GridMouseFilterHeaderEventArgs,
     filterHeaderKind,
+    headerKind,
+    type CellContextEventArgs,
 } from "../internal/data-grid/event-args.js";
 import { type Keybinds, useKeybindingsWithDefaults } from "./data-editor-keybindings.js";
 import type { Highlight } from "../internal/data-grid/render/data-grid-render.cells.js";
@@ -97,22 +98,14 @@ const DataGridOverlayEditor = React.lazy(
 let idCounter = 0;
 
 export interface RowMarkerOptions {
-    kind:
-        | "checkbox"
-        | "number"
-        | "clickable-number"
-        | "checkbox-visible"
-        | "both"
-        | "none"
-        | "expand-number-icon"
-        | "expand-number"
-        | "number-icon";
+    kind: "checkbox" | "number" | "clickable-number" | "checkbox-visible" | "both" | "none";
     checkboxStyle?: "circle" | "square";
     startIndex?: number;
     width?: number;
     theme?: Partial<Theme>;
     headerTheme?: Partial<Theme>;
     headerAlwaysVisible?: boolean;
+    fns?: MarkerFn[];
 }
 
 interface MouseState {
@@ -248,7 +241,7 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
     /** Emitted when a cell is activated, by pressing Enter, Space or double clicking it.
      * @group Events
      */
-    readonly onCellActivated?: (cell: Item, type?: "dbclick" | "enter" | "space") => void;
+    readonly onCellActivated?: (cell: Item) => void;
 
     /**
      * Emitted whenever the user initiats a pattern fill using the fill handle. This event provides both
@@ -344,7 +337,6 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
      * @group Style
      */
     readonly rowMarkers?: RowMarkerOptions["kind"] | RowMarkerOptions;
-    readonly rowMarkerFns?: MarkerFn[];
     /**
      * Sets the width of row markers in pixels, if unset row markers will automatically size.
      * @group Style
@@ -713,6 +705,9 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
     readonly showFilter?: boolean;
 
     readonly filterHeight?: number;
+
+    // 是否可以选中行
+    readonly selectRow?: boolean;
 }
 
 type ScrollToFn = (
@@ -779,8 +774,6 @@ const emptyGridSelection: GridSelection = {
     current: undefined,
 };
 
-const emptyMarkerFns = [] as MarkerFn[];
-
 const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorProps> = (p, forwardedRef) => {
     const [gridSelectionInner, setGridSelectionInner] = React.useState<GridSelection>(emptyGridSelection);
 
@@ -801,7 +794,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const safeWindow = typeof window === "undefined" ? null : window;
 
     const {
-        rowMarkerFns = emptyMarkerFns,
         imageEditorOverride,
         getRowThemeOverride: getRowThemeOverrideIn,
         markdownDivCreateNode,
@@ -862,6 +854,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         rowSelectionMode = "auto",
         onHeaderMenuClick,
         onHeaderIndicatorClick,
+        onFilterClearClick,
         getGroupDetails,
         rowGrouping,
         onSearchClose: onSearchCloseIn,
@@ -919,6 +912,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         showFilter = false,
         filterHeight = 20,
         showAccent = true,
+        selectRow = false,
     } = p;
 
     const drawFocusRing = drawFocusRingIn === "no-editor" ? overlay === undefined : drawFocusRingIn;
@@ -1148,6 +1142,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         return columns.some(c => c.group !== undefined);
     }, [columns]);
 
+    // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
     const totalHeaderHeight = enableGroups ? headerHeight + groupHeaderHeight : headerHeight;
 
     const numSelectedRows = gridSelection.rows.length;
@@ -1364,7 +1359,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     row: rowMarkerStartIndex + mappedRow,
                     drawHandle: onRowMoved !== undefined,
                     cursor: "pointer", // rowMarkers === "clickable-number" ? "pointer" : undefined,
-                    functions: rowMarkerFns,
+                    functions: rowMarkersObj?.fns,
                 } as MarkerCell;
 
                 const outerResult = getMarkerContent?.(row);
@@ -1446,7 +1441,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             rowMarkers,
             rowMarkerStartIndex,
             onRowMoved,
-            rowMarkerFns,
+            rowMarkersObj?.fns,
             getMarkerContent,
             trailingRowOptions?.marker,
             trailingRowOptions?.hint,
@@ -1509,7 +1504,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
             const [col, row] = gridSelection.current.cell;
             const c = getMangledCellContent([col, row]);
-            if (c.kind !== GridCellKind.Boolean && c.allowOverlay) {
+            if (c.kind !== GridCellKind.Boolean && c.allowOverlay && c.readonly !== true) {
                 let content = c;
                 if (initialValue !== undefined) {
                     switch (content.kind) {
@@ -1785,10 +1780,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             freezeColumns,
             columns,
             mangledRows,
-            lastRowSticky,
             rowHeight,
-            rowHeight,
-            rows,
         ]
     );
 
@@ -1985,6 +1977,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     const isSelected = selectedRows.hasIndex(row);
 
                     const lastHighlighted = lastSelectedRowRef.current;
+
                     /**
                      * 行选中逻辑
                      * 摒弃了单独的cell选中逻辑，如需要，找源代码
@@ -2041,6 +2034,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 setOverlay(undefined);
                 lastSelectedRowRef.current = undefined;
                 lastSelectedColRef.current = undefined;
+
                 // if (hasRowMarkers && col === 0) {
                 //     lastSelectedRowRef.current = undefined;
                 //     lastSelectedColRef.current = undefined;
@@ -2466,16 +2460,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             };
 
             const handleFilterMaybeClick = (a: GridMouseFilterHeaderEventArgs): boolean => {
-                if (a.isTouch || (lastMouseDownCol === col && lastMouseDownRow === row)) {
-                    // onCellClicked?.([col - rowMarkerOffset, row], {
-                    //     ...a,
-                    //     preventDefault,
-                    // });
-                }
                 if (!isPrevented.current) {
-                    // const c = getMangledCellContent(args.location);
                     const [activeCol] = args.location;
-                    // const outerCol = activeCol - rowMarkerOffset;
                     const result = getFilterCellContent?.(activeCol) ?? (defaultFilterCell as any);
 
                     const r = getCellRenderer(result);
@@ -2499,17 +2485,13 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             ]);
                         }
                     }
-                    if (
-                        !isPrevented.current &&
-                        mouse?.previousSelection?.current?.cell !== undefined &&
-                        gridSelection.current !== undefined
-                    ) {
-                        const [selectedCol, selectedRow] = gridSelection.current.cell;
-                        if (col === selectedCol && row === selectedRow) {
-                            // onCellActivated?.([col - rowMarkerOffset, row]);
-                            reselectFilter(a.bounds, false);
-                            return true;
-                        }
+
+                    if (isPrevented.current || gridSelection.current === undefined) return false;
+
+                    const [selectedCol, selectedRow] = gridSelection.current.cell;
+                    if (col === selectedCol && row === selectedRow) {
+                        reselectFilter(a.bounds, false);
+                        return true;
                     }
                 }
                 return false;
@@ -2533,14 +2515,14 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         });
                         return;
                     } else if (args.kind === "header" && gridSelection.columns.hasIndex(col)) {
-                        onHeaderContextMenu?.(clickLocation, { ...args, preventDefault });
+                        onHeaderContextMenu?.(clickLocation, { ...args, preventDefault, sourceEvent });
                         return;
                     } else if (args.kind === groupHeaderKind) {
                         if (clickLocation < 0) {
                             return;
                         }
 
-                        onGroupHeaderContextMenu?.(clickLocation, { ...args, preventDefault });
+                        onGroupHeaderContextMenu?.(clickLocation, { ...args, preventDefault, sourceEvent });
                         return;
                     }
                 }
@@ -2550,12 +2532,13 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         handleSelect(args);
                     }
                 } else if (args.kind === groupHeaderKind) {
-                    onGroupHeaderClicked?.(clickLocation, { ...args, preventDefault });
+                    onGroupHeaderClicked?.(clickLocation, { ...args, preventDefault, sourceEvent });
                 } else {
                     if (args.kind === headerKind) {
                         onHeaderClicked?.(clickLocation, {
                             ...args,
                             preventDefault,
+                            sourceEvent,
                         });
                     }
                     handleSelect(args);
@@ -2573,7 +2556,22 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         void normalSizeColumn(col);
                     }
                 } else if (args.button === 0 && col === lastMouseDownCol && row === lastMouseDownRow) {
-                    onHeaderClicked?.(clickLocation, { ...args, preventDefault });
+                    const column = mangledCols[col];
+                    if (column.customHeaderCell !== undefined) {
+                        const r = getCellRenderer(column.customHeaderCell);
+                        if (r !== undefined && r.onClick !== undefined) {
+                            r.onClick({
+                                ...args,
+                                cell: column.customHeaderCell,
+                                posX: args.localEventX,
+                                posY: args.localEventY,
+                                bounds: args.bounds,
+                                theme: themeForCell(column.customHeaderCell, args.location),
+                                preventDefault,
+                            });
+                        }
+                    }
+                    onHeaderClicked?.(clickLocation, { ...args, preventDefault, sourceEvent });
                 }
             }
 
@@ -2583,7 +2581,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 }
 
                 if (args.button === 0 && col === lastMouseDownCol && row === lastMouseDownRow) {
-                    onGroupHeaderClicked?.(clickLocation, { ...args, preventDefault });
+                    onGroupHeaderClicked?.(clickLocation, { ...args, preventDefault, sourceEvent });
                     if (!isPrevented.current) {
                         handleGroupHeaderSelection(args);
                     }
@@ -2595,7 +2593,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             }
 
             if ((args.kind === "cell" && args.button === 0) || args.button === 1) {
-                handleMaybeClick(args);
+                handleMaybeClick(args as GridMouseCellEventArgs);
             }
 
             lastMouseSelectLocation.current = undefined;
@@ -2661,6 +2659,13 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             onHeaderMenuClick?.(col - rowMarkerOffset, screenPosition);
         },
         [onHeaderMenuClick, rowMarkerOffset]
+    );
+
+    const onFilterClearClickInner = React.useCallback(
+        (col: number, screenPosition: Rectangle) => {
+            onFilterClearClick?.(col - rowMarkerOffset, screenPosition);
+        },
+        [onFilterClearClick, rowMarkerOffset]
     );
 
     const onHeaderIndicatorClickInner = React.useCallback(
@@ -3104,7 +3109,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const updateSelectedCell = React.useCallback(
         (col: number, row: number, fromEditingTrailingRow: boolean, freeMove: boolean): boolean => {
             const rowMax = mangledRows - (fromEditingTrailingRow ? 0 : 1);
-            col = clamp(col, rowMarkerOffset, columns.length - 1 + rowMarkerOffset);
+            col = clamp(col, 0, columns.length - 1 + rowMarkerOffset);
             row = clamp(row, 0, rowMax);
 
             const curCol = currentCell?.[0];
@@ -3399,12 +3404,109 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             } else if (!overlayOpen) {
                 if (isHotkey(keys.goDownCell, event, details)) {
                     row += 1;
+                    if (selectRow === true && row >= 0 && row < rows) {
+                        setSelectedRowsAndCell(
+                            CompactSelection.fromSingleSelection(row),
+                            lastSelectedCurrent.current
+                                ? {
+                                      ...lastSelectedCurrent.current,
+                                      cell: [lastSelectedCurrent.current.cell[0], row],
+                                      range: {
+                                          ...lastSelectedCurrent.current.range,
+                                          y: row,
+                                      },
+                                  }
+                                : undefined,
+                            undefined,
+                            false
+                        );
+
+                        const didMatch = details.didMatch;
+
+                        if (didMatch) {
+                            cancel();
+                            return true;
+                        }
+                    }
                 } else if (isHotkey(keys.goUpCell, event, details)) {
                     row -= 1;
+                    // 上下选择，选中单行
+                    if (selectRow === true && row >= 0 && row < rows) {
+                        setSelectedRowsAndCell(
+                            CompactSelection.fromSingleSelection(row),
+                            lastSelectedCurrent.current
+                                ? {
+                                      ...lastSelectedCurrent.current,
+                                      cell: [lastSelectedCurrent.current.cell[0], row],
+                                      range: {
+                                          ...lastSelectedCurrent.current.range,
+                                          y: row,
+                                      },
+                                  }
+                                : undefined,
+                            undefined,
+                            false
+                        );
+
+                        const didMatch = details.didMatch;
+
+                        if (didMatch) {
+                            cancel();
+                            return true;
+                        }
+                    }
                 } else if (isHotkey(keys.goRightCell, event, details)) {
                     col += 1;
+                    // 左右选择，保持选中不变
+                    if (col >= 0 && col < mangledCols.length && selectRow) {
+                        setSelectedRowsAndCell(
+                            selectedRows,
+                            lastSelectedCurrent.current
+                                ? {
+                                      ...lastSelectedCurrent.current,
+                                      cell: [col, lastSelectedCurrent.current.cell[1]],
+                                      range: {
+                                          ...lastSelectedCurrent.current.range,
+                                          x: col,
+                                      },
+                                  }
+                                : undefined,
+                            undefined,
+                            false
+                        );
+                        const didMatch = details.didMatch;
+
+                        if (didMatch) {
+                            cancel();
+                            return true;
+                        }
+                    }
                 } else if (isHotkey(keys.goLeftCell, event, details)) {
                     col -= 1;
+                    // 左右选择，保持选中不变
+                    if (col >= 0 && col < mangledCols.length && selectRow) {
+                        setSelectedRowsAndCell(
+                            selectedRows,
+                            lastSelectedCurrent.current
+                                ? {
+                                      ...lastSelectedCurrent.current,
+                                      cell: [col, lastSelectedCurrent.current.cell[1]],
+                                      range: {
+                                          ...lastSelectedCurrent.current.range,
+                                          x: col,
+                                      },
+                                  }
+                                : undefined,
+                            undefined,
+                            false
+                        );
+                        const didMatch = details.didMatch;
+
+                        if (didMatch) {
+                            cancel();
+                            return true;
+                        }
+                    }
                 } else if (isHotkey(keys.goDownCellRetainSelection, event, details)) {
                     row += 1;
                     freeMove = true;
@@ -3467,6 +3569,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
                 if (isHotkey(keys.acceptOverlayRight, event, details)) {
                     setOverlay(undefined);
+                    // reselect(bounds, true);
                     col++;
                 }
             }
@@ -3514,22 +3617,20 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             return didMatch;
         },
         [
-            rowGroupingNavBehavior,
-            overlayOpen,
             gridSelection,
             keybindings,
+            overlayOpen,
             columnSelect,
             rowSelect,
-            rangeSelect,
-            rowMarkerOffset,
-            mapper,
-            rows,
+            rowGroupingNavBehavior,
             updateSelectedCell,
+            trapFocus,
             setGridSelection,
             onSelectionCleared,
+            rowMarkerOffset,
             columnsIn.length,
+            rows,
             onDelete,
-            trapFocus,
             deleteRange,
             setSelectedColumns,
             setSelectedRows,
@@ -3541,6 +3642,11 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             fillDown,
             fillRight,
             adjustSelection,
+            rangeSelect,
+            selectRow,
+            setSelectedRowsAndCell,
+            mangledCols.length,
+            mapper,
         ]
     );
 
@@ -3602,14 +3708,14 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         (args: GridMouseEventArgs, preventDefault: () => void, sourceEvent: MouseEvent) => {
             const adjustedCol = args.location[0] - rowMarkerOffset;
             if (args.kind === "header") {
-                onHeaderContextMenu?.(adjustedCol, { ...args, preventDefault });
+                onHeaderContextMenu?.(adjustedCol, { ...args, preventDefault, sourceEvent });
             }
 
             if (args.kind === groupHeaderKind) {
                 if (adjustedCol < 0) {
                     return;
                 }
-                onGroupHeaderContextMenu?.(adjustedCol, { ...args, preventDefault });
+                onGroupHeaderContextMenu?.(adjustedCol, { ...args, preventDefault, sourceEvent });
             }
 
             if (args.kind === "cell") {
@@ -4352,6 +4458,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     onDragStart={onDragStartImpl}
                     onHeaderMenuClick={onHeaderMenuClickInner}
                     onHeaderIndicatorClick={onHeaderIndicatorClickInner}
+                    onFilterClearClick={onFilterClearClickInner}
                     onItemHovered={onItemHoveredImpl}
                     isFilling={mouseState?.fillHandle === true}
                     onMouseMove={onMouseMoveImpl}
@@ -4377,7 +4484,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     gridRef={gridRef}
                     getCellRenderer={getCellRenderer}
                     resizeIndicator={resizeIndicator}
-                    scrollToEnd={scrollToEnd}
                     verticalOnly={verticalOnly}
                     getFilterCellContent={getFilterCellContent}
                     showAccent={showAccent}

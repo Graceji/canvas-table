@@ -103,6 +103,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
         rowMarkerWidth,
         hasRowMarkers,
         onHeaderMenuClick,
+        onFilterClearClick,
         onHeaderIndicatorClick,
         getCellContent,
         onColumnMoved,
@@ -191,6 +192,14 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
             onHeaderMenuClick?.(col, screenPosition);
         },
         [dragColActive, dragRowActive, onHeaderMenuClick]
+    );
+
+    const onFilterClearClickMangled = React.useCallback(
+        (col: number, screenPosition: Rectangle) => {
+            if (dragColActive || dragRowActive) return;
+            onFilterClearClick?.(col, screenPosition);
+        },
+        [dragColActive, dragRowActive, onFilterClearClick]
     );
 
     const onHeaderIndicatorClickMangled = React.useCallback(
@@ -433,6 +442,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
             getCellContent={getMangledCellContent}
             isResizing={resizeCol !== undefined}
             onHeaderMenuClick={onHeaderMenuClickMangled}
+            onFilterClearClick={onFilterClearClickMangled}
             onHeaderIndicatorClick={onHeaderIndicatorClickMangled}
             isDragging={dragColActive}
             onItemHovered={onItemHoveredImpl}
