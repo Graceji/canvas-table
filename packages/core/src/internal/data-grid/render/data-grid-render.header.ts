@@ -61,6 +61,7 @@ export function drawGridHeaders(
     overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
     getFilterCellRenderer: GetCellRendererCallback,
     getFilterCellContent: (cell: number) => InnerGridCell,
+    showFilter: boolean,
     hasRowMarkers?: boolean,
     rowMarkerWidth?: number,
     showAccent?: boolean
@@ -71,8 +72,10 @@ export function drawGridHeaders(
     ctx.fillStyle = outerTheme.bgHeader;
     ctx.fillRect(0, 0, width, totalHeaderHeight);
 
-    ctx.fillStyle = outerTheme.filterHeaderBg ?? outerTheme.bgHeader;
-    ctx.fillRect(hasRowMarkers === true ? rowMarkerWidth ?? 0 : 0, totalHeaderHeight, width, filterHeight);
+    if (showFilter === true && filterHeight > 0) {
+        ctx.fillStyle = outerTheme.filterHeaderBg ?? outerTheme.bgHeader;
+        ctx.fillRect(hasRowMarkers === true ? rowMarkerWidth ?? 0 : 0, totalHeaderHeight, width, filterHeight);
+    }
 
     const frameTime = performance.now();
     const hCol = hovered?.[0]?.[0];
@@ -89,7 +92,12 @@ export function drawGridHeaders(
         const diff = Math.max(0, clipX - x);
         ctx.save();
         ctx.beginPath();
-        ctx.rect(x + diff, groupHeaderHeight, c.width - diff, headerHeight + filterHeight);
+
+        if (c.group === undefined) {
+            ctx.rect(x + diff, 0, c.width - diff, totalHeaderHeight);
+        } else {
+            ctx.rect(x + diff, groupHeaderHeight, c.width - diff, headerHeight + filterHeight);
+        }
         ctx.clip();
 
         const groupTheme = getGroupDetails(c.group ?? "").overrideTheme;
@@ -111,6 +119,7 @@ export function drawGridHeaders(
         const hoveredBoolean = !noHover && hRow === -1 && hCol === c.sourceIndex;
 
         const filterHoveredBoolean = !noHover && hRow === -3 && hCol === c.sourceIndex;
+
         const hover = noHover
             ? 0
             : hoverValues.find(s => s.item[0] === c.sourceIndex && s.item[1] === -1)?.hoverAmount ?? 0;
@@ -124,10 +133,18 @@ export function drawGridHeaders(
 
         if (selected && showAccent === true) {
             ctx.fillStyle = bgFillStyle;
-            ctx.fillRect(x + xOffset, y, c.width - xOffset, headerHeight);
+            if (c.group === undefined) {
+                ctx.rect(x + xOffset, 0, c.width - xOffset, totalHeaderHeight);
+            } else {
+                ctx.rect(x + xOffset, y, c.width - xOffset, headerHeight);
+            }
         } else if (hasSelectedCell || hover > 0) {
             ctx.beginPath();
-            ctx.rect(x + xOffset, y, c.width - xOffset, headerHeight);
+            if (c.group === undefined) {
+                ctx.rect(x + xOffset, 0, c.width - xOffset, totalHeaderHeight);
+            } else {
+                ctx.rect(x + xOffset, y, c.width - xOffset, headerHeight);
+            }
             if (hasSelectedCell) {
                 ctx.fillStyle = theme.bgHeaderHasFocus;
                 ctx.fill();
@@ -252,7 +269,9 @@ export function drawGroups(
             return;
         ctx.save();
         ctx.beginPath();
-        ctx.rect(x, y, w, h);
+        if (effectiveCols[span[0]]?.group !== undefined) {
+            ctx.rect(x, y, w, h);
+        }
         ctx.clip();
 
         const group = getGroupDetails(groupName);

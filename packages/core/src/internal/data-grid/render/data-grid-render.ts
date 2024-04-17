@@ -63,7 +63,12 @@ function clipHeaderDamage(
             const finalX = drawX + diff + 1;
             const finalWidth = c.width - diff - 1;
             if (damage.has([c.sourceIndex, -1]) || damage.has([c.sourceIndex, -3])) {
-                ctx.rect(finalX, groupHeaderHeight, finalWidth, totalHeaderHeight - groupHeaderHeight);
+                ctx.rect(
+                    finalX,
+                    c.group === undefined ? 0 : groupHeaderHeight,
+                    finalWidth,
+                    totalHeaderHeight // totalHeaderHeight - groupHeaderHeight
+                );
             }
         }
     );
@@ -304,6 +309,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             overrideCursor,
             getCellRenderer,
             getFilterCellContent,
+            showFilter,
             hasRowMarkers,
             rowMarkerWidth,
             showAccent

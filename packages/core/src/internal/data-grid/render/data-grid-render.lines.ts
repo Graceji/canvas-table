@@ -324,7 +324,7 @@ export function drawGridLines(
         if (tx >= minX && tx <= maxX && verticalBorder(index + 1)) {
             toDraw.push({
                 x1: tx,
-                y1: Math.max(groupHeaderHeight, minY),
+                y1: Math.max(effectiveCols[index + 1]?.group === undefined ? minY : groupHeaderHeight, minY),
                 x2: tx,
                 y2: Math.min(height, maxY),
                 color: vColor,
@@ -356,7 +356,6 @@ export function drawGridLines(
                     color: rowTheme?.horizontalBorderColor ?? rowTheme?.borderColor ?? hColor,
                 });
             }
-
             y += getRowHeight(row);
             row++;
         }
