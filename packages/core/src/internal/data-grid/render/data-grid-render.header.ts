@@ -94,7 +94,7 @@ export function drawGridHeaders(
         ctx.beginPath();
 
         if (c.group === undefined) {
-            ctx.rect(x + diff, 0, c.width - diff, totalHeaderHeight);
+            ctx.rect(x + diff, 0, c.width - diff, totalHeaderHeight + filterHeight);
         } else {
             ctx.rect(x + diff, groupHeaderHeight, c.width - diff, headerHeight + filterHeight);
         }
