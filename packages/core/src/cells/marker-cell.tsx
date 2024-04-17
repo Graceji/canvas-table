@@ -136,7 +136,7 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
                 ctx.lineWidth = 1.5;
                 ctx.strokeStyle = theme.markLine;
                 ctx.beginPath();
-                const startX = x + theme.cellHorizontalPadding + size / 2;
+                const startX = start + size / 2;
 
                 if (isLast === true) {
                     ctx.moveTo(startX, y);
