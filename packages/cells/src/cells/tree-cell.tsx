@@ -30,7 +30,7 @@ const renderer: CustomRenderer<TreeCell> = {
     isMatch: (cell: CustomCell): cell is TreeCell => (cell.data as any).kind === "tree-cell",
     draw: (args, cell) => {
         const { ctx, rect, theme, spriteManager } = args;
-        const { x, y, width, height } = rect;
+        const { y, width, height } = rect;
         const { data } = cell;
         const { node, key, iconSize = theme.markerIconSize } = data;
 

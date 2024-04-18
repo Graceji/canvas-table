@@ -992,7 +992,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     }
     const canDrag = hoveredOnEdge ?? false;
     const cursor = isDragging
-        ? "grabbing"
+        ? "move" // "grabbing"
         : canDrag || isResizing
         ? "col-resize"
         : overFill || isFilling

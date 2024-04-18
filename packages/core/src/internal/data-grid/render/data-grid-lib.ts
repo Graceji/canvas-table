@@ -160,7 +160,7 @@ export function remapForDnDState(
         const srcCol = writable[dndState.src];
         const target = writable[dndState.dest];
 
-        if (srcCol.group !== undefined && srcCol.group !== target.group) {
+        if (srcCol.group !== target.group) {
             (srcCol as any).group = target.group;
         }
 

@@ -68,13 +68,11 @@ export const ColumnGroups: React.VFC = () => {
                 const current = columns[s];
                 const target = columns[e];
 
-                if (current.group !== target.group && current.group !== undefined) {
+                if (target.group !== current.group) {
                     current.group = target.group;
                 }
 
                 setColumns(swapArrayElements([...columns], s, e));
-                // if (current.group !== undefined) {
-                // }
             }}
             onDragStart={e => {
                 e.setData("text/plain", "Drag data here!");
