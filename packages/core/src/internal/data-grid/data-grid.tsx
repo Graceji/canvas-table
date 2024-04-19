@@ -322,6 +322,8 @@ export interface DataGridProps {
 
     // 点击头部是否显示高亮
     readonly showAccent?: boolean;
+
+    readonly dragCursor?: "move" | "not-allowed";
 }
 
 type DamageUpdateList = readonly {
@@ -418,6 +420,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         hasRowMarkers,
         rowMarkerWidth,
         showAccent = true,
+        dragCursor,
     } = p;
     const translateX = p.translateX ?? 0;
     const translateY = p.translateY ?? 0;
@@ -992,7 +995,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     }
     const canDrag = hoveredOnEdge ?? false;
     const cursor = isDragging
-        ? "move" // "grabbing"
+        ? dragCursor ?? "move"
         : canDrag || isResizing
         ? "col-resize"
         : overFill || isFilling
@@ -1324,7 +1327,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             } else if (args.kind === groupHeaderKind) {
                 const action = groupHeaderActionForEvent(args.group, args.bounds, args.localEventX, args.localEventY);
                 if (action !== undefined && args.button === 0) {
-                    action.onClick(args);
+                    // 没有明白为什么在onmouseup和click中都要执行action上的click方法？
+                    // action.onClick(args);
                 }
             }
         },

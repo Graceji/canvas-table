@@ -1462,11 +1462,13 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     icon: result.icon,
                     name: result.name,
                     overrideTheme: result.overrideTheme,
+                    collapse: result.collapse,
                     actions: [
                         ...(result.actions ?? []),
                         {
                             title: "Rename",
                             icon: "renameIcon",
+                            needHover: true,
                             onClick: e =>
                                 setRenameGroup({
                                     group: result.name,

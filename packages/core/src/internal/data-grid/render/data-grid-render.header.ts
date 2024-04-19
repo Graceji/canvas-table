@@ -267,13 +267,13 @@ export function drawGroups(
             })
         )
             return;
+
         ctx.save();
         ctx.beginPath();
-        if (effectiveCols[span[0]]?.group !== undefined) {
+        if (groupName !== "") {
             ctx.rect(x, y, w, h);
         }
         ctx.clip();
-
         const group = getGroupDetails(groupName);
         const groupTheme =
             group?.overrideTheme === undefined ? theme : mergeAndRealizeTheme(theme, group.overrideTheme);
@@ -288,6 +288,7 @@ export function drawGroups(
         if (group !== undefined) {
             let drawX = x;
             if (group.icon !== undefined) {
+                // icon的位置也需要修改下，等需要支持icon时再修改。看需求
                 spriteManager.drawSprite(
                     group.icon,
                     "normal",
@@ -299,13 +300,16 @@ export function drawGroups(
                 );
                 drawX += 26;
             }
+
+            const start = x + w / 2 - measureTextCached(group.name, ctx).width / 2;
+
             ctx.fillText(
                 group.name,
-                drawX + xPad,
+                start, // drawX
                 groupHeaderHeight / 2 + getMiddleCenterBias(ctx, theme.headerFontFull)
             );
 
-            if (group.actions !== undefined && isHovered) {
+            if (group.actions !== undefined) {
                 const actionBoxes = getActionBoundsForGroup({ x, y, width: w, height: h }, group.actions);
 
                 ctx.beginPath();
@@ -327,13 +331,18 @@ export function drawGroups(
                 const [mouseX, mouseY] = hovered?.[1] ?? [-1, -1];
                 for (let i = 0; i < group.actions.length; i++) {
                     const action = group.actions[i];
+
+                    if (action.needHover === true && !isHovered) {
+                        break;
+                    }
+
                     const box = actionBoxes[i];
                     const actionHovered = pointInRect(box, mouseX + x, mouseY);
                     if (actionHovered) {
                         ctx.globalAlpha = 1;
                     }
                     spriteManager.drawSprite(
-                        action.icon,
+                        action.title === "Collapse" ? (group.collapse === true ? "collapse" : "expand") : action.icon,
                         "normal",
                         ctx,
                         box.x + box.width / 2 - 10,

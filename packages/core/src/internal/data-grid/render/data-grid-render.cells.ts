@@ -43,10 +43,12 @@ export interface GroupDetails {
     readonly name: string;
     readonly icon?: string;
     readonly overrideTheme?: Partial<Theme>;
+    readonly collapse?: boolean;
     readonly actions?: readonly {
         readonly title: string;
         readonly onClick: (e: GridMouseGroupHeaderEventArgs) => void;
         readonly icon: GridColumnIcon | string;
+        readonly needHover?: boolean;
     }[];
 }
 

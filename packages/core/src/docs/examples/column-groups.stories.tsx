@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { DataEditorAll as DataEditor } from "../../data-editor-all.js";
 import {
     BeautifulWrapper,
@@ -51,17 +51,43 @@ export const ColumnGroups: React.VFC = () => {
 
     const [columns, setColumns] = useState(cols);
 
+    const [expandMap, setExpandMap] = useState({});
+
+    const gridRef = useRef();
+
     return (
         <DataEditor
             {...defaultProps}
+            ref={gridRef}
             getCellContent={getCellContent}
-            onGroupHeaderRenamed={(x, y) => window.alert(`Please rename group ${x} to ${y}`)}
+            // onGroupHeaderRenamed={(x, y) => window.alert(`Please rename group ${x} to ${y}`)}
             columns={columns}
             rows={1000}
-            getGroupDetails={g => ({
-                name: g,
-                icon: g === "" ? undefined : GridColumnIcon.HeaderCode,
-            })}
+            getGroupDetails={g => {
+                return {
+                    name: g,
+                    icon: g === "" ? undefined : GridColumnIcon.HeaderCode,
+                    collapse: expandMap[g] ?? false,
+                    actions: [
+                        {
+                            title: "Collapse",
+                            // icon: actionIcon,
+                            onClick: e => {
+                                setExpandMap({
+                                    ...expandMap,
+                                    [g]: !expandMap[g],
+                                });
+                                setColumns([...columns]);
+                                gridRef.current?.updateCells?.([
+                                    {
+                                        cell: [e.location[0] - 1, e.location[1]],
+                                    },
+                                ]);
+                            },
+                        },
+                    ],
+                };
+            }}
             rowMarkers="both"
             isDraggable={false}
             onColumnMoved={(s, e) => {
@@ -72,10 +98,19 @@ export const ColumnGroups: React.VFC = () => {
                     current.group = target.group;
                 }
 
-                setColumns(swapArrayElements([...columns], s, e));
+                // setColumns(swapArrayElements([...columns], s, e));
             }}
             onDragStart={e => {
                 e.setData("text/plain", "Drag data here!");
+            }}
+            onColumnProposeMove={(start, end) => {
+                // const endCol = columns[end - 1];
+
+                // if (endCol.frozen) {
+                //     return false;
+                // }
+
+                return true;
             }}
         />
     );
