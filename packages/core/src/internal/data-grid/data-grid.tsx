@@ -1419,6 +1419,11 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 });
             };
 
+            // if (
+            //     !mouseEventArgsAreEqual(args, hoveredRef.current) ||
+            //     (hasRowMarkers === true && args.location[0] === 0)
+            // ) {
+
             if (!mouseEventArgsAreEqual(args, hoveredRef.current)) {
                 setDrawCursorOverride(undefined);
                 onItemHovered?.(args);
@@ -1455,6 +1460,10 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 }
             }
 
+            if (hasRowMarkers === true && args.location[0] === 0) {
+                onItemHovered?.(args);
+            }
+
             const notRowMarkerCol = args.location[0] >= (firstColAccessible ? 0 : 1);
             setHoveredOnEdge(args.kind === headerKind && args.isEdge && notRowMarkerCol && allowResize === true);
 
@@ -1466,6 +1475,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         [
             eventTargetRef,
             getMouseArgsForPosition,
+            hasRowMarkers,
             firstColAccessible,
             allowResize,
             onMouseMoveRaw,

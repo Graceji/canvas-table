@@ -117,7 +117,7 @@ export function useSelectionBehavior(
     const setSelectedRowsAndCell = React.useCallback(
         (
             newRows: CompactSelection | undefined,
-            value: Pick<NonNullable<GridSelection["current"]>, "cell" | "range"> | undefined,
+            value: NonNullable<GridSelection["current"]> | undefined,
             append: Slice | number | undefined,
             allowMixed: boolean,
             trigger: SelectionTrigger = "click"
@@ -144,7 +144,13 @@ export function useSelectionBehavior(
                 const columnMixed = allowMixed && columnBehavior === "mixed";
                 const current = gridSelection.current; // !rangeMixed ? undefined : gridSelection.current;
                 newVal = {
-                    current,
+                    current:
+                        value === undefined
+                            ? current
+                            : ({
+                                  ...current,
+                                  ...value,
+                              } as any),
                     columns: columnMixed ? gridSelection.columns : CompactSelection.empty(),
                     rows: newRows,
                 };

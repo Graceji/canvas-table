@@ -155,7 +155,7 @@ const dataEditorBaseTheme: Theme = {
     headerIconSize: 18,
     markerIconSize: 18,
 
-    headerFontStyle: "600 14px",
+    headerFontStyle: "400 14px",
     filterFontStyle: "500 13px",
     baseFontStyle: "13px",
     markerFontStyle: "13px",

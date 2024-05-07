@@ -538,7 +538,8 @@ function drawMultiLineText(
     bias: number,
     theme: FullTheme,
     contentAlign?: BaseGridCell["contentAlign"],
-    hyperWrapping?: boolean
+    hyperWrapping?: boolean,
+    splitNum?: number
 ) {
     const fontStyle = theme.baseFontFull;
     const split = splitText(ctx, data, fontStyle, w - theme.cellHorizontalPadding * 2, hyperWrapping ?? false);
@@ -558,10 +559,32 @@ function drawMultiLineText(
 
     const optimalY = y + h / 2 - actualHeight / 2;
     let drawY = Math.max(y + theme.cellVerticalPadding, optimalY);
-    for (const line of split) {
+
+    let lineNum = 0;
+    let newSplit = split;
+    const canTruncate = splitNum !== undefined && typeof splitNum === "number" && splitNum > 1;
+
+    if (canTruncate && split.length > splitNum) {
+        newSplit = [...split.slice(0, splitNum - 1), split.slice(splitNum - 1).join("")];
+    }
+
+    for (let line of newSplit) {
+        lineNum++;
+
+        if (canTruncate && lineNum > splitNum - 1) {
+            const textWidth = measureTextCached(line, ctx).width;
+            const padding = theme.cellHorizontalPadding * 2;
+            if (textWidth > w - padding) {
+                const ellipsisWidth = measureTextCached("...", ctx).width;
+                const truncatedText = truncateTextToFit(ctx, line, w - padding - ellipsisWidth);
+                line = truncatedText + "...";
+            }
+        }
+
         drawSingleTextLine(ctx, line, x, drawY, w, emHeight, bias, theme, contentAlign);
         drawY += lineHeight;
-        if (drawY > y + h) break;
+
+        if (drawY > y + h && (canTruncate ? lineNum > splitNum - 1 : true)) break;
     }
     if (mustClip) {
         ctx.restore();
@@ -574,7 +597,8 @@ export function drawTextCell(
     data: string,
     contentAlign?: BaseGridCell["contentAlign"],
     allowWrapping?: boolean,
-    hyperWrapping?: boolean
+    hyperWrapping?: boolean,
+    splitNum?: number
 ): void {
     if (!data) {
         return;
@@ -624,7 +648,7 @@ export function drawTextCell(
             }
             drawSingleTextLine(ctx, data, x, y, w, h, bias, theme, contentAlign);
         } else {
-            drawMultiLineText(ctx, data, x, y, w, h, bias, theme, contentAlign, hyperWrapping);
+            drawMultiLineText(ctx, data, x, y, w, h, bias, theme, contentAlign, hyperWrapping, splitNum);
         }
 
         if (changed) {

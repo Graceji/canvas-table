@@ -292,7 +292,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
         ]
     );
 
-    const [dragCursor, setDargCursor] = React.useState("move");
+    const [dragCursor, setDargCursor] = React.useState<"move" | "not-allowed">("move");
 
     const dragOffset = React.useMemo(() => {
         if (dragCol === undefined || dropCol === undefined) return undefined;

@@ -7,8 +7,8 @@ import {
     useMockDataGenerator,
     defaultProps,
 } from "../../data-editor/stories/utils.js";
-import { GridColumnIcon } from "../../internal/data-grid/data-grid-types.js";
 import { SimpleThemeWrapper } from "../../stories/story-utils.js";
+import { GridColumnIcon } from "../../internal/data-grid/data-grid-types.js";
 
 export default {
     title: "Glide-Data-Grid/DataEditor Demos",
@@ -67,7 +67,7 @@ export const ColumnGroups: React.VFC = () => {
                 return {
                     name: g,
                     icon: g === "" ? undefined : GridColumnIcon.HeaderCode,
-                    collapse: expandMap[g] ?? false,
+                    collapse: (expandMap as any)[g] ?? false,
                     actions: [
                         {
                             title: "Collapse",
@@ -75,7 +75,8 @@ export const ColumnGroups: React.VFC = () => {
                             onClick: e => {
                                 setExpandMap({
                                     ...expandMap,
-                                    [g]: !expandMap[g],
+                                    // eslint-disable-next-line no-extra-boolean-cast
+                                    [g]: !Boolean((expandMap as any)[g]),
                                 });
                                 setColumns([...columns]);
                                 gridRef.current?.updateCells?.([
@@ -86,7 +87,7 @@ export const ColumnGroups: React.VFC = () => {
                             },
                         },
                     ],
-                };
+                } as any;
             }}
             rowMarkers="both"
             isDraggable={false}

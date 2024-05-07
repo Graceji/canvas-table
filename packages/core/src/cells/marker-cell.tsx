@@ -42,7 +42,7 @@ export const markerCellRenderer: InternalCellRenderer<MarkerCell> = {
         return undefined;
     },
     onPaste: () => undefined,
-    onSelect(args) {
+    onSelect: args => {
         const { cell, posX: x, posY: y, bounds } = args;
 
         // 计算边界时应该按照每一项的盒子来计算
@@ -77,7 +77,7 @@ function deprepMarkerRowCell(args: Pick<BaseDrawArgs, "ctx">) {
 }
 
 function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
-    const { ctx, rect, hoverAmount, theme, spriteManager, hoverX = -100, highlighted } = args;
+    const { ctx, rect, hoverAmount, theme, spriteManager, hoverX = -100, highlighted, hoverY } = args;
     const { row: index, markerKind, node, functions, checked, drawHandle } = cell;
     const { x, y, width, height } = rect;
     const text = index.toString();
@@ -91,7 +91,7 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
             // ctx.globalAlpha = 1 - hoverAmount;
         }
         ctx.fillStyle = highlighted ? theme.markerTextAccent : theme.markerTextLight;
-        ctx.font = markerFontStyle;
+        ctx.font = `${hoverAmount > 0 ? "bold " + markerFontStyle : markerFontStyle}`;
         ctx.fillText(text, start, y + height / 2 + getMiddleCenterBias(ctx, markerFontStyle));
 
         if (hoverAmount !== 0) {
@@ -159,10 +159,22 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
     };
 
     const drawIcon = (item: MarkerFn, size: number, disabled?: boolean) => {
-        const { content, start, color } = item;
+        const { content, start, color, hoverColor } = item;
         const icon = typeof content === "string" ? content : content?.(node);
 
-        const variant = disabled === true ? "disabled" : "normal";
+        let isHovered = false;
+        if (
+            hoverX !== undefined &&
+            hoverX > item.start &&
+            hoverX <= item.end &&
+            hoverY !== undefined &&
+            hoverY > 0 &&
+            hoverY <= rect.height
+        ) {
+            isHovered = true;
+        }
+
+        const variant = disabled === true ? "disabled" : isHovered ? "hovered" : "normal";
 
         if (icon !== undefined) {
             const iconSize = size;
@@ -176,7 +188,9 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
                 theme,
                 1,
                 iconSize,
-                color
+                color,
+                undefined,
+                hoverColor
             );
             if (hoverAmount !== 0) {
                 ctx.globalAlpha = 1;
@@ -248,17 +262,6 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
                     fnItem.disabled === true ||
                     (typeof fnItem.disabled === "function" && fnItem.disabled?.(node) === true);
 
-                // eslint-disable-next-line unicorn/prefer-switch
-                if (type === "number") {
-                    drawIndexNumber(fnItem.start);
-                } else if (type === "checkbox") {
-                    // drawCheckbox();
-                } else if (type === "expand") {
-                    drawExpand(fnItem.start, itemWidth);
-                } else {
-                    drawIcon(fnItem, itemWidth, disabled);
-                }
-
                 // 找出鼠标悬浮的项，修正鼠标悬浮样式
                 const isHovered = rectHoverX > fnItem.start && rectHoverX <= fnItem.end;
 
@@ -268,6 +271,17 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
                     } else if (disabled) {
                         args.overrideCursor?.("not-allowed");
                     }
+                }
+
+                // eslint-disable-next-line unicorn/prefer-switch
+                if (type === "number") {
+                    drawIndexNumber(fnItem.start);
+                } else if (type === "checkbox") {
+                    // drawCheckbox();
+                } else if (type === "expand") {
+                    drawExpand(fnItem.start, itemWidth);
+                } else {
+                    drawIcon(fnItem, itemWidth, disabled);
                 }
             });
     } else {

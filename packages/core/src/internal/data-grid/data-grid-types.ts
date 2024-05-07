@@ -520,6 +520,7 @@ export type TreeNode = {
 };
 
 export interface MarkerFn {
+    key?: string;
     type: "icon" | "checkbox" | "delete" | "expand" | "number";
     start: number;
     end: number;
@@ -530,6 +531,7 @@ export interface MarkerFn {
     size?: number;
     disabled?: boolean | ((row: any) => boolean);
     color?: string;
+    hoverColor?: string;
     tooltip?: string;
     placement?: string;
 }

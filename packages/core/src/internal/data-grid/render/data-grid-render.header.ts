@@ -345,9 +345,9 @@ export function drawGroups(
                         action.title === "Collapse" ? (group.collapse === true ? "collapse" : "expand") : action.icon,
                         "normal",
                         ctx,
-                        box.x + box.width / 2 - 10,
-                        box.y + box.height / 2 - 10,
-                        20,
+                        box.x + box.width / 2 - (action.iconSize !== undefined ? action.iconSize / 2 : 10),
+                        box.y + box.height / 2 - (action.iconSize !== undefined ? action.iconSize / 2 : 10),
+                        action.iconSize ?? 20,
                         groupTheme
                     );
                     if (actionHovered) {
@@ -803,7 +803,7 @@ export function drawFilterCell(
         }
 
         const startX = x + c.width - 13 - theme.cellHorizontalPadding * 2;
-        const startY = y + (filterHeight - 13) / 2;
+        const startY = y + (filterHeight - 13) / 2 + 0.3;
         spriteManager.drawSprite("clearIcon", "normal", ctx, startX, startY, 13, theme);
 
         if (!hovered) {

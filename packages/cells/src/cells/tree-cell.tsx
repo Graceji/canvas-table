@@ -110,7 +110,7 @@ const renderer: CustomRenderer<TreeCell> = {
 
         const depthOffset = (depth || 0) * 20;
 
-        if (posX < depthOffset || posX > depthOffset + 22) return;
+        if (posX < depthOffset || posX > depthOffset + 22) return undefined;
 
         preventDefault();
 
@@ -119,6 +119,19 @@ const renderer: CustomRenderer<TreeCell> = {
         return cell;
     },
     provideEditor: undefined,
+    onSelect: args => {
+        const { cell, posX } = args;
+        const { node } = cell.data;
+        const { depth } = node;
+
+        const depthOffset = (depth || 0) * 20;
+
+        if (posX < depthOffset || posX > depthOffset + 22) {
+            args.preventDefault(false);
+        } else {
+            args.preventDefault();
+        }
+    },
 };
 
 export default renderer;

@@ -8,7 +8,7 @@ import {
     defaultProps,
 } from "../../data-editor/stories/utils.js";
 import { SimpleThemeWrapper } from "../../stories/story-utils.js";
-import { GridCellKind } from "../../internal/data-grid/data-grid-types.js";
+import { CompactSelection, GridCellKind } from "../../internal/data-grid/data-grid-types.js";
 
 export default {
     title: "Glide-Data-Grid/DataEditor Demos",
@@ -57,6 +57,11 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
     const onHeaderClicked = React.useCallback((location, event) => {
         // eslint-disable-next-line no-console
     }, []);
+
+    const [selection, setSelection] = useState({
+        rows: CompactSelection.empty(),
+        columns: CompactSelection.empty(),
+    });
 
     return (
         <DataEditor
@@ -119,6 +124,11 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
             theme={{
                 filterHeaderBg: "orange",
             }}
+            gridSelection={selection}
+            onGridSelectionChange={newSelection => {
+                setSelection(newSelection);
+            }}
+            rangeSelect="none"
             // customRenderers={allCells}
             // drawCell={args => {
             //     const isRowMarkerCol = args.row === -3 && args.isRowMarkerCol;

@@ -32,7 +32,9 @@ function getColors(
     variant: SpriteVariant,
     theme: Theme,
     fgColorOuter?: string,
-    bgColorOuter?: string
+    bgColorOuter?: string,
+    fgHoverColorOuter?: string,
+    bgHoverColorOuter?: string
 ): readonly [string, string] {
     // eslint-disable-next-line unicorn/prefer-switch
     if (variant === "normal") {
@@ -40,7 +42,7 @@ function getColors(
     } else if (variant === "selected") {
         return ["white", theme.accentColor];
     } else if (variant === "hovered") {
-        return [theme.bgIconHeaderHovered, theme.fgIconHeaderHovered];
+        return [bgHoverColorOuter ?? theme.bgIconHeaderHovered, fgHoverColorOuter ?? theme.fgIconHeaderHovered];
     } else if (variant === "disabled") {
         return [theme.bgIconDisabled, theme.fgIconDisabled];
     } else {
@@ -80,9 +82,18 @@ export class SpriteManager {
         alpha: number = 1,
         height?: number,
         fgColorOuter?: string,
-        bgColorOuter?: string
+        bgColorOuter?: string,
+        fgHoverColorOuter?: string,
+        bgHoverColorOuter?: string
     ) {
-        const [bgColor, fgColor] = getColors(variant, theme, fgColorOuter, bgColorOuter);
+        const [bgColor, fgColor] = getColors(
+            variant,
+            theme,
+            fgColorOuter,
+            bgColorOuter,
+            fgHoverColorOuter,
+            bgHoverColorOuter
+        );
         const rSize = size * Math.ceil(window.devicePixelRatio);
         const vSize =
             height !== undefined && typeof height === "number" ? height * Math.ceil(window.devicePixelRatio) : rSize;
