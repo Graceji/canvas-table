@@ -560,7 +560,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             const row = getRowIndexForY(
                 y,
                 height,
-                enableGroups && effectiveCols[col]?.group !== undefined,
+                enableGroups && mappedColumns?.[col]?.group !== undefined,
                 headerHeight,
                 groupHeaderHeight,
                 showFilter ? filterHeight : 0,
