@@ -1465,7 +1465,12 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             }
 
             const notRowMarkerCol = args.location[0] >= (firstColAccessible ? 0 : 1);
-            setHoveredOnEdge(args.kind === headerKind && args.isEdge && notRowMarkerCol && allowResize === true);
+            setHoveredOnEdge(
+                (args.kind === headerKind || args.kind === filterHeaderKind) &&
+                    args.isEdge &&
+                    notRowMarkerCol &&
+                    allowResize === true
+            );
 
             setOverFill(args.kind === "cell" && args.isFillHandle);
 

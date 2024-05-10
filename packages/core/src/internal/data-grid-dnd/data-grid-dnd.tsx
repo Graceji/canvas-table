@@ -157,7 +157,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
                         setResizeColStartX(bounds.x);
                         setResizeCol(columns.length - 1);
                     }
-                } else if (args.kind === "header" && col >= lockColumns) {
+                } else if ((args.kind === "header" || args.kind === "filterHeader") && col >= lockColumns) {
                     const canvas = canvasRef?.current;
                     if (args.isEdge && canResize && canvas) {
                         setResizeColStartX(args.bounds.x);
@@ -166,7 +166,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
                         const scale = rect.width / canvas.offsetWidth;
                         const width = args.bounds.width / scale;
                         onColumnResizeStart?.(columns[col], width, col, width + (columns[col].growOffset ?? 0));
-                    } else if (args.kind === "header" && canDragCol) {
+                    } else if ((args.kind === "header" || args.kind === "filterHeader") && canDragCol) {
                         setDragStartX(args.bounds.x);
                         setDragCol(col);
                     }
