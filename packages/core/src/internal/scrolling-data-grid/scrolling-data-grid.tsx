@@ -95,7 +95,6 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
         smoothScrollY = false,
         isDraggable,
         verticalOnly,
-        rowMarkerWidth,
         filterHeight,
         showFilter,
     } = p;
@@ -270,7 +269,6 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
             update={onScrollUpdate}
             initialSize={initialSize}>
             <DataGridDnd
-                rowMarkerWidth={rowMarkerWidth}
                 hasRowMarkers={hasRowMarkers}
                 eventTargetRef={scrollRef}
                 width={clientWidth}

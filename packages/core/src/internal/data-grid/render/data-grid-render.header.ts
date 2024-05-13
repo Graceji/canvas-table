@@ -61,9 +61,6 @@ export function drawGridHeaders(
     overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
     getFilterCellRenderer: GetCellRendererCallback,
     getFilterCellContent: (cell: number) => InnerGridCell,
-    showFilter: boolean,
-    hasRowMarkers?: boolean,
-    rowMarkerWidth?: number,
     showAccent?: boolean
 ) {
     const totalHeaderHeight = headerHeight + groupHeaderHeight;
@@ -72,10 +69,10 @@ export function drawGridHeaders(
     ctx.fillStyle = outerTheme.bgHeader;
     ctx.fillRect(0, 0, width, totalHeaderHeight);
 
-    if (showFilter === true && filterHeight > 0) {
-        ctx.fillStyle = outerTheme.filterHeaderBg ?? outerTheme.bgHeader;
-        ctx.fillRect(hasRowMarkers === true ? rowMarkerWidth ?? 0 : 0, totalHeaderHeight, width, filterHeight);
-    }
+    // if (showFilter === true && filterHeight > 0) {
+    //     ctx.fillStyle = outerTheme.filterHeaderBg ?? outerTheme.bgHeader;
+    //     ctx.fillRect(hasRowMarkers === true ? rowMarkerWidth ?? 0 : 0, totalHeaderHeight, width, filterHeight);
+    // }
 
     const frameTime = performance.now();
     const hCol = hovered?.[0]?.[0];
@@ -768,6 +765,10 @@ export function drawFilterCell(
     let prepResult: PrepResult | undefined = undefined;
     const isRtl = direction(c.title) === "rtl";
     const filterCell = getFilterCellContent?.(c.sourceIndex) ?? loadingCell;
+
+    ctx.fillStyle = filterCell.themeOverride?.filterHeaderBg ?? theme.filterHeaderBg ?? theme.bgHeader;
+    ctx.fillRect(x, y, c.width, filterHeight);
+
     const fillStyle = selected ? theme.textHeaderSelected : theme.textHeader;
     ctx.fillStyle = fillStyle;
     const isLastColumn = c.sourceIndex === allColumns.length - 1;

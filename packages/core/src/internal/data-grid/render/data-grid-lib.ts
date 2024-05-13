@@ -28,6 +28,7 @@ export function useMappedColumns(
             columns.map(
                 (c, i): MappedGridColumn => ({
                     ...c,
+                    resizable: c.resizable,
                     group: c.group,
                     grow: c.grow,
                     hasMenu: c.hasMenu,

@@ -166,6 +166,7 @@ export interface BaseGridColumn {
         readonly marker?: boolean;
     };
     readonly customHeaderCell?: GridCell;
+    readonly resizable?: boolean;
 }
 
 /** @category Columns */

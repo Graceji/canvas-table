@@ -100,7 +100,6 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
     const [dragStartY, setDragStartY] = React.useState<number>();
 
     const {
-        rowMarkerWidth,
         hasRowMarkers,
         onHeaderMenuClick,
         onFilterClearClick,
@@ -151,7 +150,8 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
         (args: GridMouseEventArgs) => {
             if (args.button === 0) {
                 const [col, row] = args.location;
-                if (args.kind === "out-of-bounds" && args.isEdge && canResize) {
+                const allowResize = canResize && columns[col]?.resizable === true;
+                if (args.kind === "out-of-bounds" && args.isEdge && allowResize) {
                     const bounds = gridRef?.current?.getBounds(columns.length - 1, -1);
                     if (bounds !== undefined) {
                         setResizeColStartX(bounds.x);
@@ -159,7 +159,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
                     }
                 } else if ((args.kind === "header" || args.kind === "filterHeader") && col >= lockColumns) {
                     const canvas = canvasRef?.current;
-                    if (args.isEdge && canResize && canvas) {
+                    if (args.isEdge && allowResize && canvas) {
                         setResizeColStartX(args.bounds.x);
                         setResizeCol(col);
                         const rect = canvas.getBoundingClientRect();
@@ -389,7 +389,6 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
 
     return (
         <DataGrid
-            rowMarkerWidth={rowMarkerWidth}
             hasRowMarkers={hasRowMarkers}
             accessibilityHeight={p.accessibilityHeight}
             canvasRef={p.canvasRef}

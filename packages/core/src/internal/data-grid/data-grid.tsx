@@ -318,8 +318,6 @@ export interface DataGridProps {
     readonly resizeIndicator: "full" | "header" | "none" | undefined;
     readonly hasRowMarkers?: boolean;
 
-    readonly rowMarkerWidth?: number;
-
     // 点击头部是否显示高亮
     readonly showAccent?: boolean;
 
@@ -418,7 +416,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         filterHeight,
         getFilterCellContent,
         hasRowMarkers,
-        rowMarkerWidth,
         showAccent = true,
         dragCursor,
     } = p;
@@ -863,8 +860,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             minimumCellWidth,
             resizeIndicator,
             verticalOnly,
-            hasRowMarkers,
-            rowMarkerWidth,
             showAccent,
         } as DrawGridArg;
 
@@ -936,8 +931,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         minimumCellWidth,
         resizeIndicator,
         verticalOnly,
-        hasRowMarkers,
-        rowMarkerWidth,
         showAccent,
     ]);
 
@@ -1469,7 +1462,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 (args.kind === headerKind || args.kind === filterHeaderKind) &&
                     args.isEdge &&
                     notRowMarkerCol &&
-                    allowResize === true
+                    allowResize === true &&
+                    columns?.[args.location[0]]?.resizable === true
             );
 
             setOverFill(args.kind === "cell" && args.isFillHandle);
@@ -1483,6 +1477,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             hasRowMarkers,
             firstColAccessible,
             allowResize,
+            columns,
             onMouseMoveRaw,
             onMouseMove,
             onItemHovered,

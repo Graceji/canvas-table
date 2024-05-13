@@ -4396,7 +4396,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 <DataGridSearch
                     showFilter={showFilter}
                     filterHeight={filterHeight}
-                    rowMarkerWidth={rowMarkerWidth}
                     hasRowMarkers={hasRowMarkers}
                     fillHandle={fillHandle}
                     drawFocusRing={drawFocusRing}

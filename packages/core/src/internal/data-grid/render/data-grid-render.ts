@@ -174,8 +174,6 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         filterHeight,
         showFilter,
         getFilterCellContent,
-        hasRowMarkers,
-        rowMarkerWidth,
         showAccent,
     } = arg;
     if (width === 0 || height === 0) return;
@@ -309,9 +307,6 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             overrideCursor,
             getCellRenderer,
             getFilterCellContent,
-            showFilter,
-            hasRowMarkers,
-            rowMarkerWidth,
             showAccent
         );
 
