@@ -458,7 +458,8 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
                 getCellRenderer,
                 overrideCursor,
                 minimumCellWidth,
-                showAccent
+                showAccent,
+                verticalOnly
             );
 
             const selectionCurrent = selection.current;
@@ -681,7 +682,8 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             getCellRenderer,
             overrideCursor,
             minimumCellWidth,
-            showAccent
+            showAccent,
+            verticalOnly
         );
         drawBlanks(
             targetCtx,

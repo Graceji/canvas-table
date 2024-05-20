@@ -78,6 +78,7 @@ export interface Theme {
     bgBubbleSelected: string;
     bgSearchResult: string;
     borderColor: string;
+    groupHorizontalBorderColor: string;
     drilldownBorder: string;
     linkColor: string;
     cellHorizontalPadding: number;
@@ -102,6 +103,8 @@ export interface Theme {
     markerTextAccent: string;
     emptyTextLight: string;
     emptyText: string;
+    groupIconColor?: string;
+    groupIconHover?: string;
 }
 
 const dataEditorBaseTheme: Theme = {
@@ -145,6 +148,7 @@ const dataEditorBaseTheme: Theme = {
     bgSearchResult: "#fff9e3",
 
     borderColor: "rgba(115, 116, 131, 0.16)",
+    groupHorizontalBorderColor: "rgba(115, 116, 131, 0.16)",
     drilldownBorder: "rgba(0, 0, 0, 0)",
 
     linkColor: "#353fb5",
@@ -164,6 +168,8 @@ const dataEditorBaseTheme: Theme = {
     editorFontSize: "13px",
     lineHeight: 1.4, //unitless scaler depends on your font
     markLine: "#313139",
+    groupIconColor: "rgba(255, 255, 255, 0.87)",
+    groupIconHover: "#FFB042",
 };
 
 export interface FullTheme extends Theme {

@@ -90,13 +90,21 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
                     },
 
                     {
-                        type: "icon",
-                        content: "workingOrder",
+                        type: "checkbox",
+                        // content: "workingOrder",
                         order: 1,
                         start: 0,
                         end: 0,
-                        disabled: true,
                     },
+
+                    // {
+                    //     type: "icon",
+                    //     content: "workingOrder",
+                    //     order: 1,
+                    //     start: 0,
+                    //     end: 0,
+                    //     disabled: true,
+                    // },
 
                     {
                         type: "icon",
@@ -129,6 +137,7 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
                 setSelection(newSelection);
             }}
             rangeSelect="none"
+            multiSelectCheckbox
             // customRenderers={allCells}
             // drawCell={args => {
             //     const isRowMarkerCol = args.row === -3 && args.isRowMarkerCol;

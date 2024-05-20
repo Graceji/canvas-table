@@ -20,7 +20,7 @@ import type { LinksCell } from "./cells/links-cell.js";
 import type { ButtonCell } from "./cells/button-cell.js";
 import type { TreeViewCell } from "./cells/tree-view-cell.js";
 import type { MultiSelectCell } from "./cells/multi-select-cell.js";
-// import { createSampleTree, useCollapsingTreeRows } from "@glideapps/glide-data-grid-source";
+import { createSampleTree, useCollapsingTreeRows } from "@glideapps/glide-data-grid-source";
 
 const SimpleWrapper = styled.div`
     box-sizing: border-box;
@@ -663,172 +663,173 @@ export const CustomCellEditing: React.VFC = () => {
     },
 };
 
-// export const CustomTreeCell: React.VFC = () => {
-//     const [root, setRoot] = React.useState(() => createSampleTree());
+export const CustomTreeCell: React.VFC = () => {
+    const [root, setRoot] = React.useState(() => createSampleTree());
 
-//     const rows = useCollapsingTreeRows(root);
+    const rows = useCollapsingTreeRows(root);
 
-//     const columns = React.useMemo<GridColumn[]>(
-//         () => [
-//             {
-//                 title: "index",
-//                 width: 100,
-//             },
-//             {
-//                 title: "Name",
-//                 width: 250,
-//                 themeOverride: {
-//                     baseFontStyle: "bold 13px",
-//                 },
-//             },
-//             { title: "Depth", width: 55 },
-//             { title: "Children", width: 70 },
-//             { title: "Collapsed", width: 80 },
-//         ],
-//         []
-//     );
+    const columns = React.useMemo<GridColumn[]>(
+        () => [
+            {
+                title: "index",
+                width: 100,
+            },
+            {
+                title: "Name",
+                width: 250,
+                themeOverride: {
+                    baseFontStyle: "bold 13px",
+                },
+            },
+            { title: "Depth", width: 55 },
+            { title: "Children", width: 70 },
+            { title: "Collapsed", width: 80 },
+        ],
+        []
+    );
 
-//     const getCellContent = React.useCallback(
-//         ([col, row]: readonly [number, number]): GridCell => {
-//             const node = rows[row];
+    const getCellContent = React.useCallback(
+        ([col, row]: readonly [number, number]): GridCell => {
+            const node = rows[row];
 
-//             const field = columns[col].title;
+            const field = columns[col].title;
 
-//             const {
-//                 name,
-//                 children: { length },
-//                 collapsed,
-//             } = node;
+            const {
+                name,
+                children: { length },
+                collapsed,
+            } = node;
 
-//             const collapsedString = node.children.length > 0 ? (collapsed ? "YES" : "NO") : "N/A";
+            const collapsedString = node.children.length > 0 ? (collapsed ? "YES" : "NO") : "N/A";
 
-//             switch (field) {
-//                 case "index": {
-//                     return {
-//                         kind: GridCellKind.Custom,
-//                         data: {
-//                             kind: "tree-cell",
-//                             node,
-//                         },
-//                         allowOverlay: false,
-//                     };
-//                 }
-//                 case "Name":
-//                     return {
-//                         kind: GridCellKind.Text,
-//                         data: name,
-//                         // data: {
-//                         //     kind: "tree-cell",
-//                         //     node,
-//                         // },
-//                         displayData: name,
-//                         allowOverlay: false,
-//                         copyData: name,
-//                     };
+            switch (field) {
+                case "index": {
+                    return {
+                        kind: GridCellKind.Custom,
+                        data: {
+                            kind: "tree-cell",
+                            node,
+                        },
+                        allowOverlay: false,
+                    };
+                }
+                case "Name":
+                    return {
+                        kind: GridCellKind.Custom,
+                        // data: name,
+                        data: {
+                            kind: "tree-cell",
+                            node,
+                        },
+                        displayData: name,
+                        allowOverlay: false,
+                        copyData: name,
+                    };
 
-//                 case "Depth":
-//                     return {
-//                         // kind: GridCellKind.Number,
-//                         // data: depth,
-//                         kind: GridCellKind.Custom,
-//                         data: {
-//                             kind: "tree-cell",
-//                             node,
-//                         },
-//                         // displayData: `${depth}`,
-//                         allowOverlay: false,
-//                     };
+                case "Depth":
+                    return {
+                        // kind: GridCellKind.Number,
+                        // data: depth,
+                        kind: GridCellKind.Custom,
+                        data: {
+                            kind: "tree-cell",
+                            node,
+                        },
+                        // displayData: `${depth}`,
+                        allowOverlay: false,
+                    };
 
-//                 case "Children":
-//                     return {
-//                         kind: GridCellKind.Number,
-//                         data: length,
-//                         displayData: `${length}`,
-//                         allowOverlay: false,
-//                     };
+                case "Children":
+                    return {
+                        kind: GridCellKind.Number,
+                        data: length,
+                        displayData: `${length}`,
+                        allowOverlay: false,
+                    };
 
-//                 case "Collapsed":
-//                     return {
-//                         kind: GridCellKind.Text,
-//                         displayData: collapsedString,
-//                         data: collapsedString,
-//                         allowOverlay: false,
-//                     };
+                case "Collapsed":
+                    return {
+                        kind: GridCellKind.Text,
+                        displayData: collapsedString,
+                        data: collapsedString,
+                        allowOverlay: false,
+                    };
 
-//                 default:
-//                     return {
-//                         kind: GridCellKind.Text,
-//                         displayData: "<unknown>",
-//                         data: "",
-//                         allowOverlay: false,
-//                     };
-//             }
-//         },
-//         [columns, rows]
-//     );
+                default:
+                    return {
+                        kind: GridCellKind.Text,
+                        displayData: "<unknown>",
+                        data: "",
+                        allowOverlay: false,
+                    };
+            }
+        },
+        [columns, rows]
+    );
 
-//     // const { drawCell, onCellClicked } = useCustomCells([CustomTreeCellRenderer]);
+    // const { drawCell, onCellClicked } = useCustomCells([CustomTreeCellRenderer]);
 
-//     const cellProps = useExtraCells();
+    // const cellProps = useExtraCells();
 
-//     return (
-//         <BeautifulWrapper
-//             title="Expandable tree"
-//             description={
-//                 <>
-//                     <Description>
-//                         An example of an expandable nested tree by implementing a custom cell renderer, shifting text
-//                         based on depth, and filtering out the children of collapsed items.
-//                     </Description>
-//                 </>
-//             }>
-//             <DataEditor
-//                 {...defaultProps}
-//                 {...cellProps}
-//                 getCellContent={getCellContent}
-//                 onCellEdited={(_, item) => {
-//                     if (item.kind === "marker" && item.markerKind === "expand-number") {
-//                         setRoot({ ...root });
-//                     }
-//                     if (item.kind !== GridCellKind.Custom) return;
-//                     if (item.data.kind !== "tree-cell") return;
-//                     setRoot({ ...root });
-//                 }}
-//                 columns={columns}
-//                 rowMarkers={"expand-number"}
-//                 rows={rows.length}
-//                 rowMarkerWidth={100}
-//                 rowMarkerFns={[
-//                     {
-//                         type: "number",
-//                         order: 2,
-//                         start: 0,
-//                         end: 0,
-//                     },
-//                     {
-//                         type: "number",
-//                         order: 3,
-//                         start: 0,
-//                         end: 0,
-//                     },
-//                     {
-//                         type: "expand",
-//                         order: 1,
-//                         start: 0,
-//                         end: 0,
-//                     },
-//                 ]}
-//                 getMarkerContent={row => {
-//                     return {
-//                         node: rows[row],
-//                     };
-//                 }}
-//             />
-//         </BeautifulWrapper>
-//     );
-// };
-// (CustomTreeCell as any).parameters = {
-//     options: {
-//         showPanel: false,
-//     },
-// };
+    return (
+        <BeautifulWrapper
+            title="Expandable tree"
+            description={
+                <>
+                    <Description>
+                        An example of an expandable nested tree by implementing a custom cell renderer, shifting text
+                        based on depth, and filtering out the children of collapsed items.
+                    </Description>
+                </>
+            }>
+            <DataEditor
+                {...defaultProps}
+                // {...cellProps}
+                customRenderers={allCells}
+                getCellContent={getCellContent}
+                onCellEdited={(_, item) => {
+                    if (item.kind === "marker" && item.markerKind === "expand-number") {
+                        setRoot({ ...root });
+                    }
+                    if (item.kind !== GridCellKind.Custom) return;
+                    if (item.data.kind !== "tree-cell") return;
+                    setRoot({ ...root });
+                }}
+                columns={columns}
+                // rowMarkers={"expand-number"}
+                rows={rows.length}
+                // rowMarkerWidth={100}
+                // rowMarkerFns={[
+                //     {
+                //         type: "number",
+                //         order: 2,
+                //         start: 0,
+                //         end: 0,
+                //     },
+                //     {
+                //         type: "number",
+                //         order: 3,
+                //         start: 0,
+                //         end: 0,
+                //     },
+                //     {
+                //         type: "expand",
+                //         order: 1,
+                //         start: 0,
+                //         end: 0,
+                //     },
+                // ]}
+                getMarkerContent={row => {
+                    return {
+                        node: rows[row],
+                    };
+                }}
+            />
+        </BeautifulWrapper>
+    );
+};
+(CustomTreeCell as any).parameters = {
+    options: {
+        showPanel: false,
+    },
+};

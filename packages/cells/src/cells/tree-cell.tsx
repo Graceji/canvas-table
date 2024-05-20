@@ -3,7 +3,8 @@ import {
     type CustomRenderer,
     GridCellKind,
     type Rectangle,
-    drawTextCell,
+    drawTextCellInner,
+    prepTextCell,
 } from "@glideapps/glide-data-grid";
 
 export type TreeNode = {
@@ -28,6 +29,7 @@ export type TreeCell = CustomCell<TreeCellProps>;
 const renderer: CustomRenderer<TreeCell> = {
     kind: GridCellKind.Custom,
     isMatch: (cell: CustomCell): cell is TreeCell => (cell.data as any).kind === "tree-cell",
+    drawPrep: prepTextCell,
     draw: (args, cell) => {
         const { ctx, rect, theme, spriteManager } = args;
         const { y, width, height } = rect;
@@ -99,7 +101,7 @@ const renderer: CustomRenderer<TreeCell> = {
                 width: width - indent,
             };
 
-            drawTextCell({ ...args, rect: indentRect }, `${node[key] ?? ""}`, cell.contentAlign);
+            drawTextCellInner({ ...args, rect: indentRect }, `${node[key] ?? ""}`, cell.contentAlign);
         }
 
         return true;

@@ -339,13 +339,22 @@ export function drawGroups(
                         ctx.globalAlpha = 1;
                     }
                     spriteManager.drawSprite(
-                        action.title === "Collapse" ? (group.collapse === true ? "collapse" : "expand") : action.icon,
-                        "normal",
+                        action.title === "Collapse"
+                            ? group.collapse === true
+                                ? "groupCollapse"
+                                : "groupExpand"
+                            : action.icon,
+                        actionHovered ? "hovered" : "normal",
                         ctx,
                         box.x + box.width / 2 - (action.iconSize !== undefined ? action.iconSize / 2 : 10),
                         box.y + box.height / 2 - (action.iconSize !== undefined ? action.iconSize / 2 : 10),
-                        action.iconSize ?? 20,
-                        groupTheme
+                        action.iconSize ?? 16,
+                        groupTheme,
+                        1,
+                        16,
+                        groupTheme.groupIconColor,
+                        undefined,
+                        groupTheme.groupIconHover
                     );
                     if (actionHovered) {
                         ctx.globalAlpha = 0.6;
@@ -373,7 +382,7 @@ export function drawGroups(
             ctx.beginPath();
             ctx.moveTo(x, groupHeaderHeight - 0.5);
             ctx.lineTo(finalX, groupHeaderHeight - 0.5);
-            ctx.strokeStyle = theme.borderColor;
+            ctx.strokeStyle = theme.groupHorizontalBorderColor;
             ctx.lineWidth = 1;
             ctx.stroke();
         }

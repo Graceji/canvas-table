@@ -61,8 +61,14 @@ export const ColumnGroups: React.VFC = () => {
             ref={gridRef}
             getCellContent={getCellContent}
             // onGroupHeaderRenamed={(x, y) => window.alert(`Please rename group ${x} to ${y}`)}
-            columns={columns}
+            columns={columns.map(item => {
+                return {
+                    ...item,
+                    width: 150,
+                };
+            })}
             rows={1000}
+            freezeColumns={1}
             getGroupDetails={g => {
                 return {
                     name: g,

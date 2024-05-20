@@ -292,6 +292,7 @@ function getResizableColumns(amount: number, group: boolean): GridColumnWithMock
             group: group ? "Name" : undefined,
             icon: GridColumnIcon.HeaderString,
             hasMenu: false,
+            resizable: true,
             getContent: () => {
                 const firstName = faker.name.firstName();
                 return {
@@ -343,6 +344,7 @@ function getResizableColumns(amount: number, group: boolean): GridColumnWithMock
             group: group ? "Info" : undefined,
             icon: GridColumnIcon.HeaderString,
             hasMenu: false,
+            resizable: true,
             getContent: () => {
                 const email = faker.internet.email();
                 return {

@@ -900,6 +900,12 @@ export function computeBounds(
                 result.width += c.width;
                 end++;
             }
+
+            // 修正宽度
+            if (result.width + result.x >= width) {
+                result.width = width - result.x;
+            }
+
             if (!sticky) {
                 const freezeWidth = getStickyWidth(mappedColumns);
                 const clip = result.x - freezeWidth;

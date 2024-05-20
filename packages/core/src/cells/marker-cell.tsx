@@ -1,6 +1,7 @@
 import { getMiddleCenterBias, measureTextCached } from "../internal/data-grid/render/data-grid-lib.js";
 import { InnerGridCellKind, type MarkerCell, type MarkerFn } from "../internal/data-grid/data-grid-types.js";
 import type { BaseDrawArgs, DrawArgs, InternalCellRenderer, PrepResult } from "./cell-types.js";
+import { drawCheckbox } from "../internal/data-grid/render/draw-checkbox.js";
 
 export const markerCellRenderer: InternalCellRenderer<MarkerCell> = {
     getAccessibilityString: c => c.row.toString(),
@@ -51,7 +52,7 @@ export const markerCellRenderer: InternalCellRenderer<MarkerCell> = {
         );
 
         if (isOverHeaderMarkerfn && isOverHeaderMarkerfn.type !== "number") {
-            args.preventDefault();
+            args.preventDefault(isOverHeaderMarkerfn.type === "checkbox" ? false : true);
         } else {
             args.preventDefault(false);
         }
@@ -78,7 +79,7 @@ function deprepMarkerRowCell(args: Pick<BaseDrawArgs, "ctx">) {
 
 function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
     const { ctx, rect, hoverAmount, theme, spriteManager, hoverX = -100, highlighted, hoverY } = args;
-    const { row: index, markerKind, node, functions, checked, drawHandle } = cell;
+    const { row: index, markerKind, node, functions, checked, drawHandle, checkboxStyle } = cell;
     const { x, y, width, height } = rect;
     const text = index.toString();
     const markerFontStyle = theme.markerFontFull;
@@ -223,7 +224,7 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
                 }
 
                 const itemWidth =
-                    type === "number" ? textWith : type === "checkbox" ? size ?? 20 : size ?? theme.markerIconSize;
+                    type === "number" ? textWith : type === "checkbox" ? size ?? 18 : size ?? theme.markerIconSize;
 
                 if (functions.length === 1) {
                     // 居中显示
@@ -277,7 +278,22 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
                 if (type === "number") {
                     drawIndexNumber(fnItem.start);
                 } else if (type === "checkbox") {
-                    // drawCheckbox();
+                    const offsetAmount = 7 * (checked ? hoverAmount : 1);
+                    drawCheckbox(
+                        ctx,
+                        theme,
+                        checked,
+                        drawHandle ? fnItem.start + offsetAmount : fnItem.start,
+                        y,
+                        drawHandle ? width - offsetAmount : width,
+                        height,
+                        true,
+                        undefined,
+                        undefined,
+                        18,
+                        "left",
+                        checkboxStyle
+                    );
                 } else if (type === "expand") {
                     drawExpand(fnItem.start, itemWidth);
                 } else {

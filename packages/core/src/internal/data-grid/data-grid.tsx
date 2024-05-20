@@ -322,6 +322,8 @@ export interface DataGridProps {
     readonly showAccent?: boolean;
 
     readonly dragCursor?: "move" | "not-allowed";
+
+    readonly multiSelectCheckbox?: boolean; // checkbox是否可实现多选
 }
 
 type DamageUpdateList = readonly {

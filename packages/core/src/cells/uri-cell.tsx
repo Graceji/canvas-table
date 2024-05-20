@@ -161,26 +161,4 @@ export const uriCellRenderer: InternalCellRenderer<UriCell> = {
         toPaste === cell.data
             ? undefined
             : { ...cell, data: toPaste, displayData: details.formattedString ?? cell.displayData },
-    onSelect: a => {
-        const { cell, bounds, posX, posY, theme, preventDefault } = a;
-        const txt = cell.displayData ?? cell.data;
-        const m = getMeasuredTextCache(txt, theme.baseFontFull);
-        if (m === undefined) return;
-        const textRect = getTextRect(m, bounds, theme, cell.contentAlign);
-        const didClick = pointInRect(
-            {
-                x: textRect.x - 4,
-                y: textRect.y - 4,
-                width: textRect.width + 8,
-                height: textRect.height + 8,
-            },
-            posX,
-            posY
-        );
-        if (didClick) {
-            preventDefault();
-        }
-
-        return undefined;
-    },
 };
