@@ -47,7 +47,7 @@ function swapArrayElements(arr, index1, index2) {
 }
 
 export const ColumnGroups: React.VFC = () => {
-    const { cols, getCellContent } = useMockDataGenerator(20, true, true);
+    const { cols, getCellContent, onColumnResize } = useMockDataGenerator(20, true, true);
 
     const [columns, setColumns] = useState(cols);
 
@@ -61,18 +61,13 @@ export const ColumnGroups: React.VFC = () => {
             ref={gridRef}
             getCellContent={getCellContent}
             // onGroupHeaderRenamed={(x, y) => window.alert(`Please rename group ${x} to ${y}`)}
-            columns={columns.map(item => {
-                return {
-                    ...item,
-                    width: 150,
-                };
-            })}
+            columns={cols}
             rows={1000}
-            freezeColumns={1}
+            freezeColumns={2}
             getGroupDetails={g => {
                 return {
                     name: g,
-                    icon: g === "" ? undefined : GridColumnIcon.HeaderCode,
+                    // icon: g === "" ? undefined : GridColumnIcon.HeaderCode,
                     collapse: (expandMap as any)[g] ?? false,
                     actions: [
                         {
@@ -119,6 +114,8 @@ export const ColumnGroups: React.VFC = () => {
 
                 return true;
             }}
+            columnSelect="none"
+            onColumnResize={onColumnResize}
         />
     );
 };

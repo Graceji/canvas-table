@@ -522,7 +522,7 @@ export type TreeNode = {
 
 export interface MarkerFn {
     key?: string;
-    type: "icon" | "checkbox" | "delete" | "expand" | "number";
+    type: "icon" | "checkbox" | "delete" | "expand" | "number" | "text";
     start: number;
     end: number;
     onClick?: (node?: any) => void;
@@ -535,6 +535,7 @@ export interface MarkerFn {
     hoverColor?: string;
     tooltip?: string;
     placement?: string;
+    hoverEffect?: boolean;
 }
 
 /** @category Cells */

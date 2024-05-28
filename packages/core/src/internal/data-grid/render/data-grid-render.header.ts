@@ -25,6 +25,7 @@ import {
     type MappedGridColumn,
     measureTextCached,
     getMeasuredTextCache,
+    truncateTextToFit,
 } from "./data-grid-lib.js";
 import { drawCell, loadingCell, type GroupDetails, type GroupDetailsCallback } from "./data-grid-render.cells.js";
 import { walkColumns, walkGroups } from "./data-grid-render.walk.js";
@@ -61,7 +62,8 @@ export function drawGridHeaders(
     overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
     getFilterCellRenderer: GetCellRendererCallback,
     getFilterCellContent: (cell: number) => InnerGridCell,
-    showAccent?: boolean
+    showAccent?: boolean,
+    dragCol?: number
 ) {
     const totalHeaderHeight = headerHeight + groupHeaderHeight;
     if (totalHeaderHeight <= 0) return;
@@ -128,13 +130,16 @@ export function drawGridHeaders(
         const y = enableGroups ? groupHeaderHeight : 0;
         const xOffset = c.sourceIndex === 0 ? 0 : 1;
 
-        if (selected && showAccent === true) {
+        // (dragCol !== undefined && allColumns[dragCol]?.id === c.id)
+        if (selected && showAccent === true && dragCol !== undefined) {
             ctx.fillStyle = bgFillStyle;
+
             if (c.group === undefined) {
                 ctx.rect(x + xOffset, 0, c.width - xOffset, totalHeaderHeight);
             } else {
                 ctx.rect(x + xOffset, y, c.width - xOffset, headerHeight);
             }
+            // ctx.fill();
         } else if (hasSelectedCell || hover > 0) {
             ctx.beginPath();
             if (c.group === undefined) {
@@ -298,31 +303,45 @@ export function drawGroups(
                 drawX += 26;
             }
 
-            const start = x + w / 2 - measureTextCached(group.name, ctx).width / 2;
+            let displayName = groupName;
+            const padding = theme.cellHorizontalPadding;
+            const drawTextWidth =
+                w -
+                (padding + (group.icon !== undefined ? 26 : 0)) -
+                (group?.actions !== undefined && group.actions?.length > 0 ? group.actions?.length * 26 : 0);
 
-            ctx.fillText(
-                group.name,
-                start, // drawX
-                groupHeaderHeight / 2 + getMiddleCenterBias(ctx, theme.headerFontFull)
-            );
+            const textWidth = measureTextCached(displayName, ctx).width;
+
+            if (textWidth > drawTextWidth) {
+                const ellipsisWidth = measureTextCached("...", ctx).width;
+                const truncatedText = truncateTextToFit(ctx, displayName, drawTextWidth - ellipsisWidth);
+                displayName = truncatedText + "...";
+            }
+
+            const start =
+                x +
+                (padding + (group.icon !== undefined ? 26 : 0)) +
+                (drawTextWidth - measureTextCached(displayName, ctx).width) / 2;
+
+            ctx.fillText(displayName, start, groupHeaderHeight / 2 + getMiddleCenterBias(ctx, theme.headerFontFull));
 
             if (group.actions !== undefined) {
                 const actionBoxes = getActionBoundsForGroup({ x, y, width: w, height: h }, group.actions);
 
-                ctx.beginPath();
-                const fadeStartX = actionBoxes[0].x - 10;
-                const fadeWidth = x + w - fadeStartX;
-                ctx.rect(fadeStartX, 0, fadeWidth, groupHeaderHeight);
-                const grad = ctx.createLinearGradient(fadeStartX, 0, fadeStartX + fadeWidth, 0);
-                const trans = withAlpha(fillColor, 0);
-                grad.addColorStop(0, trans);
-                grad.addColorStop(10 / fadeWidth, fillColor);
-                grad.addColorStop(1, fillColor);
-                ctx.fillStyle = grad;
+                // ctx.beginPath();
+                // const fadeStartX = actionBoxes[0].x - 10;
+                // const fadeWidth = x + w - fadeStartX;
+                // ctx.rect(fadeStartX, 0, fadeWidth, groupHeaderHeight);
+                // const grad = ctx.createLinearGradient(fadeStartX, 0, fadeStartX + fadeWidth, 0);
+                // const trans = withAlpha(fillColor, 0);
+                // grad.addColorStop(0, trans);
+                // grad.addColorStop(10 / fadeWidth, fillColor);
+                // grad.addColorStop(1, fillColor);
+                // ctx.fillStyle = grad;
 
-                ctx.fill();
+                // ctx.fill();
 
-                ctx.globalAlpha = 0.6;
+                ctx.globalAlpha = 0.87;
 
                 // eslint-disable-next-line prefer-const
                 const [mouseX, mouseY] = hovered?.[1] ?? [-1, -1];
@@ -346,12 +365,12 @@ export function drawGroups(
                             : action.icon,
                         actionHovered ? "hovered" : "normal",
                         ctx,
-                        box.x + box.width / 2 - (action.iconSize !== undefined ? action.iconSize / 2 : 10),
-                        box.y + box.height / 2 - (action.iconSize !== undefined ? action.iconSize / 2 : 10),
+                        box.x + box.width - 8 - (action.iconSize ?? 16),
+                        box.y + (box.height - (action.iconSize ?? 16)) / 2,
                         action.iconSize ?? 16,
                         groupTheme,
                         1,
-                        16,
+                        action.iconSize ?? 16,
                         groupTheme.groupIconColor,
                         undefined,
                         groupTheme.groupIconHover
@@ -561,6 +580,8 @@ function drawHeaderInner(
     posX: number | undefined,
     posY: number | undefined,
     hoverAmount: number,
+    hoverX: number | undefined,
+    hoverY: number | undefined,
     spriteManager: SpriteManager,
     touchMode: boolean,
     isRtl: boolean,
@@ -573,21 +594,7 @@ function drawHeaderInner(
         }
         const markerTheme =
             c.headerRowMarkerTheme !== undefined ? mergeAndRealizeTheme(theme, c.headerRowMarkerTheme) : theme;
-        drawCheckbox(
-            ctx,
-            markerTheme,
-            checked,
-            x,
-            y,
-            width,
-            height,
-            false,
-            undefined,
-            undefined,
-            18,
-            "center",
-            c.rowMarker
-        );
+        drawCheckbox(ctx, markerTheme, checked, x, y, width, height, false, hoverX, hoverY, 16, "center", c.rowMarker);
         if (checked !== true && c.headerRowMarkerAlwaysVisible !== true) {
             ctx.globalAlpha = 1;
         }
@@ -910,6 +917,8 @@ export function drawHeader(
                     posX,
                     posY,
                     hoverAmount,
+                    hoverX,
+                    hoverY,
                     spriteManager,
                     touchMode,
                     isRtl,
@@ -930,6 +939,8 @@ export function drawHeader(
             posX,
             posY,
             hoverAmount,
+            hoverX,
+            hoverY,
             spriteManager,
             touchMode,
             isRtl,

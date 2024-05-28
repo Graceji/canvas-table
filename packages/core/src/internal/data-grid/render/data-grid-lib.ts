@@ -505,7 +505,7 @@ export function getEmHeight(ctx: CanvasRenderingContext2D, fontStyle: string): n
 export function truncateTextToFit(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
     let truncatedText = "";
     for (let i = 0; i < text.length; i++) {
-        const width = ctx.measureText(truncatedText + text[i]).width;
+        const width = measureTextCached(truncatedText + text[i], ctx).width;
         if (width <= maxWidth) {
             truncatedText += text[i];
         } else {

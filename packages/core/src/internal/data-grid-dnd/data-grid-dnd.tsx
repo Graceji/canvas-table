@@ -450,6 +450,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
             onHeaderMenuClick={onHeaderMenuClickMangled}
             onFilterClearClick={onFilterClearClickMangled}
             onHeaderIndicatorClick={onHeaderIndicatorClickMangled}
+            dragCol={dragCol}
             isDragging={dragColActive}
             onItemHovered={onItemHoveredImpl}
             onDragStart={onDragStartImpl}

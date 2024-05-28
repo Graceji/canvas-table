@@ -64,6 +64,8 @@ export interface Theme {
     fgIconDisabled: string;
     bgIconHeaderHovered: string;
     fgIconHeaderHovered: string;
+    bgIconDisableHovered: string;
+    fgIconDisableHovered: string;
     textHeader: string;
     textGroupHeader?: string;
     textHeaderSelected: string;
@@ -105,6 +107,9 @@ export interface Theme {
     emptyText: string;
     groupIconColor?: string;
     groupIconHover?: string;
+    checkboxBg: string;
+    checkboxActiveBg: string;
+    checkboxInnerColor: string;
 }
 
 const dataEditorBaseTheme: Theme = {
@@ -127,13 +132,14 @@ const dataEditorBaseTheme: Theme = {
     bgIconHeader: "#737383",
     fgIconHeader: "#FFFFFF",
     bgIconDisabled: "#737383",
-    fgIconDisabled: "#FFFFFF",
+    fgIconDisabled: "#7b7d80",
+    fgIconDisableHovered: "rgba(123,125,128,0.7)",
+    bgIconDisableHovered: "",
     bgIconHeaderHovered: "#000000",
     fgIconHeaderHovered: "#f3f4ef",
     textHeader: "#313139",
-    textGroupHeader: "#313139BB",
+    textGroupHeader: "rgba(0,0,0,0.5)", //"#313139BB",
     textHeaderSelected: "#FFFFFF",
-
     bgCell: "#FFFFFF",
     bgCellMedium: "#FAFAFB",
     bgHeader: "#F7F7F8",
@@ -168,8 +174,11 @@ const dataEditorBaseTheme: Theme = {
     editorFontSize: "13px",
     lineHeight: 1.4, //unitless scaler depends on your font
     markLine: "#313139",
-    groupIconColor: "rgba(255, 255, 255, 0.87)",
+    groupIconColor: "#fff",
     groupIconHover: "#FFB042",
+    checkboxBg: "#505050",
+    checkboxActiveBg: "#3898fc",
+    checkboxInnerColor: "#fff",
 };
 
 export interface FullTheme extends Theme {

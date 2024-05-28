@@ -909,7 +909,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         showFilter = false,
         filterHeight = 20,
         showAccent = true,
-        multiSelectCheckbox = false,
     } = p;
 
     const drawFocusRing = drawFocusRingIn === "no-editor" ? overlay === undefined : drawFocusRingIn;
@@ -2000,7 +1999,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                                 isMultiRow
                             );
                         }
-                    } else if (multiSelectCheckbox || isMultiRow || args.isTouch || rowSelectionMode === "multi") {
+                    } else if (isMultiRow || args.isTouch || rowSelectionMode === "multi") {
                         if (isSelected) {
                             setSelectedRowsAndCell(
                                 selectedRows.remove(row),
@@ -2078,6 +2077,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             } else if (args.kind === groupHeaderKind) {
                 lastMouseSelectLocation.current = [col, row];
             } else if (args.kind === outOfBoundsKind && !args.isMaybeScrollbar && onSelectionCleared !== undefined) {
+                // onSelectionCleared !== undefined防止点击空白行，清空选中
                 setGridSelection(emptyGridSelection, false);
                 setOverlay(undefined);
                 focus();
@@ -2105,6 +2105,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         [
             rowSelect,
             gridSelection,
+            onSelectionCleared,
             rowMarkerOffset,
             showTrailingBlankRow,
             rows,
@@ -2117,12 +2118,10 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             rowGroupingNavBehavior,
             mapper,
             focus,
-            multiSelectCheckbox,
             rowSelectionMode,
             themeForCell,
             setSelectedRowsAndCell,
             setGridSelection,
-            onSelectionCleared,
             setCurrent,
         ]
     );
@@ -2183,9 +2182,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             if (args.kind !== groupHeaderKind || columnSelect !== "multi") {
                 return;
             }
-            // const isMultiKey = browserIsOSX.value ? args.metaKey : args.ctrlKey;
+            const isMultiKey = browserIsOSX.value ? args.metaKey : args.ctrlKey;
             const [col] = args.location;
-            // const selectedColumns = gridSelection.columns;
+            const selectedColumns = gridSelection.columns;
 
             if (col < rowMarkerOffset) return;
 
@@ -2204,21 +2203,21 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
             focus();
 
-            // if (isMultiKey) {
-            //     if (selectedColumns.hasAll([start, end + 1])) {
-            //         let newVal = selectedColumns;
-            //         for (let index = start; index <= end; index++) {
-            //             newVal = newVal.remove(index);
-            //         }
-            //         setSelectedColumns(newVal, undefined, isMultiKey);
-            //     } else {
-            //         setSelectedColumns(undefined, [start, end + 1], isMultiKey);
-            //     }
-            // } else {
-            //     setSelectedColumns(CompactSelection.fromSingleSelection([start, end + 1]), undefined, isMultiKey);
-            // }
+            if (isMultiKey) {
+                if (selectedColumns.hasAll([start, end + 1])) {
+                    let newVal = selectedColumns;
+                    for (let index = start; index <= end; index++) {
+                        newVal = newVal.remove(index);
+                    }
+                    setSelectedColumns(newVal, undefined, isMultiKey);
+                } else {
+                    setSelectedColumns(undefined, [start, end + 1], isMultiKey);
+                }
+            } else {
+                setSelectedColumns(CompactSelection.fromSingleSelection([start, end + 1]), undefined, isMultiKey);
+            }
         },
-        [columnSelect, focus, mangledCols, rowMarkerOffset]
+        [columnSelect, focus, gridSelection.columns, mangledCols, rowMarkerOffset, setSelectedColumns]
     );
 
     const isPrevented = React.useRef(false);
@@ -3457,7 +3456,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         void appendRow(customTargetColumn ?? col);
                     }, 0);
                 } else {
-                    onCellActivated?.([col - rowMarkerOffset, row]);
+                    // onCellActivated?.([col - rowMarkerOffset, row]);
                     reselect(bounds, true);
                 }
             } else if (gridSelection.current.range.height > 1 && isHotkey(keys.downFill, event, details)) {
@@ -3640,7 +3639,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             showTrailingBlankRow,
             getCustomNewRowTargetColumn,
             appendRow,
-            onCellActivated,
             reselect,
             fillDown,
             fillRight,

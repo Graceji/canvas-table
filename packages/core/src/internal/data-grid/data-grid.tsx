@@ -94,6 +94,7 @@ export interface DataGridProps {
     readonly isResizing: boolean;
     readonly resizeColumn: number | undefined;
     readonly isDragging: boolean;
+    readonly dragCol?: number;
     readonly isFilling: boolean;
     readonly isFocused: boolean;
 
@@ -322,8 +323,6 @@ export interface DataGridProps {
     readonly showAccent?: boolean;
 
     readonly dragCursor?: "move" | "not-allowed";
-
-    readonly multiSelectCheckbox?: boolean; // checkbox是否可实现多选
 }
 
 type DamageUpdateList = readonly {
@@ -392,6 +391,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         isResizing,
         resizeColumn: resizeCol,
         isDragging,
+        dragCol,
         isDraggable = false,
         allowResize,
         disabledRows,
@@ -863,6 +863,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             resizeIndicator,
             verticalOnly,
             showAccent,
+            dragCol,
         } as DrawGridArg;
 
         // This confusing bit of code due to some poor design. Long story short, the damage property is only used
@@ -905,20 +906,20 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         rowHeight,
         verticalBorder,
         isResizing,
-        hasAppendRow,
         resizeCol,
         isFocused,
         selection,
         fillHandle,
+        drawCellCallback,
+        hasAppendRow,
+        maxDPR,
         freezeTrailingRows,
         rows,
         drawFocusRing,
-        maxDPR,
         getCellContent,
         getFilterCellContent,
         getGroupDetails,
         getRowThemeOverride,
-        drawCellCallback,
         drawHeaderCallback,
         prelightCells,
         highlightRegions,
@@ -934,6 +935,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         resizeIndicator,
         verticalOnly,
         showAccent,
+        dragCol,
     ]);
 
     const lastDrawRef = React.useRef(draw);
@@ -1109,6 +1111,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     };
                 }
             }
+
             return undefined;
         },
         [mappedColumns, isDragging, isResizing, hoveredOnEdge, getBoundsForItem, theme, showFilter]
@@ -1174,11 +1177,11 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         },
         [
             eventTargetRef,
-            isDraggable,
             getMouseArgsForPosition,
-            groupHeaderActionForEvent,
             isOverHeaderElement,
             onMouseDown,
+            isDraggable,
+            groupHeaderActionForEvent,
         ]
     );
     useEventListener("touchstart", onMouseDownImpl, windowEventTarget, false);

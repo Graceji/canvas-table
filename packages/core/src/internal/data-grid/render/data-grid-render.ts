@@ -175,6 +175,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         showFilter,
         getFilterCellContent,
         showAccent,
+        dragCol,
     } = arg;
     if (width === 0 || height === 0) return;
     const doubleBuffer = renderStrategy === "double-buffer";
@@ -307,7 +308,8 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             overrideCursor,
             getCellRenderer,
             getFilterCellContent,
-            showAccent
+            showAccent,
+            dragCol
         );
 
         drawGridLines(

@@ -26,7 +26,7 @@ export type Sprite = (props: SpriteProps) => string;
 export type SpriteMap = Record<string | HeaderIcon, Sprite>;
 
 /** @category Columns */
-export type SpriteVariant = "normal" | "selected" | "special" | "hovered" | "disabled";
+export type SpriteVariant = "normal" | "selected" | "special" | "hovered" | "disabled" | "disableHovered";
 
 function getColors(
     variant: SpriteVariant,
@@ -45,6 +45,8 @@ function getColors(
         return [bgHoverColorOuter ?? theme.bgIconHeaderHovered, fgHoverColorOuter ?? theme.fgIconHeaderHovered];
     } else if (variant === "disabled") {
         return [theme.bgIconDisabled, theme.fgIconDisabled];
+    } else if (variant === "disableHovered") {
+        return [theme.bgIconDisableHovered, theme.fgIconDisableHovered];
     } else {
         return [theme.accentColor, theme.bgHeader];
     }
@@ -69,6 +71,12 @@ export class SpriteManager {
             this.icons[sprite] = spriteCb;
         }
         return this.icons[sprite];
+    }
+
+    overrideSprite(sprite: string, spriteCb: Sprite) {
+        if (this.icons[sprite] !== undefined) {
+            this.icons[sprite] = spriteCb;
+        }
     }
 
     public drawSprite(
