@@ -38,7 +38,7 @@ interface AddColumnsProps {
 const iconHead = `<svg width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">`;
 
 export const AddColumns: React.FC<AddColumnsProps> = p => {
-    const { cols, getCellContent } = useMockDataGenerator(p.columnsCount, false);
+    const { cols, getCellContent } = useMockDataGenerator(p.columnsCount, true);
     const [filterValue, setFilterValue] = useState("filter");
 
     const getFilterCellContent = (col: number): GridCell => {

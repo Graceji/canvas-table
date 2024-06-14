@@ -113,6 +113,16 @@ export function drawGridHeaders(
         if (theme !== outerTheme) {
             ctx.font = theme.baseFontFull;
         }
+
+        if (c.group !== undefined) {
+            ctx.beginPath();
+            ctx.moveTo(x, groupHeaderHeight + 0.5);
+            ctx.lineTo(x + c.width, groupHeaderHeight + 0.5);
+            ctx.strokeStyle = theme.headerHorizontalBorderColor;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
         const selected = selection.columns.hasIndex(c.sourceIndex);
         const noHover = dragAndDropState !== undefined || isResizing;
         const hoveredBoolean = !noHover && hRow === -1 && hCol === c.sourceIndex;
@@ -137,15 +147,15 @@ export function drawGridHeaders(
             if (c.group === undefined) {
                 ctx.rect(x + xOffset, 0, c.width - xOffset, totalHeaderHeight);
             } else {
-                ctx.rect(x + xOffset, y, c.width - xOffset, headerHeight);
+                ctx.rect(x + xOffset, y + 1, c.width - xOffset, headerHeight - 1);
             }
-            // ctx.fill();
+            ctx.fill();
         } else if (hasSelectedCell || hover > 0) {
             ctx.beginPath();
             if (c.group === undefined) {
                 ctx.rect(x + xOffset, 0, c.width - xOffset, totalHeaderHeight);
             } else {
-                ctx.rect(x + xOffset, y, c.width - xOffset, headerHeight);
+                ctx.rect(x + xOffset, y + 1, c.width - xOffset, headerHeight - 1);
             }
             if (hasSelectedCell) {
                 ctx.fillStyle = theme.bgHeaderHasFocus;
@@ -388,7 +398,7 @@ export function drawGroups(
             ctx.beginPath();
             ctx.moveTo(x + 0.5, 0);
             ctx.lineTo(x + 0.5, groupHeaderHeight);
-            ctx.strokeStyle = theme.borderColor;
+            ctx.strokeStyle = theme.headerBorderColor;
             ctx.lineWidth = 1;
             ctx.stroke();
         }
@@ -430,7 +440,7 @@ function getHeaderMenuBounds(x: number, y: number, width: number, height: number
 }
 
 const filterActionButtonSize = 13;
-function getFilterActionBounds(
+export function getFilterActionBounds(
     x: number,
     y: number,
     width: number,
@@ -479,10 +489,9 @@ interface HeaderLayout {
     readonly iconOverlayBounds: Rectangle | undefined;
     readonly indicatorIconBounds: Rectangle | undefined;
     readonly menuBounds: Rectangle | undefined;
-    readonly filterBounds: Rectangle | undefined;
 }
 
-function flipHorizontal(
+export function flipHorizontal(
     toFlip: Mutable<Rectangle> | undefined,
     mirrorX: number,
     isRTL: boolean
@@ -505,7 +514,6 @@ export function computeHeaderLayout(
     const xPad = theme.cellHorizontalPadding;
     const headerIconSize = theme.headerIconSize;
     const menuBounds = getHeaderMenuBounds(x, y, width, height, false);
-    const filterBounds = getFilterActionBounds(x, y, width, height, theme.cellHorizontalPadding * 2, false);
 
     let drawX = x + xPad;
     const iconBounds =
@@ -559,7 +567,6 @@ export function computeHeaderLayout(
 
     return {
         menuBounds: flipHorizontal(menuBounds, mirrorPoint, isRTL),
-        filterBounds: flipHorizontal(filterBounds, mirrorPoint, isRTL),
         iconBounds: flipHorizontal(iconBounds, mirrorPoint, isRTL),
         iconOverlayBounds: flipHorizontal(iconOverlayBounds, mirrorPoint, isRTL),
         textBounds: flipHorizontal(textBounds, mirrorPoint, isRTL),
@@ -779,7 +786,6 @@ export function drawFilterCell(
     getFilterCellContent?: (cell: number) => InnerGridCell
 ) {
     let prepResult: PrepResult | undefined = undefined;
-    const isRtl = direction(c.title) === "rtl";
     const filterCell = getFilterCellContent?.(c.sourceIndex) ?? loadingCell;
 
     ctx.fillStyle = filterCell.themeOverride?.filterHeaderBg ?? theme.filterHeaderBg ?? theme.bgHeader;
@@ -797,10 +803,10 @@ export function drawFilterCell(
         }
     }
 
-    const filterLayout = computeHeaderLayout(ctx, c, x, y, c.width, filterHeight, theme, isRtl);
+    const filterBounds = getFilterActionBounds(x, y, c.width, filterHeight, theme.cellHorizontalPadding, false);
     const shouldDrawMenu =
         isHovered &&
-        filterLayout.filterBounds !== undefined &&
+        filterBounds !== undefined &&
         filterCell?.kind === GridCellKind.Custom &&
         (Array.isArray((filterCell.data as any)?.displayData)
             ? (filterCell.data as any)?.displayData.length > 0
@@ -808,7 +814,6 @@ export function drawFilterCell(
               !!(filterCell.data as any)?.displayData);
 
     if (shouldDrawMenu) {
-        const filterBounds = filterLayout.filterBounds;
         const hovered = posX !== undefined && posY !== undefined && pointInRect(filterBounds, posX + x, posY + y);
 
         if (!hovered) {

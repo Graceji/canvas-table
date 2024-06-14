@@ -138,6 +138,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         disabledRows,
         rowHeight,
         verticalBorder,
+        horizontalBorder,
         overrideCursor,
         isResizing,
         selection,
@@ -170,7 +171,6 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         damage,
         minimumCellWidth,
         resizeIndicator,
-        verticalOnly,
         filterHeight,
         showFilter,
         getFilterCellContent,
@@ -197,7 +197,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
     const overlayCanvas = headerCanvasCtx.canvas;
     const totalHeaderHeight =
         (enableGroups ? groupHeaderHeight + headerHeight : headerHeight) + (showFilter ? filterHeight : 0);
-    const overlayHeight = totalHeaderHeight + 1; // border
+    const overlayHeight = totalHeaderHeight + 0; // border
     if (overlayCanvas.width !== width * dpr || overlayCanvas.height !== overlayHeight * dpr) {
         overlayCanvas.width = width * dpr;
         overlayCanvas.height = overlayHeight * dpr;
@@ -327,20 +327,22 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             getRowHeight,
             getRowThemeOverride,
             verticalBorder,
+            horizontalBorder,
             freezeTrailingRows,
             rows,
             theme,
-            verticalOnly
+            true,
+            true
         );
 
-        overlayCtx.beginPath();
-        overlayCtx.moveTo(0, overlayHeight - 0.5);
-        overlayCtx.lineTo(width, overlayHeight - 0.5);
-        overlayCtx.strokeStyle = blend(
-            theme.headerBottomBorderColor ?? theme.horizontalBorderColor ?? theme.borderColor,
-            theme.bgHeader
-        );
-        overlayCtx.stroke();
+        // overlayCtx.beginPath();
+        // overlayCtx.moveTo(0, overlayHeight - 0.5);
+        // overlayCtx.lineTo(width, overlayHeight - 0.5);
+        // overlayCtx.strokeStyle = blend(
+        //     theme.headerBottomBorderColor ?? theme.horizontalBorderColor ?? theme.borderColor,
+        //     theme.bgHeader
+        // );
+        // overlayCtx.stroke();
 
         if (mustDrawHighlightRingsOnHeader) {
             drawHighlightRings(
@@ -460,8 +462,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
                 getCellRenderer,
                 overrideCursor,
                 minimumCellWidth,
-                showAccent,
-                verticalOnly
+                showAccent
             );
 
             const selectionCurrent = selection.current;
@@ -587,7 +588,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         overdrawStickyBoundaries(
             targetCtx,
             effectiveCols,
-            width,
+            // width,
             height,
             freezeTrailingRows,
             rows,
@@ -684,8 +685,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             getCellRenderer,
             overrideCursor,
             minimumCellWidth,
-            showAccent,
-            verticalOnly
+            showAccent
         );
         drawBlanks(
             targetCtx,
@@ -742,10 +742,10 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             getRowHeight,
             getRowThemeOverride,
             verticalBorder,
+            horizontalBorder,
             freezeTrailingRows,
             rows,
-            theme,
-            verticalOnly
+            theme
         );
 
         highlightRedraw?.();

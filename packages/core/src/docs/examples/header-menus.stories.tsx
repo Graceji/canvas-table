@@ -129,7 +129,7 @@ export const HeaderMenus: React.VFC = () => {
     }, []);
 
     const onFilterClearClick = React.useCallback((col: number, bounds: Rectangle) => {
-        // console.log(col, bounds);
+        console.log(col, bounds);
     }, []);
 
     const onHeaderClicked = React.useCallback((location, event) => {

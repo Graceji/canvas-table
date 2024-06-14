@@ -163,6 +163,7 @@ type Props = Partial<
         | "translateX"
         | "translateY"
         | "verticalBorder"
+        | "horizontalBorder"
     >
 >;
 
@@ -258,7 +259,7 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
     /** Emitted editing, regardless of data changing or not.
      * @group Editing
      */
-    readonly onEditing?: (newValue: GridCell | undefined) => void;
+    readonly onCellEditing?: (cell: Item, newValue: GridCell | undefined) => void;
 
     /** Emitted when a column header should show a context menu. Usually right click.
      * @group Events
@@ -307,6 +308,7 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
         readonly targetColumn?: number | GridColumn;
         /** hint 是否显示在marker列 */
         readonly marker?: boolean;
+        readonly contentAlign?: "center" | 'left | "right';
     };
     /** Controls the height of the header row
      * @defaultValue 36
@@ -628,6 +630,8 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
      */
     readonly verticalBorder?: DataGridSearchProps["verticalBorder"] | boolean;
 
+    readonly horizontalBorder?: DataGridSearchProps["horizontalBorder"] | boolean;
+
     /**
      * Controls the grouping of rows to be drawn in the grid.
      */
@@ -804,7 +808,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         onCellClicked,
         onCellActivated,
         onFillPattern,
-        onEditing,
+        onCellEditing,
         onFinishedEditing,
         coercePasteValue,
         drawHeader: drawHeaderIn,
@@ -871,6 +875,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         scrollOffsetX,
         scrollOffsetY,
         verticalBorder,
+        horizontalBorder,
         onDragOverCell,
         onDrop,
         onColumnResize: onColumnResizeIn,
@@ -905,7 +910,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         resizeIndicator,
         scrollToActiveCell = true,
         drawFocusRing: drawFocusRingIn = true,
-        verticalOnly = false,
         showFilter = false,
         filterHeight = 20,
         showAccent = true,
@@ -1340,6 +1344,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                                 allowOverlay: false,
                                 icon,
                                 showAddIcon,
+                                contentAlign: c?.trailingRowOptions?.contentAlign ?? "center",
                             };
                         }
                     }
@@ -1388,6 +1393,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         allowOverlay: false,
                         icon,
                         showAddIcon,
+                        contentAlign: c?.trailingRowOptions?.contentAlign ?? c.align,
                     };
                 }
             } else {
@@ -3206,11 +3212,19 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const onEditingIn = React.useCallback(
         (newValue: GridCell | undefined) => {
             if (overlay?.cell !== undefined && newValue !== undefined && isEditableGridCell(newValue)) {
-                mangledOnCellsEdited([{ location: overlay.cell, value: newValue }]);
+                const item = { location: overlay.cell, value: newValue };
+                const mangledItem =
+                    rowMarkerOffset === 0
+                        ? { ...item }
+                        : {
+                              ...item,
+                              location: [item.location[0] - rowMarkerOffset, item.location[1]] as const,
+                          };
+
+                onCellEditing?.(mangledItem.location, mangledItem.value);
             }
-            onEditing?.(newValue);
         },
-        [overlay?.cell, onEditing, mangledOnCellsEdited]
+        [overlay?.cell, rowMarkerOffset, onCellEditing]
     );
 
     const onFinishEditing = React.useCallback(
@@ -4169,6 +4183,21 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         [rowMarkerOffset, verticalBorder]
     );
 
+    /** @type {*}
+     * 默认没有水平线
+     */
+    const mangledHorizontalBorder = React.useCallback(
+        (col: number, row: number) => {
+            return typeof horizontalBorder === "boolean"
+                ? horizontalBorder
+                : horizontalBorder?.(col, row) ??
+                      (col - rowMarkerOffset < 0
+                          ? false
+                          : getCellContent([col - rowMarkerOffset, row])?.readonly === false);
+        },
+        [horizontalBorder, rowMarkerOffset, getCellContent]
+    );
+
     const renameGroupNode = React.useMemo(() => {
         if (renameGroup === undefined || canvasRef.current === null) return null;
         const { bounds, group } = renameGroup;
@@ -4481,10 +4510,10 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     translateX={visibleRegion.tx}
                     translateY={visibleRegion.ty}
                     verticalBorder={mangledVerticalBorder}
+                    horizontalBorder={mangledHorizontalBorder}
                     gridRef={gridRef}
                     getCellRenderer={getCellRenderer}
                     resizeIndicator={resizeIndicator}
-                    verticalOnly={verticalOnly}
                     getFilterCellContent={getFilterCellContent}
                     showAccent={showAccent}
                 />

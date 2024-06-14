@@ -107,7 +107,7 @@ export function drawBlanks(
 export function overdrawStickyBoundaries(
     ctx: CanvasRenderingContext2D,
     effectiveCols: readonly MappedGridColumn[],
-    width: number,
+    // width: number,
     height: number,
     freezeTrailingRows: number,
     rows: number,
@@ -121,7 +121,7 @@ export function overdrawStickyBoundaries(
         drawFreezeBorder = verticalBorder(c.sourceIndex);
         break;
     }
-    const hColor = theme.horizontalBorderColor ?? theme.borderColor;
+    // const hColor = theme.horizontalBorderColor ?? theme.borderColor;
     const vColor = theme.borderColor;
     const drawX = drawFreezeBorder ? getStickyWidth(effectiveCols) : 0;
 
@@ -130,20 +130,24 @@ export function overdrawStickyBoundaries(
         vStroke = blendCache(vColor, theme.bgCell);
         ctx.beginPath();
         ctx.moveTo(drawX + 0.5, 0);
-        ctx.lineTo(drawX + 0.5, height);
+        ctx.lineTo(
+            drawX + 0.5,
+            height - (freezeTrailingRows > 0 ? getFreezeTrailingHeight(rows, freezeTrailingRows, getRowHeight) : 0)
+        );
         ctx.strokeStyle = vStroke;
         ctx.stroke();
     }
 
-    if (freezeTrailingRows > 0) {
-        const hStroke = vColor === hColor && vStroke !== undefined ? vStroke : blendCache(hColor, theme.bgCell);
-        const h = getFreezeTrailingHeight(rows, freezeTrailingRows, getRowHeight);
-        ctx.beginPath();
-        ctx.moveTo(0, height - h + 0.5);
-        ctx.lineTo(width, height - h + 0.5);
-        ctx.strokeStyle = hStroke;
-        ctx.stroke();
-    }
+    // 滚动时会在合计行上方绘制一条线，目前不需要
+    // if (freezeTrailingRows > 0) {
+    //     const hStroke = vColor === hColor && vStroke !== undefined ? vStroke : blendCache(hColor, theme.bgCell);
+    //     const h = getFreezeTrailingHeight(rows, freezeTrailingRows, getRowHeight);
+    //     ctx.beginPath();
+    //     ctx.moveTo(0, height - h + 0.5);
+    //     ctx.lineTo(width, height - h + 0.5);
+    //     ctx.strokeStyle = hStroke;
+    //     ctx.stroke();
+    // }
 }
 
 const getMinMaxXY = (drawRegions: Rectangle[] | undefined, width: number, height: number) => {
@@ -291,10 +295,12 @@ export function drawGridLines(
     getRowHeight: (row: number) => number,
     getRowThemeOverride: GetRowThemeCallback | undefined,
     verticalBorder: (col: number) => boolean,
+    horizontalBorder: (col: number, row: number) => boolean,
     freezeTrailingRows: number,
     rows: number,
     theme: FullTheme,
-    verticalOnly: boolean = false
+    verticalOnly: boolean = false,
+    isHeader: boolean = false
 ) {
     if (spans !== undefined) {
         ctx.beginPath();
@@ -305,8 +311,8 @@ export function drawGridLines(
         }
         ctx.clip("evenodd");
     }
-    const hColor = theme.horizontalBorderColor ?? theme.borderColor;
-    const vColor = theme.borderColor;
+    const hColor = isHeader ? theme.headerBorderColor : theme.horizontalBorderColor ?? theme.borderColor;
+    const vColor = isHeader ? theme.headerBorderColor : theme.borderColor;
 
     const { minX, maxX, minY, maxY } = getMinMaxXY(drawRegions, width, height);
 
@@ -316,6 +322,7 @@ export function drawGridLines(
 
     // vertical lines
     let x = 0.5;
+    const h = getFreezeTrailingHeight(rows, freezeTrailingRows, getRowHeight);
     for (let index = 0; index < effectiveCols.length; index++) {
         const c = effectiveCols[index];
         if (c.width === 0) continue;
@@ -326,38 +333,73 @@ export function drawGridLines(
                 x1: tx,
                 y1: Math.max(effectiveCols[index + 1]?.group === undefined ? minY : groupHeaderHeight, minY),
                 x2: tx,
-                y2: Math.min(height, maxY),
+                y2: Math.min(height - (freezeTrailingRows && isHeader !== true ? h : 0), maxY),
                 color: vColor,
             });
         }
+    }
+
+    let startX = 0.5;
+    for (let index = 0; index < effectiveCols.length; index++) {
+        // let row = cellYOffset;
+        let freezeY = height + 0.5;
+        const c = effectiveCols[index];
+        if (c.width === 0) continue;
+        const tx = c.sticky ? startX : startX + translateX;
+
+        for (let i = rows - freezeTrailingRows; i < rows; i++) {
+            const rh = getRowHeight(i);
+            freezeY -= rh;
+            if (horizontalBorder(c.sourceIndex, i)) {
+                toDraw.push({
+                    x1: tx,
+                    y1: freezeY,
+                    x2: tx + c.width,
+                    y2: freezeY,
+                    color: hColor,
+                });
+            }
+        }
+
+        startX += c.width;
     }
 
     let freezeY = height + 0.5;
     for (let i = rows - freezeTrailingRows; i < rows; i++) {
         const rh = getRowHeight(i);
         freezeY -= rh;
-        toDraw.push({ x1: minX, y1: freezeY, x2: maxX, y2: freezeY, color: hColor });
+        // toDraw.push({ x1: minX, y1: freezeY, x2: maxX, y2: freezeY, color: hColor });
     }
 
     if (verticalOnly !== true) {
         // horizontal lines
-        let y = totalHeaderHeight + 0.5;
-        let row = cellYOffset;
+        let rowX = 0.5;
         const target = freezeY;
-        while (y + translateY < target) {
-            const ty = y + translateY;
-            if (ty >= minY && ty <= maxY - 1) {
-                const rowTheme = getRowThemeOverride?.(row);
-                toDraw.push({
-                    x1: minX,
-                    y1: ty,
-                    x2: maxX,
-                    y2: ty,
-                    color: rowTheme?.horizontalBorderColor ?? rowTheme?.borderColor ?? hColor,
-                });
+
+        for (let index = 0; index < effectiveCols.length; index++) {
+            let row = cellYOffset;
+            const c = effectiveCols[index];
+            if (c.width === 0) continue;
+            const tx = c.sticky ? rowX : rowX + translateX;
+            let y = totalHeaderHeight + 0.5 + getRowHeight(row); // 绘制下划线
+
+            while (y + translateY < target) {
+                const ty = y + translateY;
+                if (ty >= minY && ty <= maxY - 1 && horizontalBorder(c.sourceIndex, row)) {
+                    const rowTheme = getRowThemeOverride?.(row);
+                    toDraw.push({
+                        x1: tx,
+                        y1: ty,
+                        x2: tx + c.width,
+                        y2: ty,
+                        color: rowTheme?.horizontalBorderColor ?? rowTheme?.borderColor ?? hColor,
+                    });
+                }
+                row++;
+                y += getRowHeight(row);
             }
-            y += getRowHeight(row);
-            row++;
+
+            rowX += c.width;
         }
     }
 

@@ -57,7 +57,13 @@ import {
     type Highlight,
     drawCell,
 } from "./render/data-grid-render.cells.js";
-import { getActionBoundsForGroup, drawHeader, computeHeaderLayout } from "./render/data-grid-render.header.js";
+import {
+    getActionBoundsForGroup,
+    drawHeader,
+    computeHeaderLayout,
+    getFilterActionBounds,
+    flipHorizontal,
+} from "./render/data-grid-render.header.js";
 
 export interface DataGridProps {
     readonly width: number;
@@ -196,7 +202,7 @@ export interface DataGridProps {
 
     readonly verticalBorder: (col: number) => boolean;
 
-    readonly verticalOnly?: boolean;
+    readonly horizontalBorder: (col: number, row: number) => boolean;
 
     /**
      * Determines what can be dragged using HTML drag and drop
@@ -401,6 +407,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         prelightCells,
         headerIcons,
         verticalBorder,
+        horizontalBorder,
         drawCell: drawCellCallback,
         drawHeader: drawHeaderCallback,
         onCellFocused,
@@ -413,7 +420,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         experimental,
         getCellRenderer,
         resizeIndicator = "full",
-        verticalOnly,
         showFilter,
         filterHeight,
         getFilterCellContent,
@@ -827,6 +833,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             disabledRows: disabledRows ?? CompactSelection.empty(),
             rowHeight,
             verticalBorder,
+            horizontalBorder,
             isResizing,
             resizeCol,
             isFocused,
@@ -861,7 +868,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             getCellRenderer,
             minimumCellWidth,
             resizeIndicator,
-            verticalOnly,
             showAccent,
             dragCol,
         } as DrawGridArg;
@@ -905,6 +911,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         disabledRows,
         rowHeight,
         verticalBorder,
+        horizontalBorder,
         isResizing,
         resizeCol,
         isFocused,
@@ -933,7 +940,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         getCellRenderer,
         minimumCellWidth,
         resizeIndicator,
-        verticalOnly,
         showAccent,
         dragCol,
     ]);
@@ -1077,29 +1083,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                         area: "menu",
                         bounds: headerLayout.menuBounds,
                     };
-                } else if (showFilter) {
-                    const filterBounds = getBoundsForItem(canvas, col, -3);
-                    assert(filterBounds !== undefined);
-                    const filterLayout = computeHeaderLayout(
-                        undefined,
-                        header,
-                        filterBounds.x,
-                        filterBounds.y,
-                        filterBounds.width,
-                        filterBounds.height,
-                        theme,
-                        direction(header.title) === "rtl"
-                    );
-
-                    if (
-                        filterLayout.filterBounds !== undefined &&
-                        pointInRect(filterLayout.filterBounds, clientX, clientY)
-                    ) {
-                        return {
-                            area: "filter",
-                            bounds: filterLayout.filterBounds,
-                        };
-                    }
                 } else if (
                     header.indicatorIcon !== undefined &&
                     headerLayout.indicatorIconBounds !== undefined &&
@@ -1114,7 +1097,58 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
 
             return undefined;
         },
-        [mappedColumns, isDragging, isResizing, hoveredOnEdge, getBoundsForItem, theme, showFilter]
+        [mappedColumns, isDragging, isResizing, hoveredOnEdge, getBoundsForItem, theme]
+    );
+
+    const isOverFilterElement = React.useCallback(
+        (canvas: HTMLCanvasElement, col: number, clientX: number, clientY: number) => {
+            if (!isDragging && !isResizing && !(hoveredOnEdge ?? false) && showFilter) {
+                const filterBounds = getBoundsForItem(canvas, col, -3);
+                assert(filterBounds !== undefined);
+
+                const filterLayout = {
+                    actionBounds: flipHorizontal(
+                        getFilterActionBounds(
+                            filterBounds.x,
+                            filterBounds.y,
+                            filterBounds.width,
+                            filterBounds.height,
+                            theme.cellHorizontalPadding * 2,
+                            false
+                        ),
+                        filterBounds.x + filterBounds.width / 2,
+                        false
+                    ),
+                };
+
+                const filterCell = getFilterCellContent?.(col);
+
+                if (
+                    filterLayout.actionBounds !== undefined &&
+                    pointInRect(filterLayout.actionBounds, clientX, clientY)
+                    // filterCell?.kind === GridCellKind.Custom &&
+                    // (Array.isArray((filterCell.data as any)?.displayData)
+                    //     ? (filterCell.data as any)?.displayData.length > 0
+                    //     : // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+                    //       !!(filterCell.data as any)?.displayData)
+                ) {
+                    return {
+                        area: "filter",
+                        bounds: filterLayout.actionBounds,
+                    };
+                }
+            }
+            return undefined;
+        },
+        [
+            getBoundsForItem,
+            getFilterCellContent,
+            hoveredOnEdge,
+            isDragging,
+            isResizing,
+            showFilter,
+            theme.cellHorizontalPadding,
+        ]
     );
 
     const downTime = React.useRef(0);
@@ -1152,8 +1186,13 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             }
 
             if (
-                (args.kind === headerKind || args.kind === filterHeaderKind) &&
+                args.kind === headerKind &&
                 isOverHeaderElement(canvas, args.location[0], clientX, clientY) !== undefined
+            ) {
+                return;
+            } else if (
+                args.kind === filterHeaderKind &&
+                isOverFilterElement(canvas, args.location[0], clientX, clientY) !== undefined
             ) {
                 return;
             } else if (args.kind === groupHeaderKind) {
@@ -1179,6 +1218,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             eventTargetRef,
             getMouseArgsForPosition,
             isOverHeaderElement,
+            isOverFilterElement,
             onMouseDown,
             isDraggable,
             groupHeaderActionForEvent,
@@ -1247,6 +1287,16 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     onMouseUp(args, true, ev);
                 }
                 return;
+            } else if (args.kind === filterHeaderKind) {
+                const filterBounds = isOverFilterElement(canvas, col, clientX, clientY);
+
+                if (filterBounds !== undefined) {
+                    if (args.button !== 0 || downPosition.current?.[0] !== col || downPosition.current?.[1] !== -3) {
+                        // force outside so that click will not process
+                        onMouseUp(args, true, ev);
+                    }
+                    return;
+                }
             } else if (args.kind === groupHeaderKind) {
                 const action = groupHeaderActionForEvent(args.group, args.bounds, args.localEventX, args.localEventY);
                 if (action !== undefined) {
@@ -1259,7 +1309,14 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
 
             onMouseUp(args, isOutside, ev);
         },
-        [onMouseUp, eventTargetRef, getMouseArgsForPosition, isOverHeaderElement, groupHeaderActionForEvent]
+        [
+            onMouseUp,
+            eventTargetRef,
+            getMouseArgsForPosition,
+            isOverHeaderElement,
+            isOverFilterElement,
+            groupHeaderActionForEvent,
+        ]
     );
     useEventListener("mouseup", onMouseUpImpl, windowEventTarget, false);
     useEventListener("touchend", onMouseUpImpl, windowEventTarget, false);
@@ -1295,13 +1352,14 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             }
 
             const [col] = args.location;
-            if (args.kind === headerKind || args.kind === filterHeaderKind) {
+            // eslint-disable-next-line unicorn/prefer-switch
+            if (args.kind === headerKind) {
                 const headerBounds = isOverHeaderElement(canvas, col, clientX, clientY);
                 if (
                     headerBounds !== undefined &&
                     args.button === 0 &&
                     downPosition.current?.[0] === col &&
-                    downPosition.current?.[1] === (args.kind === headerKind ? -1 : -3)
+                    downPosition.current?.[1] === -1
                 ) {
                     switch (headerBounds.area) {
                         case "menu": {
@@ -1314,13 +1372,20 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
 
                             break;
                         }
-                        case "filter": {
-                            onFilterClearClick?.(col, headerBounds.bounds);
-
-                            break;
-                        }
                         // No default
                     }
+                }
+            } else if (args.kind === filterHeaderKind) {
+                const filterBounds = isOverFilterElement(canvas, col, clientX, clientY);
+
+                if (
+                    filterBounds !== undefined &&
+                    args.button === 0 &&
+                    downPosition.current?.[0] === col &&
+                    downPosition.current?.[1] === -3 &&
+                    filterBounds.area === "filter"
+                ) {
+                    onFilterClearClick?.(col, filterBounds.bounds);
                 }
             } else if (args.kind === groupHeaderKind) {
                 const action = groupHeaderActionForEvent(args.group, args.bounds, args.localEventX, args.localEventY);
@@ -1336,6 +1401,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             isOverHeaderElement,
             onHeaderMenuClick,
             onHeaderIndicatorClick,
+            isOverFilterElement,
             onFilterClearClick,
             groupHeaderActionForEvent,
         ]
@@ -1458,7 +1524,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 }
             }
 
-            if (hasRowMarkers === true && args.location[0] === 0) {
+            if ((hasRowMarkers === true && args.location[0] === 0) || args.kind === "group-header") {
                 onItemHovered?.(args);
             }
 

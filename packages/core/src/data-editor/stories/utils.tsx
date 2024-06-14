@@ -300,7 +300,7 @@ function getResizableColumns(amount: number, group: boolean): GridColumnWithMock
                     displayData: firstName,
                     data: firstName,
                     allowOverlay: false,
-                    readonly: true,
+                    readonly: false,
                 };
             },
         },
@@ -388,7 +388,7 @@ function getResizableColumns(amount: number, group: boolean): GridColumnWithMock
                     data: url,
                     hoverEffect: true,
                     allowOverlay: true,
-                    readonly: true,
+                    readonly: false,
                     onClickUri: a => {
                         window.open(url, "_blank");
                         a.preventDefault();

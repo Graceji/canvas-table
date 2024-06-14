@@ -33,7 +33,6 @@ import type { ImageWindowLoader } from "../image-window-loader-interface.js";
 import { intersectRect } from "../../../common/math.js";
 import type { GridMouseGroupHeaderEventArgs } from "../event-args.js";
 import { getSkipPoint, getSpanBounds, walkColumns, walkRowsInCol } from "./data-grid-render.walk.js";
-import groupBy from "lodash/groupBy.js";
 
 export const loadingCell: InnerGridCell = {
     kind: GridCellKind.Loading,
@@ -111,8 +110,7 @@ export function drawCells(
     getCellRenderer: GetCellRendererCallback,
     overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
     minimumCellWidth: number,
-    showAccent?: boolean,
-    verticalOnly?: boolean
+    showAccent?: boolean
 ): Rectangle[] | undefined {
     let toDraw = damage?.size ?? Number.MAX_SAFE_INTEGER;
     const frameTime = performance.now();
@@ -123,7 +121,6 @@ export function drawCells(
     const freezeTrailingRowsHeight =
         freezeTrailingRows > 0 ? getFreezeTrailingHeight(rows, freezeTrailingRows, getRowHeight) : 0;
     let result: Rectangle[] | undefined;
-    const editHorizontalLines: { x1: number; y1: number; x2: number; y2: number; color: string }[] = []; // 编辑单元格边框
     let handledSpans: Set<string> | undefined = undefined;
 
     const skipPoint = getSkipPoint(drawRegions);
@@ -301,28 +298,24 @@ export function drawCells(
                         if (showAccent === true && colSelected && !isTrailingRow) accentCount++;
                     }
 
-                    if (verticalOnly === true && cell.readonly === false && cell.allowOverlay === true) {
+                    if (cell.readonly === false && cell.allowOverlay === true) {
                         /**
+                         * 编辑单元格不需要有选中高亮背景
                          * 适用于：
                          * 1. 只有垂直线的表格
                          * 2. 编辑单元格
                          * 3. 单元格允许overlay
+                         *
                          */
                         accentCount = 0;
-                        editHorizontalLines.push({
-                            x1: cellX,
-                            y1: drawY,
-                            x2: cellX + cellWidth,
-                            y2: drawY,
-                            color:
-                                rowTheme?.horizontalBorderColor ??
-                                rowTheme?.borderColor ??
-                                theme.horizontalBorderColor ??
-                                theme.borderColor,
-                        });
                     }
 
-                    const bgCell = cell.kind === GridCellKind.Protected ? theme.bgCellMedium : theme.bgCell;
+                    const bgCell =
+                        cell.kind === GridCellKind.Protected
+                            ? theme.bgCellMedium
+                            : cell.readonly === false
+                            ? theme.editBgCell
+                            : theme.bgCell;
                     let fill: string | undefined;
                     if (isSticky || bgCell !== outerTheme.bgCell) {
                         fill = blend(bgCell, fill);
@@ -481,20 +474,6 @@ export function drawCells(
             return toDraw <= 0;
         }
     );
-
-    if (editHorizontalLines?.length > 0) {
-        const groups = groupBy(editHorizontalLines, line => line.color);
-        ctx.lineWidth = outerTheme.lineWidth;
-        for (const g of Object.keys(groups)) {
-            ctx.strokeStyle = g;
-            for (const line of groups[g]) {
-                ctx.moveTo(line.x1, line.y1);
-                ctx.lineTo(line.x2, line.y2);
-            }
-            ctx.stroke();
-            ctx.beginPath();
-        }
-    }
 
     return result;
 }

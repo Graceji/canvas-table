@@ -70,6 +70,7 @@ export interface Theme {
     textGroupHeader?: string;
     textHeaderSelected: string;
     bgCell: string;
+    editBgCell: string;
     bgCellMedium: string;
     bgHeader: string;
     bgHeaderDisabled: string;
@@ -80,7 +81,9 @@ export interface Theme {
     bgBubbleSelected: string;
     bgSearchResult: string;
     borderColor: string;
+    headerBorderColor: string;
     groupHorizontalBorderColor: string;
+    headerHorizontalBorderColor: string;
     drilldownBorder: string;
     linkColor: string;
     cellHorizontalPadding: number;
@@ -138,9 +141,10 @@ const dataEditorBaseTheme: Theme = {
     bgIconHeaderHovered: "#000000",
     fgIconHeaderHovered: "#f3f4ef",
     textHeader: "#313139",
-    textGroupHeader: "rgba(0,0,0,0.5)", //"#313139BB",
+    textGroupHeader: "#313139BB",
     textHeaderSelected: "#FFFFFF",
     bgCell: "#FFFFFF",
+    editBgCell: "#cfc",
     bgCellMedium: "#FAFAFB",
     bgHeader: "#F7F7F8",
     bgHeaderDisabled: "#F7F7F8",
@@ -154,7 +158,9 @@ const dataEditorBaseTheme: Theme = {
     bgSearchResult: "#fff9e3",
 
     borderColor: "rgba(115, 116, 131, 0.16)",
-    groupHorizontalBorderColor: "rgba(115, 116, 131, 0.16)",
+    headerBorderColor: "#000",
+    groupHorizontalBorderColor: "#000",
+    headerHorizontalBorderColor: "rgba(115, 116, 131, 0.16)",
     drilldownBorder: "rgba(0, 0, 0, 0)",
 
     linkColor: "#353fb5",

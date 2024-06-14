@@ -94,7 +94,6 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
         smoothScrollX = false,
         smoothScrollY = false,
         isDraggable,
-        verticalOnly,
         filterHeight,
         showFilter,
     } = p;
@@ -313,6 +312,7 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
                 translateY={p.translateY}
                 onColumnProposeMove={p.onColumnProposeMove}
                 verticalBorder={p.verticalBorder}
+                horizontalBorder={p.horizontalBorder}
                 drawFocusRing={p.drawFocusRing}
                 drawHeader={p.drawHeader}
                 drawCell={p.drawCell}
@@ -342,7 +342,6 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
                 smoothScrollX={p.smoothScrollX}
                 smoothScrollY={p.smoothScrollY}
                 resizeIndicator={p.resizeIndicator}
-                verticalOnly={verticalOnly}
                 showFilter={p.showFilter}
                 filterHeight={p.filterHeight}
                 getFilterCellContent={p.getFilterCellContent}

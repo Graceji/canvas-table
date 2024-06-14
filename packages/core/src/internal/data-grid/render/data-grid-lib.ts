@@ -53,6 +53,7 @@ export function useMappedColumns(
                     minWidth: c.minWidth,
                     maxWidth: c.maxWidth,
                     customHeaderCell: c.customHeaderCell,
+                    align: c.align,
                 })
             ),
         [columns, freezeColumns]

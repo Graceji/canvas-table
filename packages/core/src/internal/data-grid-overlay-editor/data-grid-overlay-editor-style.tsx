@@ -39,20 +39,23 @@ export const DataGridOverlayEditorStyle = styled.div<Props>`
     }
 
     &.gdg-style {
-        border-radius: 2px;
-        background-color: var(--gdg-bg-cell);
+        // border-radius: 2px;
+        // background-color: var(--gdg-bg-cell);
 
-        box-shadow:
-            0 0 0 1px var(--gdg-accent-color),
-            0px 0px 1px rgba(62, 65, 86, 0.4),
-            0px 6px 12px rgba(62, 65, 86, 0.15);
+        // box-shadow:
+        //     0 0 0 1px var(--gdg-accent-color),
+        //     0px 0px 1px rgba(62, 65, 86, 0.4),
+        //     0px 6px 12px rgba(62, 65, 86, 0.15);
 
-        animation: glide_fade_in 60ms 1;
+        // animation: glide_fade_in 60ms 1;
+        box-shadow: none;
+        background-color: transparent;
+        width: auto;
     }
 
-    &.pad {
+    &.gdg-pad {
         // padding: ${p => Math.max(0, (p.targetHeight - 28) / 2)}px 8.5px 3px;
-        padding: 0 6px;
+        padding: 0;
     }
 
     .gdg-clip-region {
@@ -61,7 +64,7 @@ export const DataGridOverlayEditorStyle = styled.div<Props>`
         justify-content: center;
         overflow-y: auto;
         overflow-x: hidden;
-        border-radius: 2px;
+        // border-radius: 2px;
         flex-grow: 1;
 
         .gdg-growing-entry {

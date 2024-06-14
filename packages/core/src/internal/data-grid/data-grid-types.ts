@@ -164,9 +164,11 @@ export interface BaseGridColumn {
         readonly disabled?: boolean;
         readonly showAddIcon?: boolean;
         readonly marker?: boolean;
+        readonly contentAlign?: "left" | "center" | "right";
     };
     readonly customHeaderCell?: GridCell;
     readonly resizable?: boolean;
+    readonly align?: "left" | "right" | "center";
 }
 
 /** @category Columns */

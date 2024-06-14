@@ -42,7 +42,7 @@ interface AddDataToMiddleProps {
     insertIndex: number;
 }
 export const AddDataToMiddle: React.FC<AddDataToMiddleProps> = p => {
-    const { cols, getCellContent, setCellValueRaw, setCellValue } = useMockDataGenerator(60, false);
+    const { cols, getCellContent, setCellValueRaw, setCellValue } = useMockDataGenerator(60, true);
 
     const [numRows, setNumRows] = React.useState(50);
 

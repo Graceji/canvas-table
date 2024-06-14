@@ -232,35 +232,6 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
                     startX = fnItem.end;
                 }
 
-                // else if (functions.length === 2 && functions.some(item => item.type === "number")) {
-                //     // 数字居中，其余靠右显示
-                //     if (type === "number") {
-                //         fnItem.start = rect.x + rect.width / 2;
-                //         fnItem.end = fnItem.start + textWith;
-                //     } else {
-                //         fnItem.start = rect.width - theme.cellHorizontalPadding - itemWidth;
-                //         fnItem.end = fnItem.start + itemWidth;
-                //     }
-                // } else if (functions.length === 3) {
-                //     if (idx === functions.length - 1) {
-                //         fnItem.start = rect.x + rect.width - itemWidth - theme.cellHorizontalPadding;
-                //         fnItem.end = fnItem.start + itemWidth;
-                //     } else if (type === "number") {
-                //         // 数字居中
-                //         fnItem.start = rect.x + rect.width / 2;
-                //         fnItem.end = fnItem.start + textWith;
-                //     } else {
-                //         fnItem.start = startX;
-                //         fnItem.end = startX + itemWidth;
-                //     }
-                // } else {
-                //     // 平分区域
-                //     // 索引数字长度很长时，如何处理？应该要设置一个最大宽度，设置为rect宽度的60%
-                //     fnItem.start = startX;
-                //     fnItem.end = startX + itemWidth;
-                //     startX = fnItem.end + padding;
-                // }
-
                 const disabled =
                     fnItem.disabled === true ||
                     (typeof fnItem.disabled === "function" && fnItem.disabled?.(node) === true);

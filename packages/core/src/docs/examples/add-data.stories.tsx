@@ -80,7 +80,7 @@ export const AddData: React.VFC = () => {
                     bgHeaderHovered: "#001232",
                 },
             }}
-            rows={0}
+            rows={100}
             onRowAppended={onRowAppended}
             style={{ height: "100%" }}
             freezeColumns={4}

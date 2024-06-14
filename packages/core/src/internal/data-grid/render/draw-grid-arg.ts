@@ -47,7 +47,7 @@ export interface DrawGridArg {
     readonly disabledRows: CompactSelection;
     readonly rowHeight: number | ((index: number) => number);
     readonly verticalBorder: (col: number) => boolean;
-    readonly verticalOnly?: boolean;
+    readonly horizontalBorder: (col: number, row: number) => boolean;
     readonly isResizing: boolean;
     readonly resizeCol: number | undefined;
     readonly isFocused: boolean;

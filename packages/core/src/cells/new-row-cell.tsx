@@ -12,7 +12,7 @@ export const newRowCellRenderer: InternalCellRenderer<NewRowCell> = {
     onPaste: () => undefined,
 };
 
-function drawNewRowCell(args: BaseDrawArgs, data: string, showAddIcon = true, icon?: string) {
+function drawNewRowCell(args: BaseDrawArgs, data: string, showAddIcon: boolean | undefined, icon?: string) {
     const { ctx, rect, hoverAmount, theme, spriteManager, cell } = args;
     const { x, y, width: w, height: h } = rect;
     ctx.beginPath();
@@ -27,7 +27,7 @@ function drawNewRowCell(args: BaseDrawArgs, data: string, showAddIcon = true, ic
 
     let textX = 0;
 
-    if (icon !== undefined) {
+    if (icon !== undefined && icon !== "") {
         const padding = 8;
         const size = h - padding;
         const px = x + padding / 2;
@@ -36,9 +36,9 @@ function drawNewRowCell(args: BaseDrawArgs, data: string, showAddIcon = true, ic
         spriteManager.drawSprite(icon, "normal", ctx, px, py, size, theme, alwaysShowIcon ? 1 : hoverAmount);
         textX = size;
     } else {
-        textX = showAddIcon ? 24 : 0;
+        textX = showAddIcon === true ? 24 : 0;
         const finalLineSize = 12;
-        const lineSize = showAddIcon ? (alwaysShowIcon ? finalLineSize : hoverAmount * finalLineSize) : 0;
+        const lineSize = showAddIcon === true ? (alwaysShowIcon ? finalLineSize : hoverAmount * finalLineSize) : 0;
         const xTranslate = alwaysShowIcon ? 0 : (1 - hoverAmount) * finalLineSize * 0.5;
 
         const padPlus = theme.cellHorizontalPadding + 4;
@@ -54,8 +54,17 @@ function drawNewRowCell(args: BaseDrawArgs, data: string, showAddIcon = true, ic
         }
     }
 
-    ctx.textAlign = cell.contentAlign ?? "left";
+    const contentAlign = cell.contentAlign ?? "left";
+    ctx.textAlign = contentAlign;
     ctx.fillStyle = theme.textMedium;
-    ctx.fillText(data, textX + x + theme.cellHorizontalPadding + 0.5, y + h / 2 + getMiddleCenterBias(ctx, theme));
+
+    const bias = getMiddleCenterBias(ctx, theme);
+    if (contentAlign === "right") {
+        ctx.fillText(data, x + w - (theme.cellHorizontalPadding + 0.5), y + h / 2 + bias);
+    } else if (contentAlign === "center") {
+        ctx.fillText(data, x + w / 2, y + h / 2 + bias);
+    } else {
+        ctx.fillText(data, textX + x + theme.cellHorizontalPadding + 0.5, y + h / 2 + getMiddleCenterBias(ctx, theme));
+    }
     ctx.beginPath();
 }

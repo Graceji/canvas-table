@@ -104,7 +104,6 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
         onSearchResultsChanged,
         showSearch = false,
         onSearchClose,
-        verticalOnly,
         hasRowMarkers,
     } = p;
 
@@ -522,6 +521,7 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
                 translateX={p.translateX}
                 translateY={p.translateY}
                 verticalBorder={p.verticalBorder}
+                horizontalBorder={p.horizontalBorder}
                 onColumnProposeMove={p.onColumnProposeMove}
                 drawFocusRing={p.drawFocusRing}
                 drawCell={p.drawCell}
@@ -552,7 +552,6 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
                 smoothScrollX={p.smoothScrollX}
                 smoothScrollY={p.smoothScrollY}
                 resizeIndicator={p.resizeIndicator}
-                verticalOnly={verticalOnly}
                 getFilterCellContent={p.getFilterCellContent}
                 showAccent={p.showAccent}
             />

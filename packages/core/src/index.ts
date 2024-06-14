@@ -40,6 +40,7 @@ export {
     drawTextCell as drawTextCellInner,
     prepTextCell,
 } from "./internal/data-grid/render/data-grid-lib.js";
+export { drawCheckbox } from "./internal/data-grid/render/draw-checkbox.js";
 export { CellSet } from "./internal/data-grid/cell-set.js";
 export { getDataEditorTheme as getDefaultTheme, useTheme } from "./common/styles.js";
 export { useColumnSizer } from "./data-editor/use-column-sizer.js";
