@@ -128,9 +128,9 @@ export const HeaderMenus: React.VFC = () => {
         setMenu({ col, bounds });
     }, []);
 
-    const onFilterClearClick = React.useCallback((col: number, bounds: Rectangle) => {
-        console.log(col, bounds);
-    }, []);
+    // const onFilterClearClick = React.useCallback((col: number, bounds: Rectangle) => {
+    //     //
+    // }, []);
 
     const onHeaderClicked = React.useCallback((location, event) => {
         // eslint-disable-next-line no-console
@@ -146,7 +146,7 @@ export const HeaderMenus: React.VFC = () => {
                 }}
                 getCellContent={getCellContent}
                 onHeaderMenuClick={onHeaderMenuClick}
-                onFilterClearClick={onFilterClearClick}
+                // onFilterClearClick={onFilterClearClick}
                 onHeaderClicked={onHeaderClicked}
                 columns={realCols}
                 onCellContextMenu={(_, e) => e.preventDefault()}

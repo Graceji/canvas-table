@@ -410,6 +410,7 @@ type ObjectEditorCallbackResult<T extends InnerGridCell> = {
     styleOverride?: CSSProperties;
     disablePadding?: boolean;
     disableStyling?: boolean;
+    preventArrow?: "horizontal" | "vertical";
 };
 
 /** @category Renderers */
@@ -417,6 +418,7 @@ export type ProvideEditorCallbackResult<T extends InnerGridCell> =
     | (ProvideEditorComponent<T> & {
           disablePadding?: boolean;
           disableStyling?: boolean;
+          preventArrow?: "horizontal" | "vertical";
       })
     | ObjectEditorCallbackResult<T>
     | undefined;

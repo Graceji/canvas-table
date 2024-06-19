@@ -212,6 +212,7 @@ const renderer: CustomRenderer<DropdownCell> = {
     provideEditor: () => ({
         editor: Editor,
         disablePadding: true,
+        preventArrow: "horizontal",
         deletedValue: v => ({
             ...v,
             copyData: "",

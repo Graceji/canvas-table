@@ -127,6 +127,15 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
         [onFinishEditing]
     );
 
+    const targetValue = tempValue ?? content;
+
+    const [editorProvider, useLabel] = React.useMemo((): [ProvideEditorCallbackResult<GridCell>, boolean] | [] => {
+        if (isInnerOnlyCell(content)) return [];
+        const external = provideEditor?.(content);
+        if (external !== undefined) return [external, false];
+        return [getCellRenderer(content)?.provideEditor?.(content), false];
+    }, [content, getCellRenderer, provideEditor]);
+
     /** @type {*}
         选中行功能
 
@@ -166,6 +175,10 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
                         event.preventDefault();
                         save = true;
 
+                        if (editorProvider?.preventArrow === "horizontal") {
+                            break;
+                        }
+
                         if (
                             gridSelection !== undefined &&
                             gridSelection.current !== undefined &&
@@ -189,6 +202,10 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
                         event.stopPropagation();
                         event.preventDefault();
                         save = true;
+
+                        if (editorProvider?.preventArrow === "vertical") {
+                            break;
+                        }
 
                         if (
                             gridSelection !== undefined &&
@@ -228,17 +245,8 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
                 }
             }, 0);
         },
-        [gridSelection, maxCol, minCol, onFinishEditing, tempValue]
+        [gridSelection, maxCol, minCol, onFinishEditing, tempValue, editorProvider]
     );
-
-    const targetValue = tempValue ?? content;
-
-    const [editorProvider, useLabel] = React.useMemo((): [ProvideEditorCallbackResult<GridCell>, boolean] | [] => {
-        if (isInnerOnlyCell(content)) return [];
-        const external = provideEditor?.(content);
-        if (external !== undefined) return [external, false];
-        return [getCellRenderer(content)?.provideEditor?.(content), false];
-    }, [content, getCellRenderer, provideEditor]);
 
     const { ref, style: stayOnScreenStyle } = useStayOnScreen();
 

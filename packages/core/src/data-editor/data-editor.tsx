@@ -2436,6 +2436,10 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     }
                     if (isPrevented.current || gridSelection.current === undefined) return false;
 
+                    if (c.kind === InnerGridCellKind.NewRow) {
+                        return false;
+                    }
+
                     let shouldActivate = false;
                     switch (c.activationBehaviorOverride ?? cellActivationBehavior) {
                         case "double-click":
@@ -2455,6 +2459,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             break;
                         }
                     }
+
                     if (shouldActivate) {
                         onCellActivated?.([col - rowMarkerOffset, row]);
                         reselect(a.bounds, false);
