@@ -912,7 +912,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         drawFocusRing: drawFocusRingIn = true,
         showFilter = false,
         filterHeight = 20,
-        showAccent = true,
     } = p;
 
     const drawFocusRing = drawFocusRingIn === "no-editor" ? overlay === undefined : drawFocusRingIn;
@@ -1902,9 +1901,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         (args: GridMouseEventArgs) => {
             const isMultiKey = browserIsOSX.value ? args.metaKey : args.ctrlKey;
             const isMultiRow = isMultiKey && rowSelect === "multi";
-            // const isMultiCol = isMultiKey && columnSelect === "multi";
+            const isMultiCol = isMultiKey && columnSelect === "multi";
             const [col, row] = args.location;
-            // const selectedColumns = gridSelection.columns;
+            const selectedColumns = gridSelection.columns;
             const selectedRows = gridSelection.rows;
             // const [cellCol, cellRow] = gridSelection.current?.cell ?? [];
 
@@ -1920,7 +1919,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 } else {
                     if (
                         (showTrailingBlankRow === true && row === rows) ||
-                        rowMarkers === "number" ||
+                        // rowMarkers === "number" ||
                         rowSelect === "none"
                     )
                         return;
@@ -1932,7 +1931,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             return;
                         }
                         const renderer = getCellRenderer(markerCell);
-                        assert(renderer?.kind === InnerGridCellKind.Marker);
+                        // assert(renderer?.kind === InnerGridCellKind.Marker);
                         const postClick = renderer?.onClick?.({
                             ...args,
                             cell: markerCell,
@@ -2002,7 +2001,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                                 CompactSelection.fromSingleSelection(newSlice),
                                 lastSelectedCurrent.current,
                                 undefined,
-                                isMultiRow
+                                rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed"
                             );
                         }
                     } else if (isMultiRow || args.isTouch || rowSelectionMode === "multi") {
@@ -2022,14 +2021,14 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             CompactSelection.empty(),
                             lastSelectedCurrent.current,
                             undefined,
-                            isMultiKey
+                            rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed"
                         );
                     } else {
                         setSelectedRowsAndCell(
                             CompactSelection.fromSingleSelection(row),
                             lastSelectedCurrent.current,
                             undefined,
-                            isMultiKey
+                            rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed"
                         );
                         lastSelectedRowRef.current = row;
                     }
@@ -2040,46 +2039,50 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 lastSelectedRowRef.current = undefined;
                 lastSelectedColRef.current = undefined;
 
-                // if (hasRowMarkers && col === 0) {
-                //     lastSelectedRowRef.current = undefined;
-                //     lastSelectedColRef.current = undefined;
-                //     // 以下逻辑暂时不需要，索引列，filter行全选逻辑由外部设置
-                //     if (rowSelect === "multi") {
-                //         if (selectedRows.length !== rows) {
-                //             setSelectedRows(CompactSelection.fromSingleSelection([0, rows]), undefined, isMultiKey);
-                //         } else {
-                //             setSelectedRows(CompactSelection.empty(), undefined, isMultiKey);
-                //         }
-                //         focus();
-                //     }
-                // } else {
-                //     const lastCol = lastSelectedColRef.current;
-                //     if (
-                //         columnSelect === "multi" &&
-                //         (args.shiftKey || args.isLongTouch === true) &&
-                //         lastCol !== undefined &&
-                //         selectedColumns.hasIndex(lastCol)
-                //     ) {
-                //         const newSlice: Slice = [Math.min(lastCol, col), Math.max(lastCol, col) + 1];
-                //         if (isMultiCol) {
-                //             setSelectedColumns(undefined, newSlice, isMultiKey);
-                //         } else {
-                //             setSelectedColumns(CompactSelection.fromSingleSelection(newSlice), undefined, isMultiKey);
-                //         }
-                //     } else if (isMultiCol) {
-                //         if (selectedColumns.hasIndex(col)) {
-                //             setSelectedColumns(selectedColumns.remove(col), undefined, isMultiKey);
-                //         } else {
-                //             setSelectedColumns(undefined, col, isMultiKey);
-                //         }
-                //         lastSelectedColRef.current = col;
-                //     } else if (columnSelect !== "none") {
-                //         setSelectedColumns(CompactSelection.fromSingleSelection(col), undefined, isMultiKey);
-                //         lastSelectedColRef.current = col;
-                //     }
-                //     lastSelectedRowRef.current = undefined;
-                //     focus();
-                // }
+                if (hasRowMarkers && col === 0) {
+                    // lastSelectedRowRef.current = undefined;
+                    // lastSelectedColRef.current = undefined;
+                    // // 以下逻辑暂时不需要，索引列，filter行全选逻辑由外部设置
+                    // if (rowSelect === "multi") {
+                    //     if (selectedRows.length !== rows) {
+                    //         setSelectedRows(CompactSelection.fromSingleSelection([0, rows]), undefined, isMultiKey);
+                    //     } else {
+                    //         setSelectedRows(CompactSelection.empty(), undefined, isMultiKey);
+                    //     }
+                    //     focus();
+                    // }
+                } else {
+                    const lastCol = lastSelectedColRef.current;
+                    if (
+                        columnSelect === "multi" &&
+                        (args.shiftKey || args.isLongTouch === true) &&
+                        lastCol !== undefined &&
+                        selectedColumns.hasIndex(lastCol)
+                    ) {
+                        const newSlice: Slice = [Math.min(lastCol, col), Math.max(lastCol, col) + 1];
+                        if (isMultiCol) {
+                            setSelectedColumns(undefined, newSlice, isMultiKey);
+                        } else {
+                            setSelectedColumns(CompactSelection.fromSingleSelection(newSlice), undefined, isMultiKey);
+                        }
+                    } else if (isMultiCol) {
+                        if (selectedColumns.hasIndex(col)) {
+                            setSelectedColumns(selectedColumns.remove(col), undefined, isMultiKey);
+                        } else {
+                            setSelectedColumns(undefined, col, isMultiKey);
+                        }
+                        lastSelectedColRef.current = col;
+                    } else if (columnSelect !== "none") {
+                        setSelectedColumns(
+                            CompactSelection.fromSingleSelection(col),
+                            undefined,
+                            rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed"
+                        );
+                        lastSelectedColRef.current = col;
+                    }
+                    lastSelectedRowRef.current = undefined;
+                    focus();
+                }
             } else if (args.kind === groupHeaderKind) {
                 lastMouseSelectLocation.current = [col, row];
             } else if (args.kind === outOfBoundsKind && !args.isMaybeScrollbar && onSelectionCleared !== undefined) {
@@ -2110,6 +2113,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         },
         [
             rowSelect,
+            columnSelect,
             gridSelection,
             onSelectionCleared,
             rowMarkerOffset,
@@ -2117,7 +2121,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             rows,
             getCustomNewRowTargetColumn,
             appendRow,
-            rowMarkers,
             onRowMoved,
             getMangledCellContent,
             getCellRenderer,
@@ -2127,6 +2130,10 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             rowSelectionMode,
             themeForCell,
             setSelectedRowsAndCell,
+            hasRowMarkers,
+            setSelectedColumns,
+            rowSelectionBlending,
+            columnSelectionBlending,
             setGridSelection,
             setCurrent,
         ]
@@ -2220,10 +2227,23 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     setSelectedColumns(undefined, [start, end + 1], isMultiKey);
                 }
             } else {
-                setSelectedColumns(CompactSelection.fromSingleSelection([start, end + 1]), undefined, isMultiKey);
+                setSelectedColumns(
+                    CompactSelection.fromSingleSelection([start, end + 1]),
+                    undefined,
+                    rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed"
+                );
             }
         },
-        [columnSelect, focus, gridSelection.columns, mangledCols, rowMarkerOffset, setSelectedColumns]
+        [
+            columnSelect,
+            columnSelectionBlending,
+            focus,
+            gridSelection.columns,
+            mangledCols,
+            rowMarkerOffset,
+            rowSelectionBlending,
+            setSelectedColumns,
+        ]
     );
 
     const isPrevented = React.useRef(false);
@@ -3153,7 +3173,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             rangeStack: newStack,
                         },
                     },
-                    false
+                    rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed"
                 );
             } else {
                 setCurrent(
@@ -3184,7 +3204,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                               }
                             : undefined,
                         undefined,
-                        false
+                        rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed"
                     );
                 }
             }
@@ -3206,6 +3226,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             currentCell,
             gridSelection,
             setGridSelection,
+            rowSelectionBlending,
+            columnSelectionBlending,
             setCurrent,
             showTrailingBlankRow,
             trailingRowOptions?.sticky,
@@ -3772,11 +3794,16 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         CompactSelection.fromSingleSelection(row),
                         lastSelectedCurrent.current,
                         undefined,
-                        false
+                        rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed"
                     );
                     lastSelectedRowRef.current = row;
                 } else {
-                    setSelectedRowsAndCell(selectedRows, lastSelectedCurrent.current, undefined, false);
+                    setSelectedRowsAndCell(
+                        selectedRows,
+                        lastSelectedCurrent.current,
+                        undefined,
+                        rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed"
+                    );
                 }
 
                 // if (!gridSelectionHasItem(gridSelection, args.location)) {
@@ -3785,12 +3812,14 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             }
         },
         [
+            columnSelectionBlending,
             focus,
             gridSelection,
             onCellContextMenu,
             onGroupHeaderContextMenu,
             onHeaderContextMenu,
             rowMarkerOffset,
+            rowSelectionBlending,
             setSelectedRowsAndCell,
         ]
     );
@@ -4520,7 +4549,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     getCellRenderer={getCellRenderer}
                     resizeIndicator={resizeIndicator}
                     getFilterCellContent={getFilterCellContent}
-                    showAccent={showAccent}
                 />
                 {renameGroupNode}
                 {overlay !== undefined && (

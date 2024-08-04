@@ -73,6 +73,7 @@ export interface Theme {
     editBgCell: string;
     bgCellMedium: string;
     bgHeader: string;
+    bgHeaderAccent: string;
     bgHeaderDisabled: string;
     bgHeaderHasFocus: string;
     bgHeaderHovered: string;
@@ -147,7 +148,8 @@ const dataEditorBaseTheme: Theme = {
     editBgCell: "#cfc",
     bgCellMedium: "#FAFAFB",
     bgHeader: "#F7F7F8",
-    bgHeaderDisabled: "#F7F7F8",
+    bgHeaderAccent: "rgba(255, 255, 255, 0.16)",
+    bgHeaderDisabled: "#001232",
     bgHeaderHasFocus: "#E9E9EB",
     bgHeaderHovered: "#EFEFF1",
     bgNewRowHovered: "#EFEFF1",

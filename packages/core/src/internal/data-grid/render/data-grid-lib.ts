@@ -549,7 +549,15 @@ function drawMultiLineText(
     const emHeight = getEmHeight(ctx, fontStyle);
     const lineHeight = theme.lineHeight * emHeight;
 
-    const actualHeight = emHeight + lineHeight * (split.length - 1);
+    let lineNum = 0;
+    let newSplit = split;
+    const canTruncate = splitNum !== undefined && typeof splitNum === "number" && splitNum > 1;
+
+    if (canTruncate && split.length > splitNum) {
+        newSplit = [...split.slice(0, splitNum - 1), split.slice(splitNum - 1).join("")];
+    }
+
+    const actualHeight = emHeight + lineHeight * (newSplit.length - 1);
     const mustClip = actualHeight + theme.cellVerticalPadding > h;
 
     if (mustClip) {
@@ -561,14 +569,6 @@ function drawMultiLineText(
 
     const optimalY = y + h / 2 - actualHeight / 2;
     let drawY = Math.max(y + theme.cellVerticalPadding, optimalY);
-
-    let lineNum = 0;
-    let newSplit = split;
-    const canTruncate = splitNum !== undefined && typeof splitNum === "number" && splitNum > 1;
-
-    if (canTruncate && split.length > splitNum) {
-        newSplit = [...split.slice(0, splitNum - 1), split.slice(splitNum - 1).join("")];
-    }
 
     for (let line of newSplit) {
         lineNum++;

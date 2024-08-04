@@ -250,6 +250,16 @@ export function drawExtraRowThemes(
                 });
             }
 
+            // if (selection.columns.hasIndex(c.sourceIndex)) {
+            //     toDraw.push({
+            //         x: tx,
+            //         y: extraRowsStartY,
+            //         w: c.width,
+            //         h,
+            //         color: theme.bgHeaderAccent,
+            //     });
+            // }
+
             x += c.width;
         }
     }
@@ -339,29 +349,30 @@ export function drawGridLines(
         }
     }
 
-    let startX = 0.5;
+    let freezeStartX = 0.5;
+    let freezeEndX = 0.5;
     for (let index = 0; index < effectiveCols.length; index++) {
-        // let row = cellYOffset;
         let freezeY = height + 0.5;
         const c = effectiveCols[index];
         if (c.width === 0) continue;
-        const tx = c.sticky ? startX : startX + translateX;
+        freezeEndX += c.width;
+        const tx = c.sticky ? freezeEndX : freezeEndX + translateX;
 
         for (let i = rows - freezeTrailingRows; i < rows; i++) {
             const rh = getRowHeight(i);
             freezeY -= rh;
             if (horizontalBorder(c.sourceIndex, i)) {
                 toDraw.push({
-                    x1: tx,
+                    x1: freezeStartX,
                     y1: freezeY,
-                    x2: tx + c.width,
+                    x2: tx,
                     y2: freezeY,
                     color: hColor,
                 });
             }
         }
 
-        startX += c.width;
+        freezeStartX = tx;
     }
 
     let freezeY = height + 0.5;
@@ -374,13 +385,15 @@ export function drawGridLines(
     if (verticalOnly !== true) {
         // horizontal lines
         let rowX = 0.5;
+        let endX = 0.5;
         const target = freezeY;
 
         for (let index = 0; index < effectiveCols.length; index++) {
             let row = cellYOffset;
             const c = effectiveCols[index];
             if (c.width === 0) continue;
-            const tx = c.sticky ? rowX : rowX + translateX;
+            endX += c.width;
+            const txEnd = c.sticky ? endX : endX + translateX;
             let y = totalHeaderHeight + 0.5 + getRowHeight(row); // 绘制下划线
 
             while (y + translateY < target) {
@@ -388,9 +401,9 @@ export function drawGridLines(
                 if (ty >= minY && ty <= maxY - 1 && horizontalBorder(c.sourceIndex, row)) {
                     const rowTheme = getRowThemeOverride?.(row);
                     toDraw.push({
-                        x1: tx,
+                        x1: rowX,
                         y1: ty,
-                        x2: tx + c.width,
+                        x2: txEnd,
                         y2: ty,
                         color: rowTheme?.horizontalBorderColor ?? rowTheme?.borderColor ?? hColor,
                     });
@@ -399,7 +412,7 @@ export function drawGridLines(
                 y += getRowHeight(row);
             }
 
-            rowX += c.width;
+            rowX = txEnd;
         }
     }
 

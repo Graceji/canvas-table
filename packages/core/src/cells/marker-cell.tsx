@@ -16,7 +16,7 @@ export const markerCellRenderer: InternalCellRenderer<MarkerCell> = {
         const { bounds, cell, posX: x, posY: y } = e;
 
         // 计算边界时应该按照每一项的盒子来计算
-        const isOverHeaderMarkerfn = cell.functions.find(
+        const isOverHeaderMarkerfn = cell.functions?.find?.(
             item => x >= item.start && x <= item.end && y >= 0 && y <= bounds.height
         );
 
@@ -48,7 +48,7 @@ export const markerCellRenderer: InternalCellRenderer<MarkerCell> = {
         const { cell, posX: x, posY: y, bounds } = args;
 
         // 计算边界时应该按照每一项的盒子来计算
-        const isOverHeaderMarkerfn = cell.functions.find(
+        const isOverHeaderMarkerfn = cell.functions?.find?.(
             item => x >= item.start && x <= item.end && y >= 0 && y <= bounds.height
         );
 
@@ -309,7 +309,7 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
             ctx.globalAlpha = 1;
         }
         if (markerKind === "number" || (markerKind === "both" && !checked)) {
-            const start = x + width / 2;
+            const start = x + (width - textWith) / 2;
 
             drawIndexNumber(start, textWith);
         }

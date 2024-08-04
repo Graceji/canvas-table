@@ -61,20 +61,13 @@ export function drawGridHeaders(
     renderStateProvider: RenderStateProvider,
     overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
     getFilterCellRenderer: GetCellRendererCallback,
-    getFilterCellContent: (cell: number) => InnerGridCell,
-    showAccent?: boolean,
-    dragCol?: number
+    getFilterCellContent: (cell: number) => InnerGridCell
 ) {
     const totalHeaderHeight = headerHeight + groupHeaderHeight;
     if (totalHeaderHeight <= 0) return;
 
     ctx.fillStyle = outerTheme.bgHeader;
     ctx.fillRect(0, 0, width, totalHeaderHeight);
-
-    // if (showFilter === true && filterHeight > 0) {
-    //     ctx.fillStyle = outerTheme.filterHeaderBg ?? outerTheme.bgHeader;
-    //     ctx.fillRect(hasRowMarkers === true ? rowMarkerWidth ?? 0 : 0, totalHeaderHeight, width, filterHeight);
-    // }
 
     const frameTime = performance.now();
     const hCol = hovered?.[0]?.[0];
@@ -115,6 +108,7 @@ export function drawGridHeaders(
         }
 
         if (c.group !== undefined) {
+            // 二级表头叠加线
             ctx.beginPath();
             ctx.moveTo(x, groupHeaderHeight + 0.5);
             ctx.lineTo(x + c.width, groupHeaderHeight + 0.5);
@@ -126,30 +120,26 @@ export function drawGridHeaders(
         const selected = selection.columns.hasIndex(c.sourceIndex);
         const noHover = dragAndDropState !== undefined || isResizing;
         const hoveredBoolean = !noHover && hRow === -1 && hCol === c.sourceIndex;
-
         const filterHoveredBoolean = !noHover && hRow === -3 && hCol === c.sourceIndex;
-
         const hover = noHover
             ? 0
             : hoverValues.find(s => s.item[0] === c.sourceIndex && s.item[1] === -1)?.hoverAmount ?? 0;
 
         const hasSelectedCell = selection?.current !== undefined && selection.current.cell[0] === c.sourceIndex;
 
-        const bgFillStyle = selected ? theme.accentColor : hasSelectedCell ? theme.bgHeaderHasFocus : theme.bgHeader;
+        const bgFillStyle = selected ? theme.bgHeaderAccent : hasSelectedCell ? theme.bgHeaderHasFocus : theme.bgHeader;
 
-        const y = enableGroups ? groupHeaderHeight : 0;
+        const y = enableGroups && c.group !== undefined ? groupHeaderHeight : 0;
         const xOffset = c.sourceIndex === 0 ? 0 : 1;
 
-        // (dragCol !== undefined && allColumns[dragCol]?.id === c.id)
-        if (selected && showAccent === true && dragCol !== undefined) {
+        if (selected) {
             ctx.fillStyle = bgFillStyle;
-
-            if (c.group === undefined) {
-                ctx.rect(x + xOffset, 0, c.width - xOffset, totalHeaderHeight);
-            } else {
-                ctx.rect(x + xOffset, y + 1, c.width - xOffset, headerHeight - 1);
-            }
-            ctx.fill();
+            ctx.fillRect(
+                x + xOffset,
+                enableGroups && c.group !== undefined ? y + 1 : y,
+                c.width - xOffset,
+                enableGroups && c.group !== undefined ? headerHeight - 1 : totalHeaderHeight
+            );
         } else if (hasSelectedCell || hover > 0) {
             ctx.beginPath();
             if (c.group === undefined) {
@@ -214,7 +204,7 @@ export function drawGridHeaders(
             x,
             y,
             c.width,
-            headerHeight,
+            enableGroups && c.group !== undefined ? headerHeight : totalHeaderHeight,
             c,
             selected,
             theme,

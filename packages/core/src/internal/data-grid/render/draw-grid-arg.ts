@@ -85,6 +85,4 @@ export interface DrawGridArg {
     readonly filterHeight: number;
     readonly hasRowMarkers?: boolean;
     readonly rowMarkerWidth?: number;
-    readonly showAccent?: boolean;
-    readonly dragCol?: number;
 }

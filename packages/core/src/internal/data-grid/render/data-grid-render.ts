@@ -174,8 +174,6 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         filterHeight,
         showFilter,
         getFilterCellContent,
-        showAccent,
-        dragCol,
     } = arg;
     if (width === 0 || height === 0) return;
     const doubleBuffer = renderStrategy === "double-buffer";
@@ -307,9 +305,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             renderStateProvider,
             overrideCursor,
             getCellRenderer,
-            getFilterCellContent,
-            showAccent,
-            dragCol
+            getFilterCellContent
         );
 
         drawGridLines(
@@ -461,8 +457,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
                 renderStateProvider,
                 getCellRenderer,
                 overrideCursor,
-                minimumCellWidth,
-                showAccent
+                minimumCellWidth
             );
 
             const selectionCurrent = selection.current;
@@ -684,8 +679,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             renderStateProvider,
             getCellRenderer,
             overrideCursor,
-            minimumCellWidth,
-            showAccent
+            minimumCellWidth
         );
         drawBlanks(
             targetCtx,

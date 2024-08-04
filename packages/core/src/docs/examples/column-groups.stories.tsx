@@ -8,7 +8,6 @@ import {
     defaultProps,
 } from "../../data-editor/stories/utils.js";
 import { SimpleThemeWrapper } from "../../stories/story-utils.js";
-import { GridColumnIcon } from "../../internal/data-grid/data-grid-types.js";
 
 export default {
     title: "Glide-Data-Grid/DataEditor Demos",
@@ -31,20 +30,20 @@ export default {
     ],
 };
 
-function swapArrayElements(arr, index1, index2) {
-    // 检查索引是否有效
-    if (index1 < 0 || index1 >= arr.length || index2 < 0 || index2 >= arr.length) {
-        // console.error("Invalid indices provided.");
-        return;
-    }
+// function swapArrayElements(arr, index1, index2) {
+//     // 检查索引是否有效
+//     if (index1 < 0 || index1 >= arr.length || index2 < 0 || index2 >= arr.length) {
+//         // console.error("Invalid indices provided.");
+//         return;
+//     }
 
-    // 交换两个位置的元素
-    const temp = arr[index1];
-    arr[index1] = arr[index2];
-    arr[index2] = temp;
+//     // 交换两个位置的元素
+//     const temp = arr[index1];
+//     arr[index1] = arr[index2];
+//     arr[index2] = temp;
 
-    return arr;
-}
+//     return arr;
+// }
 
 export const ColumnGroups: React.VFC = () => {
     const { cols, getCellContent, onColumnResize } = useMockDataGenerator(20, true, true);
@@ -91,6 +90,9 @@ export const ColumnGroups: React.VFC = () => {
                 } as any;
             }}
             rowMarkers="both"
+            rowSelectionBlending="mixed"
+            columnSelectionBlending="mixed"
+            rangeSelect="none"
             isDraggable={false}
             onColumnMoved={(s, e) => {
                 const current = columns[s];
@@ -114,7 +116,6 @@ export const ColumnGroups: React.VFC = () => {
 
                 return true;
             }}
-            columnSelect="none"
             onColumnResize={onColumnResize}
         />
     );

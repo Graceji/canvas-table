@@ -100,7 +100,6 @@ export interface DataGridProps {
     readonly isResizing: boolean;
     readonly resizeColumn: number | undefined;
     readonly isDragging: boolean;
-    readonly dragCol?: number;
     readonly isFilling: boolean;
     readonly isFocused: boolean;
 
@@ -325,9 +324,6 @@ export interface DataGridProps {
     readonly resizeIndicator: "full" | "header" | "none" | undefined;
     readonly hasRowMarkers?: boolean;
 
-    // 点击头部是否显示高亮
-    readonly showAccent?: boolean;
-
     readonly dragCursor?: "move" | "not-allowed";
 }
 
@@ -397,7 +393,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         isResizing,
         resizeColumn: resizeCol,
         isDragging,
-        dragCol,
         isDraggable = false,
         allowResize,
         disabledRows,
@@ -424,7 +419,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         filterHeight,
         getFilterCellContent,
         hasRowMarkers,
-        showAccent = true,
         dragCursor,
     } = p;
     const translateX = p.translateX ?? 0;
@@ -868,8 +862,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             getCellRenderer,
             minimumCellWidth,
             resizeIndicator,
-            showAccent,
-            dragCol,
         } as DrawGridArg;
 
         // This confusing bit of code due to some poor design. Long story short, the damage property is only used
@@ -940,8 +932,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         getCellRenderer,
         minimumCellWidth,
         resizeIndicator,
-        showAccent,
-        dragCol,
     ]);
 
     const lastDrawRef = React.useRef(draw);

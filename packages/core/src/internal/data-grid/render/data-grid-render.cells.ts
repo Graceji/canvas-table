@@ -109,8 +109,7 @@ export function drawCells(
     renderStateProvider: RenderStateProvider,
     getCellRenderer: GetCellRendererCallback,
     overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
-    minimumCellWidth: number,
-    showAccent?: boolean
+    minimumCellWidth: number
 ): Rectangle[] | undefined {
     let toDraw = damage?.size ?? Number.MAX_SAFE_INTEGER;
     const frameTime = performance.now();
@@ -278,6 +277,7 @@ export function drawCells(
 
                     const isSelected = cellIsSelected(cellIndex, cell, selection);
                     let accentCount = cellIsInRange(cellIndex, cell, selection, drawFocus);
+                    let isColselected = false;
                     const spanIsHighlighted =
                         cell.span !== undefined &&
                         selection.columns.some(
@@ -295,7 +295,10 @@ export function drawCells(
                     }
                     if (!isSelected) {
                         if (rowSelected) accentCount++;
-                        if (showAccent === true && colSelected && !isTrailingRow) accentCount++;
+                        if (colSelected && !isTrailingRow) {
+                            isColselected = true;
+                            accentCount++;
+                        }
                     }
 
                     if (cell.readonly === false && cell.allowOverlay === true) {
@@ -326,7 +329,11 @@ export function drawCells(
                             fill = blend(theme.bgHeaderDisabled, fill);
                         }
                         for (let i = 0; i < accentCount; i++) {
-                            fill = blend(theme.accentLight, fill);
+                            fill = isColselected
+                                ? rowSelected
+                                    ? blend(theme.bgHeaderAccent, theme.accentLight)
+                                    : blend(theme.bgHeaderAccent, fill)
+                                : blend(theme.accentLight, fill);
                         }
                     } else if (prelightCells !== undefined) {
                         for (const pre of prelightCells) {

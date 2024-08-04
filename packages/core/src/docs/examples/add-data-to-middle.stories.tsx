@@ -67,7 +67,7 @@ export const AddDataToMiddle: React.FC<AddDataToMiddleProps> = p => {
             {...defaultProps}
             getCellContent={getCellContent}
             columns={cols}
-            rowMarkers={"both"}
+            rowMarkers={"number"}
             onCellEdited={setCellValue}
             trailingRowOptions={{
                 hint: "New row...",
@@ -76,6 +76,8 @@ export const AddDataToMiddle: React.FC<AddDataToMiddleProps> = p => {
             }}
             rows={numRows}
             onRowAppended={onRowAppended}
+            rowSelectionBlending="mixed"
+            columnSelectionBlending="mixed"
         />
     );
 };

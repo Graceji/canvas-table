@@ -71,8 +71,6 @@ export const RearrangeColumns: React.VFC = () => {
             columnSelectionBlending="mixed"
             rangeSelectionBlending="mixed"
             rows={1000}
-            showAccent={false}
-            columnSelect={"none"}
         />
     );
 };
