@@ -8,6 +8,7 @@ import {
     defaultProps,
 } from "../../data-editor/stories/utils.js";
 import { SimpleThemeWrapper } from "../../stories/story-utils.js";
+import { GridColumnIcon } from "../../index.js";
 
 export default {
     title: "Glide-Data-Grid/DataEditor Demos",
@@ -62,12 +63,17 @@ export const ColumnGroups: React.VFC = () => {
             // onGroupHeaderRenamed={(x, y) => window.alert(`Please rename group ${x} to ${y}`)}
             columns={cols}
             rows={1000}
+            showFilter
             freezeColumns={2}
+            theme={{
+                filterHeaderBg: "orange",
+            }}
             getGroupDetails={g => {
                 return {
                     name: g,
                     // icon: g === "" ? undefined : GridColumnIcon.HeaderCode,
                     collapse: (expandMap as any)[g] ?? false,
+                    icon: g === "index" ? GridColumnIcon.HeaderAdd : undefined,
                     actions: [
                         {
                             title: "Collapse",
@@ -89,7 +95,11 @@ export const ColumnGroups: React.VFC = () => {
                     ],
                 } as any;
             }}
-            rowMarkers="both"
+            rowMarkers={{
+                width: 100,
+                kind: "number",
+                group: "index",
+            }}
             rowSelectionBlending="mixed"
             columnSelectionBlending="mixed"
             rangeSelect="none"

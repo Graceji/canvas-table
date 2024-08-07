@@ -325,6 +325,8 @@ export interface DataGridProps {
     readonly hasRowMarkers?: boolean;
 
     readonly dragCursor?: "move" | "not-allowed";
+
+    readonly rowMarkerGroup?: string;
 }
 
 type DamageUpdateList = readonly {
@@ -420,6 +422,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         getFilterCellContent,
         hasRowMarkers,
         dragCursor,
+        rowMarkerGroup,
     } = p;
     const translateX = p.translateX ?? 0;
     const translateY = p.translateY ?? 0;
@@ -862,6 +865,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             getCellRenderer,
             minimumCellWidth,
             resizeIndicator,
+            rowMarkerGroup,
         } as DrawGridArg;
 
         // This confusing bit of code due to some poor design. Long story short, the damage property is only used
@@ -932,6 +936,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         getCellRenderer,
         minimumCellWidth,
         resizeIndicator,
+        rowMarkerGroup,
     ]);
 
     const lastDrawRef = React.useRef(draw);
@@ -1472,11 +1477,6 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     return newVal;
                 });
             };
-
-            // if (
-            //     !mouseEventArgsAreEqual(args, hoveredRef.current) ||
-            //     (hasRowMarkers === true && args.location[0] === 0)
-            // ) {
 
             if (!mouseEventArgsAreEqual(args, hoveredRef.current)) {
                 setDrawCursorOverride(undefined);

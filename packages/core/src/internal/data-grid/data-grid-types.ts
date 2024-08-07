@@ -93,6 +93,7 @@ export enum GridCellKind {
 
 /** @category Columns */
 export enum GridColumnIcon {
+    HeaderAdd = "headerAdd",
     HeaderRowID = "headerRowID",
     HeaderCode = "headerCode",
     HeaderNumber = "headerNumber",

@@ -89,6 +89,7 @@ import { useRowGroupingInner, type RowGroupingOptions } from "./row-grouping.js"
 import { useRowGrouping } from "./row-grouping-api.js";
 import { useInitialScrollOffset } from "./use-initial-scroll-offset.js";
 import type { VisibleRegion } from "./visible-region.js";
+import { getMarkerActionBoundsForGroup } from "../internal/data-grid/render/data-grid-render.header.js";
 
 const DataGridOverlayEditor = React.lazy(
     async () => await import("../internal/data-grid-overlay-editor/data-grid-overlay-editor.js")
@@ -106,6 +107,7 @@ export interface RowMarkerOptions {
     headerTheme?: Partial<Theme>;
     headerAlwaysVisible?: boolean;
     fns?: MarkerFn[];
+    group?: string;
 }
 
 interface MouseState {
@@ -926,6 +928,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const headerRowMarkerAlwaysVisible = rowMarkersObj?.headerAlwaysVisible;
     const headerRowMarkerDisabled = rowSelect !== "multi";
     const rowMarkerCheckboxStyle = rowMarkersObj?.checkboxStyle ?? "square";
+    const rowMarkerGroup = rowMarkersObj?.group ?? undefined;
 
     const minColumnWidth = Math.max(minColumnWidthIn, 20);
     const maxColumnWidth = Math.max(maxColumnWidthIn, minColumnWidth);
@@ -1165,6 +1168,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 headerRowMarkerTheme,
                 headerRowMarkerAlwaysVisible,
                 headerRowMarkerDisabled,
+                group: rowMarkerGroup,
             },
             ...columns,
         ];
@@ -1178,6 +1182,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         headerRowMarkerTheme,
         headerRowMarkerAlwaysVisible,
         headerRowMarkerDisabled,
+        rowMarkerGroup,
     ]);
 
     const visibleRegionRef = React.useRef<VisibleRegion>({
@@ -2576,7 +2581,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 return;
             }
 
-            if (args.kind === "header") {
+            if (args.kind === headerKind) {
                 // if (clickLocation < 0) {
                 //     return;
                 // }
@@ -2607,6 +2612,11 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
             if (args.kind === groupHeaderKind) {
                 if (clickLocation < 0) {
+                    // 索引列
+                    const box = getMarkerActionBoundsForGroup(args.bounds, groupHeaderHeight, theme?.groupIconSize);
+                    if (pointInRect(box, args.localEventX + args.bounds.x, args.localEventY)) {
+                        onGroupHeaderClicked?.(clickLocation, { ...args, preventDefault, sourceEvent });
+                    }
                     return;
                 }
 
@@ -4458,6 +4468,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     showFilter={showFilter}
                     filterHeight={filterHeight}
                     hasRowMarkers={hasRowMarkers}
+                    rowMarkerGroup={rowMarkerGroup}
                     fillHandle={fillHandle}
                     drawFocusRing={drawFocusRing}
                     experimental={experimental}

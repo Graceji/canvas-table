@@ -61,7 +61,8 @@ export function drawGridHeaders(
     renderStateProvider: RenderStateProvider,
     overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
     getFilterCellRenderer: GetCellRendererCallback,
-    getFilterCellContent: (cell: number) => InnerGridCell
+    getFilterCellContent: (cell: number) => InnerGridCell,
+    rowMarkerGroup?: string
 ) {
     const totalHeaderHeight = headerHeight + groupHeaderHeight;
     if (totalHeaderHeight <= 0) return;
@@ -107,7 +108,7 @@ export function drawGridHeaders(
             ctx.font = theme.baseFontFull;
         }
 
-        if (c.group !== undefined) {
+        if (enableGroups && c.group !== undefined) {
             // 二级表头叠加线
             ctx.beginPath();
             ctx.moveTo(x, groupHeaderHeight + 0.5);
@@ -235,7 +236,8 @@ export function drawGridHeaders(
             hoverValues,
             verticalBorder,
             getGroupDetails,
-            damage
+            damage,
+            rowMarkerGroup
         );
     }
 }
@@ -252,10 +254,12 @@ export function drawGroups(
     _hoverValues: HoverValues,
     verticalBorder: (col: number) => boolean,
     getGroupDetails: GroupDetailsCallback,
-    damage: CellSet | undefined
+    damage: CellSet | undefined,
+    rowMarkerGroup?: string
 ) {
     const xPad = 8;
     const [hCol, hRow] = hovered?.[0] ?? [];
+    const groupIconSize = theme.groupIconSize ?? 20;
 
     let finalX = 0;
     walkGroups(effectiveCols, width, translateX, groupHeaderHeight, (span, groupName, x, y, w, h) => {
@@ -291,14 +295,36 @@ export function drawGroups(
             let drawX = x;
             if (group.icon !== undefined) {
                 // icon的位置也需要修改下，等需要支持icon时再修改。看需求
+                // 简单处理，仅索引列有group时，绘制icon的高亮
+                let variant: SpriteVariant = "normal";
+                if (rowMarkerGroup !== undefined) {
+                    const box = getMarkerActionBoundsForGroup(
+                        { x, y, width: w, height: h },
+                        groupHeaderHeight,
+                        groupIconSize
+                    );
+                    const [mouseX, mouseY] = hovered?.[1] ?? [-1, -1];
+
+                    const iconHovered = pointInRect(box, mouseX + x, mouseY);
+
+                    if (iconHovered) {
+                        variant = "hovered";
+                    }
+                }
+
                 spriteManager.drawSprite(
                     group.icon,
-                    "normal",
+                    variant,
                     ctx,
-                    drawX + xPad,
-                    (groupHeaderHeight - 20) / 2,
-                    20,
-                    groupTheme
+                    rowMarkerGroup !== undefined ? drawX + (w - groupIconSize) / 2 : drawX + xPad,
+                    (groupHeaderHeight - groupIconSize) / 2,
+                    groupIconSize,
+                    groupTheme,
+                    1,
+                    groupIconSize,
+                    groupTheme.groupHeaderIconColor,
+                    undefined,
+                    groupTheme.groupHeaderIconHover
                 );
                 drawX += 26;
             }
@@ -310,77 +336,84 @@ export function drawGroups(
                 (padding + (group.icon !== undefined ? 26 : 0)) -
                 (group?.actions !== undefined && group.actions?.length > 0 ? group.actions?.length * 26 : 0);
 
-            const textWidth = measureTextCached(displayName, ctx).width;
+            // 索引列有group时，默认为功能性显示，不绘制group name
+            if (displayName !== rowMarkerGroup) {
+                const textWidth = measureTextCached(displayName, ctx).width;
 
-            if (textWidth > drawTextWidth) {
-                const ellipsisWidth = measureTextCached("...", ctx).width;
-                const truncatedText = truncateTextToFit(ctx, displayName, drawTextWidth - ellipsisWidth);
-                displayName = truncatedText + "...";
-            }
-
-            const start =
-                x +
-                (padding + (group.icon !== undefined ? 26 : 0)) +
-                (drawTextWidth - measureTextCached(displayName, ctx).width) / 2;
-
-            ctx.fillText(displayName, start, groupHeaderHeight / 2 + getMiddleCenterBias(ctx, theme.headerFontFull));
-
-            if (group.actions !== undefined) {
-                const actionBoxes = getActionBoundsForGroup({ x, y, width: w, height: h }, group.actions);
-
-                // ctx.beginPath();
-                // const fadeStartX = actionBoxes[0].x - 10;
-                // const fadeWidth = x + w - fadeStartX;
-                // ctx.rect(fadeStartX, 0, fadeWidth, groupHeaderHeight);
-                // const grad = ctx.createLinearGradient(fadeStartX, 0, fadeStartX + fadeWidth, 0);
-                // const trans = withAlpha(fillColor, 0);
-                // grad.addColorStop(0, trans);
-                // grad.addColorStop(10 / fadeWidth, fillColor);
-                // grad.addColorStop(1, fillColor);
-                // ctx.fillStyle = grad;
-
-                // ctx.fill();
-
-                ctx.globalAlpha = 0.87;
-
-                // eslint-disable-next-line prefer-const
-                const [mouseX, mouseY] = hovered?.[1] ?? [-1, -1];
-                for (let i = 0; i < group.actions.length; i++) {
-                    const action = group.actions[i];
-
-                    if (action.needHover === true && !isHovered) {
-                        break;
-                    }
-
-                    const box = actionBoxes[i];
-                    const actionHovered = pointInRect(box, mouseX + x, mouseY);
-                    if (actionHovered) {
-                        ctx.globalAlpha = 1;
-                    }
-                    spriteManager.drawSprite(
-                        action.title === "Collapse"
-                            ? group.collapse === true
-                                ? "groupCollapse"
-                                : "groupExpand"
-                            : action.icon,
-                        actionHovered ? "hovered" : "normal",
-                        ctx,
-                        box.x + box.width - 8 - (action.iconSize ?? 16),
-                        box.y + (box.height - (action.iconSize ?? 16)) / 2,
-                        action.iconSize ?? 16,
-                        groupTheme,
-                        1,
-                        action.iconSize ?? 16,
-                        groupTheme.groupIconColor,
-                        undefined,
-                        groupTheme.groupIconHover
-                    );
-                    if (actionHovered) {
-                        ctx.globalAlpha = 0.6;
-                    }
+                if (textWidth > drawTextWidth) {
+                    const ellipsisWidth = measureTextCached("...", ctx).width;
+                    const truncatedText = truncateTextToFit(ctx, displayName, drawTextWidth - ellipsisWidth);
+                    displayName = truncatedText + "...";
                 }
 
-                ctx.globalAlpha = 1;
+                const start =
+                    x +
+                    (padding + (group.icon !== undefined ? 26 : 0)) +
+                    (drawTextWidth - measureTextCached(displayName, ctx).width) / 2;
+
+                ctx.fillText(
+                    displayName,
+                    start,
+                    groupHeaderHeight / 2 + getMiddleCenterBias(ctx, theme.headerFontFull)
+                );
+
+                if (group.actions !== undefined) {
+                    const actionBoxes = getActionBoundsForGroup({ x, y, width: w, height: h }, group.actions);
+
+                    // ctx.beginPath();
+                    // const fadeStartX = actionBoxes[0].x - 10;
+                    // const fadeWidth = x + w - fadeStartX;
+                    // ctx.rect(fadeStartX, 0, fadeWidth, groupHeaderHeight);
+                    // const grad = ctx.createLinearGradient(fadeStartX, 0, fadeStartX + fadeWidth, 0);
+                    // const trans = withAlpha(fillColor, 0);
+                    // grad.addColorStop(0, trans);
+                    // grad.addColorStop(10 / fadeWidth, fillColor);
+                    // grad.addColorStop(1, fillColor);
+                    // ctx.fillStyle = grad;
+
+                    // ctx.fill();
+
+                    ctx.globalAlpha = 0.87;
+
+                    // eslint-disable-next-line prefer-const
+                    const [mouseX, mouseY] = hovered?.[1] ?? [-1, -1];
+                    for (let i = 0; i < group.actions.length; i++) {
+                        const action = group.actions[i];
+
+                        if (action.needHover === true && !isHovered) {
+                            break;
+                        }
+
+                        const box = actionBoxes[i];
+                        const actionHovered = pointInRect(box, mouseX + x, mouseY);
+                        if (actionHovered) {
+                            ctx.globalAlpha = 1;
+                        }
+                        spriteManager.drawSprite(
+                            action.title === "Collapse"
+                                ? group.collapse === true
+                                    ? "groupCollapse"
+                                    : "groupExpand"
+                                : action.icon,
+                            actionHovered ? "hovered" : "normal",
+                            ctx,
+                            box.x + box.width - 8 - (action.iconSize ?? 16),
+                            box.y + (box.height - (action.iconSize ?? 16)) / 2,
+                            action.iconSize ?? 16,
+                            groupTheme,
+                            1,
+                            action.iconSize ?? 16,
+                            groupTheme.groupIconColor,
+                            undefined,
+                            groupTheme.groupIconHover
+                        );
+                        if (actionHovered) {
+                            ctx.globalAlpha = 0.6;
+                        }
+                    }
+
+                    ctx.globalAlpha = 1;
+                }
             }
         }
 
@@ -467,6 +500,15 @@ export function getActionBoundsForGroup(
         x += 26;
     }
     return result;
+}
+
+export function getMarkerActionBoundsForGroup(box: Rectangle, totalHeight: number, size: number = 20) {
+    return {
+        x: box.x + (box.width - size) / 2,
+        y: (totalHeight - size) / 2,
+        width: size,
+        height: size,
+    };
 }
 
 type Mutable<T> = {

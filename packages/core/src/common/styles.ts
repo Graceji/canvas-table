@@ -109,8 +109,11 @@ export interface Theme {
     markerTextAccent: string;
     emptyTextLight: string;
     emptyText: string;
+    groupIconSize?: number;
     groupIconColor?: string;
     groupIconHover?: string;
+    groupHeaderIconColor?: string;
+    groupHeaderIconHover?: string;
     checkboxBg: string;
     checkboxActiveBg: string;
     checkboxInnerColor: string;
@@ -182,7 +185,10 @@ const dataEditorBaseTheme: Theme = {
     editorFontSize: "13px",
     lineHeight: 1.4, //unitless scaler depends on your font
     markLine: "#313139",
+    groupIconSize: 20,
     groupIconColor: "#fff",
+    groupHeaderIconColor: "#fff",
+    groupHeaderIconHover: "#fff",
     groupIconHover: "#FFB042",
     checkboxBg: "#505050",
     checkboxActiveBg: "#3898fc",

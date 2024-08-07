@@ -120,6 +120,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
         onItemHovered,
         onDragStart,
         canvasRef,
+        rowMarkerGroup,
     } = p;
 
     const canResize = (onColumnResize ?? onColumnResizeEnd ?? onColumnResizeStart) !== undefined;
@@ -388,6 +389,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
 
     return (
         <DataGrid
+            rowMarkerGroup={rowMarkerGroup}
             hasRowMarkers={hasRowMarkers}
             accessibilityHeight={p.accessibilityHeight}
             canvasRef={p.canvasRef}

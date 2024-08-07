@@ -96,6 +96,7 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
         isDraggable,
         filterHeight,
         showFilter,
+        rowMarkerGroup,
     } = p;
     const { paddingRight, paddingBottom } = experimental ?? {};
 
@@ -269,6 +270,7 @@ const GridScroller: React.FunctionComponent<ScrollingDataGridProps> = p => {
             initialSize={initialSize}>
             <DataGridDnd
                 hasRowMarkers={hasRowMarkers}
+                rowMarkerGroup={rowMarkerGroup}
                 eventTargetRef={scrollRef}
                 width={clientWidth}
                 height={clientHeight}
