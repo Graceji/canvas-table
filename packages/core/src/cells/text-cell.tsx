@@ -19,7 +19,8 @@ export const textCellRenderer: InternalCellRenderer<TextCell> = {
         if (hoverEffect === true && hoverAmount > 0) {
             drawEditHoverIndicator(ctx, theme, hoverEffectTheme, displayData, rect, hoverAmount, overrideCursor);
         }
-        drawTextCell(a, displayData, contentAlign, allowWrapping, hyperWrapping);
+
+        cell.truncated = drawTextCell(a, displayData, contentAlign, allowWrapping, hyperWrapping);
     },
     measure: (ctx, cell, t) => {
         const lines = cell.displayData.split("\n", cell.allowWrapping === true ? undefined : 1);

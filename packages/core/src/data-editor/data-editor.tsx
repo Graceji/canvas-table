@@ -2078,14 +2078,26 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         }
                         lastSelectedColRef.current = col;
                     } else if (columnSelect !== "none") {
-                        setSelectedColumns(
-                            CompactSelection.fromSingleSelection(col),
-                            undefined,
-                            rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed"
-                        );
+                        // setSelectedColumns(
+                        //     CompactSelection.fromSingleSelection(col),
+                        //     undefined,
+                        //     rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed"
+                        // );
+
+                        if (selectedColumns.hasIndex(col) && selectedColumns.length === 1) {
+                            setSelectedColumns(CompactSelection.empty(), undefined, isMultiKey);
+                            lastSelectedColRef.current = undefined;
+                        } else {
+                            setSelectedColumns(
+                                CompactSelection.fromSingleSelection(col),
+                                undefined,
+                                rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed"
+                            );
+                        }
                         lastSelectedColRef.current = col;
                     }
                     lastSelectedRowRef.current = undefined;
+
                     focus();
                 }
             } else if (args.kind === groupHeaderKind) {

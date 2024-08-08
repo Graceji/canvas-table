@@ -100,7 +100,7 @@ export const ColumnGroups: React.VFC = () => {
                 kind: "number",
                 group: "index",
             }}
-            rowSelectionBlending="mixed"
+            // rowSelectionBlending="mixed"
             columnSelectionBlending="mixed"
             rangeSelect="none"
             isDraggable={false}

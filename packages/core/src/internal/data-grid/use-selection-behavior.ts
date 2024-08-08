@@ -174,18 +174,19 @@ export function useSelectionBehavior(
                     columns: newCols,
                 };
             } else {
+                // 列选中时，默认保留选中行
                 const rangeMixed = allowMixed && rangeBehavior === "mixed";
-                const rowMixed = allowMixed && rowBehavior === "mixed";
+                // const rowMixed = allowMixed && rowBehavior === "mixed";
                 const current = !rangeMixed ? undefined : gridSelection.current;
                 newVal = {
                     current,
-                    rows: rowMixed ? gridSelection.rows : CompactSelection.empty(),
+                    rows: gridSelection.rows, //rowMixed ? gridSelection.rows : CompactSelection.empty(),
                     columns: newCols,
                 };
             }
             setGridSelection(newVal, false);
         },
-        [columnBehavior, gridSelection, rangeBehavior, rowBehavior, setGridSelection]
+        [columnBehavior, gridSelection, rangeBehavior, setGridSelection]
     );
 
     return [setCurrent, setSelectedRows, setSelectedColumns, setSelectedRowsAndCell] as const;

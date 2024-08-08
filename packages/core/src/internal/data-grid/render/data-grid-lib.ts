@@ -543,6 +543,7 @@ function drawMultiLineText(
     hyperWrapping?: boolean,
     splitNum?: number
 ) {
+    let truncated = false;
     const fontStyle = theme.baseFontFull;
     const split = splitText(ctx, data, fontStyle, w - theme.cellHorizontalPadding * 2, hyperWrapping ?? false);
 
@@ -580,6 +581,7 @@ function drawMultiLineText(
                 const ellipsisWidth = measureTextCached("...", ctx).width;
                 const truncatedText = truncateTextToFit(ctx, line, w - padding - ellipsisWidth);
                 line = truncatedText + "...";
+                truncated = true;
             }
         }
 
@@ -591,6 +593,8 @@ function drawMultiLineText(
     if (mustClip) {
         ctx.restore();
     }
+
+    return truncated;
 }
 
 /** @category Drawing */
@@ -601,9 +605,10 @@ export function drawTextCell(
     allowWrapping?: boolean,
     hyperWrapping?: boolean,
     splitNum?: number
-): void {
+): boolean {
+    let truncated = false;
     if (!data) {
-        return;
+        return truncated;
     }
 
     const { ctx, rect, theme } = args;
@@ -647,10 +652,11 @@ export function drawTextCell(
                 const ellipsisWidth = measureTextCached("...", ctx).width;
                 const truncatedText = truncateTextToFit(ctx, data, rect.width - padding - ellipsisWidth);
                 data = truncatedText + "...";
+                truncated = true;
             }
             drawSingleTextLine(ctx, data, x, y, w, h, bias, theme, contentAlign);
         } else {
-            drawMultiLineText(ctx, data, x, y, w, h, bias, theme, contentAlign, hyperWrapping, splitNum);
+            truncated = drawMultiLineText(ctx, data, x, y, w, h, bias, theme, contentAlign, hyperWrapping, splitNum);
         }
 
         if (changed) {
@@ -662,6 +668,7 @@ export function drawTextCell(
             ctx.direction = "inherit";
         }
     }
+    return truncated;
 }
 
 interface CornerRadius {
@@ -862,7 +869,7 @@ export function computeBounds(
 
     switch (row) {
         case -1: {
-            result.y = groupHeaderHeight;
+            result.y = mappedColumns[col]?.group !== undefined ? groupHeaderHeight : 0;
             result.height = headerHeight;
 
             break;
