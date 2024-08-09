@@ -357,7 +357,7 @@ export interface TextCell extends BaseGridCell {
     readonly allowWrapping?: boolean;
     readonly hoverEffect?: boolean;
     readonly hoverEffectTheme?: HoverEffectTheme;
-    truncated: boolean; // 文本是否被截断
+    truncated?: boolean; // 文本是否被截断
 }
 
 /** @category Cells */
@@ -562,6 +562,7 @@ export interface MarkerCell extends BaseGridCell {
         | "expand-number"
         | "number-icon";
     readonly functions: MarkerFn[];
+    activeFn?: MarkerFn;
     node?: TreeNode;
 }
 

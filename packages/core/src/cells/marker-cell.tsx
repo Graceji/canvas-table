@@ -38,6 +38,9 @@ export const markerCellRenderer: InternalCellRenderer<MarkerCell> = {
                 }
             }
 
+            // 索引单元格可能会有多个功能区，每个功能区点击事件不一致。所以需要在调用onCelledited前设定所点击的功能区
+            cell.activeFn = isOverHeaderMarkerfn;
+
             return cell;
         }
 
