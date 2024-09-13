@@ -15,12 +15,12 @@ export const textCellRenderer: InternalCellRenderer<TextCell> = {
     useLabel: true,
     draw: a => {
         const { cell, hoverAmount, hyperWrapping, ctx, rect, theme, overrideCursor } = a;
-        const { displayData, contentAlign, hoverEffect, allowWrapping, hoverEffectTheme } = cell;
+        const { displayData, contentAlign, hoverEffect, allowWrapping, hoverEffectTheme, striked = false } = cell;
         if (hoverEffect === true && hoverAmount > 0) {
             drawEditHoverIndicator(ctx, theme, hoverEffectTheme, displayData, rect, hoverAmount, overrideCursor);
         }
 
-        cell.truncated = drawTextCell(a, displayData, contentAlign, allowWrapping, hyperWrapping);
+        cell.truncated = drawTextCell(a, displayData, contentAlign, allowWrapping, hyperWrapping, striked);
     },
     measure: (ctx, cell, t) => {
         const lines = cell.displayData.split("\n", cell.allowWrapping === true ? undefined : 1);

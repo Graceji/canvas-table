@@ -301,6 +301,8 @@ function getResizableColumns(amount: number, group: boolean): GridColumnWithMock
                     data: firstName,
                     allowOverlay: false,
                     readonly: false,
+                    contentAlign: "center",
+                    striked: true,
                 };
             },
         },
@@ -319,6 +321,7 @@ function getResizableColumns(amount: number, group: boolean): GridColumnWithMock
                     data: lastName,
                     allowOverlay: true,
                     readonly: true,
+                    contentAlign: "right",
                 };
             },
         },

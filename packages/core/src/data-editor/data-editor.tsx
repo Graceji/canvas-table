@@ -33,6 +33,7 @@ import {
     type EditListItem,
     type CellActiviationBehavior,
     type MarkerFn,
+    type CellArray,
 } from "../internal/data-grid/data-grid-types.js";
 import DataGridSearch, { type DataGridSearchProps } from "../internal/data-grid-search/data-grid-search.js";
 import { browserIsOSX } from "../common/browser-detect.js";
@@ -108,6 +109,7 @@ export interface RowMarkerOptions {
     headerAlwaysVisible?: boolean;
     fns?: MarkerFn[];
     group?: string;
+    getTheme?: (row: number) => FullTheme;
 }
 
 interface MouseState {
@@ -711,6 +713,8 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
     readonly showFilter?: boolean;
 
     readonly filterHeight?: number;
+
+    readonly onCopy?: (cells: CellArray, item: Item) => void;
 }
 
 type ScrollToFn = (
@@ -914,6 +918,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         drawFocusRing: drawFocusRingIn = true,
         showFilter = false,
         filterHeight = 20,
+        onCopy: onCopyOuter,
     } = p;
 
     const drawFocusRing = drawFocusRingIn === "no-editor" ? overlay === undefined : drawFocusRingIn;
@@ -1367,6 +1372,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     drawHandle: onRowMoved !== undefined,
                     cursor: "pointer", // rowMarkers === "clickable-number" ? "pointer" : undefined,
                     functions: rowMarkersObj?.fns,
+                    themeOverride: rowMarkersObj?.getTheme?.(mappedRow),
                 } as MarkerCell;
 
                 const outerResult = getMarkerContent?.(row);
@@ -1449,7 +1455,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             rowMarkers,
             rowMarkerStartIndex,
             onRowMoved,
-            rowMarkersObj?.fns,
+            rowMarkersObj,
             getMarkerContent,
             trailingRowOptions?.marker,
             trailingRowOptions?.hint,
@@ -4069,13 +4075,18 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     if (typeof thunk !== "object") {
                         thunk = await thunk();
                     }
-                    copyToClipboardWithHeaders(
-                        thunk,
-                        range(
-                            gridSelection.current.range.x - rowMarkerOffset,
-                            gridSelection.current.range.x + gridSelection.current.range.width - rowMarkerOffset
-                        )
-                    );
+
+                    if (onCopyOuter !== undefined && typeof onCopyOuter === "function") {
+                        onCopyOuter(thunk, gridSelection.current.cell);
+                    } else {
+                        copyToClipboardWithHeaders(
+                            thunk,
+                            range(
+                                gridSelection.current.range.x - rowMarkerOffset,
+                                gridSelection.current.range.x + gridSelection.current.range.width - rowMarkerOffset
+                            )
+                        );
+                    }
                 } else if (selectedRows !== undefined && selectedRows.length > 0) {
                     const toCopy = [...selectedRows];
                     const cells = toCopy.map(rowIndex => {
@@ -4129,14 +4140,15 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             }
         },
         [
-            columnsIn,
-            getCellsForSelection,
-            gridSelection,
             keybindings.copy,
-            rowMarkerOffset,
             scrollRef,
-            rows,
+            gridSelection,
+            getCellsForSelection,
             copyHeaders,
+            columnsIn,
+            onCopyOuter,
+            rowMarkerOffset,
+            rows,
         ]
     );
 

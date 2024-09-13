@@ -92,11 +92,11 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
 
     const textWith = measureTextCached(text, ctx, markerFontStyle).width;
 
-    const drawIndexNumber = (start: number, textWidth: number) => {
+    const drawIndexNumber = (start: number, textWidth: number, color?: string, accentColor?: string) => {
         if (markerKind === "both" && hoverAmount !== 0) {
             // ctx.globalAlpha = 1 - hoverAmount;
         }
-        ctx.fillStyle = highlighted ? theme.markerTextAccent : theme.markerTextLight;
+        ctx.fillStyle = highlighted ? accentColor ?? theme.markerTextAccent : color ?? theme.markerTextLight;
         ctx.font = `${hoverAmount > 0 ? "bold " + markerFontStyle : markerFontStyle}`;
         ctx.fillText(
             text,
@@ -110,7 +110,7 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
         }
     };
 
-    const drawExpand = (start: number, size: number) => {
+    const drawExpand = (start: number, size: number, color?: string) => {
         if (node !== undefined) {
             const { children, collapsed, pid, isLast } = node;
 
@@ -127,7 +127,10 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
                     start,
                     startY,
                     size,
-                    theme
+                    theme,
+                    1,
+                    size,
+                    color
                 );
             } else if (pid !== undefined) {
                 // 子元素绘制刻度线
@@ -195,9 +198,9 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
                 theme,
                 1,
                 iconSize,
-                color,
+                typeof color === "string" ? color : color?.(node),
                 undefined,
-                hoverColor
+                typeof hoverColor === "string" ? hoverColor : hoverColor?.(node)
             );
             if (hoverAmount !== 0) {
                 ctx.globalAlpha = 1;
@@ -252,7 +255,12 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
 
                 // eslint-disable-next-line unicorn/prefer-switch
                 if (type === "number") {
-                    drawIndexNumber(fnItem.start, perWidth);
+                    drawIndexNumber(
+                        fnItem.start,
+                        perWidth,
+                        typeof fnItem.color === "string" ? fnItem.color : fnItem.color?.(node),
+                        typeof fnItem.hoverColor === "string" ? fnItem.hoverColor : fnItem.hoverColor?.(node)
+                    );
                 } else if (type === "checkbox") {
                     const offsetAmount = 7 * (checked ? hoverAmount : 1);
                     drawCheckbox(
@@ -271,7 +279,11 @@ function drawMarkerRowCell(args: DrawArgs<MarkerCell>, cell: MarkerCell) {
                         checkboxStyle
                     );
                 } else if (type === "expand") {
-                    drawExpand(fnItem.start, itemWidth);
+                    drawExpand(
+                        fnItem.start,
+                        itemWidth,
+                        typeof fnItem.color === "string" ? fnItem.color : fnItem.color?.(node)
+                    );
                 } else {
                     drawIcon(fnItem, perWidth, itemWidth, disabled);
                 }

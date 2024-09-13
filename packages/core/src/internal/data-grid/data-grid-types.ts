@@ -329,6 +329,7 @@ export interface BaseGridCell {
     readonly copyData?: string;
     readonly activationBehaviorOverride?: CellActiviationBehavior;
     readonly readonly?: boolean;
+    readonly striked?: boolean;
 }
 
 /** @category Cells */
@@ -537,8 +538,8 @@ export interface MarkerFn {
     order: number;
     size?: number;
     disabled?: boolean | ((row: any) => boolean);
-    color?: string;
-    hoverColor?: string;
+    color?: string | ((node?: any) => string);
+    hoverColor?: string | ((node?: any) => string);
     tooltip?: string;
     placement?: string;
     hoverEffect?: boolean;

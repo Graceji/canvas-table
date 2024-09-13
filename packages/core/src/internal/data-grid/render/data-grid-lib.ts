@@ -604,6 +604,7 @@ export function drawTextCell(
     contentAlign?: BaseGridCell["contentAlign"],
     allowWrapping?: boolean,
     hyperWrapping?: boolean,
+    striked?: boolean,
     splitNum?: number
 ): boolean {
     let truncated = false;
@@ -647,14 +648,44 @@ export function drawTextCell(
 
         if (!allowWrapping) {
             const textWidth = measureTextCached(data, ctx).width;
+            let truncatedText = data;
+            let ellipsisWidth = 0;
             const padding = theme.cellHorizontalPadding * 2;
             if (textWidth > rect.width - padding) {
-                const ellipsisWidth = measureTextCached("...", ctx).width;
-                const truncatedText = truncateTextToFit(ctx, data, rect.width - padding - ellipsisWidth);
+                ellipsisWidth = measureTextCached("...", ctx).width;
+                truncatedText = truncateTextToFit(ctx, data, rect.width - padding - ellipsisWidth);
                 data = truncatedText + "...";
                 truncated = true;
             }
             drawSingleTextLine(ctx, data, x, y, w, h, bias, theme, contentAlign);
+            if (striked === true) {
+                // 绘制文字删除线
+                const truncatedTextWidth = truncated ? measureTextCached(truncatedText, ctx).width : textWidth;
+
+                let startX = x;
+                const startY = y + h / 2 + bias;
+
+                if (contentAlign === "right") {
+                    startX =
+                        x +
+                        (truncated
+                            ? w - (theme.cellHorizontalPadding + 0.5) - ellipsisWidth
+                            : w - (theme.cellHorizontalPadding + 0.5));
+                } else if (contentAlign === "center") {
+                    startX =
+                        x + (truncated ? (w - truncatedTextWidth - ellipsisWidth) / 2 : (w - truncatedTextWidth) / 2);
+                } else {
+                    startX = x + theme.cellHorizontalPadding + 0.5;
+                }
+
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(
+                    contentAlign === "right" ? startX - truncatedTextWidth : startX + truncatedTextWidth,
+                    startY
+                );
+                ctx.strokeStyle = theme.textDark;
+                ctx.stroke();
+            }
         } else {
             truncated = drawMultiLineText(ctx, data, x, y, w, h, bias, theme, contentAlign, hyperWrapping, splitNum);
         }
