@@ -162,16 +162,58 @@ export function remapForDnDState(
         const srcCol = writable[dndState.src];
         const target = writable[dndState.dest];
 
-        if (srcCol.group !== target.group) {
-            (srcCol as any).group = target.group;
-        }
+        if (dndState.dragGroupColActive === true) {
+            // 拖拽一级表头
+            const srcGroup = srcCol.group;
+            const targetGroup = target.group;
 
-        if (dndState.src > dndState.dest) {
-            writable.splice(dndState.src, 1);
-            writable.splice(dndState.dest, 0, temp);
+            // srcGroup与targetGroup相等时，不做任何处理
+            if (srcGroup !== targetGroup) {
+                const srcSiblings = [];
+                let groupSrc = -1;
+
+                for (let i = 0; i < writable.length; i++) {
+                    const item = writable[i];
+                    if (item.group === srcGroup) {
+                        if (groupSrc === -1) {
+                            groupSrc = i;
+                        }
+                        srcSiblings.push(item);
+                    }
+                }
+
+                const destSiblings = [];
+                let groupDest = -1;
+                for (let i = 0; i < writable.length; i++) {
+                    const item = writable[i];
+                    if (item.group === targetGroup) {
+                        if (groupDest === -1) {
+                            groupDest = i;
+                        }
+                        destSiblings.push(item);
+                    }
+                }
+
+                if (groupSrc > groupDest) {
+                    writable.splice(groupSrc, srcSiblings.length);
+                    writable.splice(groupDest, 0, ...srcSiblings);
+                } else {
+                    writable.splice(groupDest + destSiblings.length, 0, ...srcSiblings);
+                    writable.splice(groupSrc, srcSiblings.length);
+                }
+            }
         } else {
-            writable.splice(dndState.dest + 1, 0, temp);
-            writable.splice(dndState.src, 1);
+            if (srcCol.group !== target.group) {
+                (srcCol as any).group = target.group;
+            }
+
+            if (dndState.src > dndState.dest) {
+                writable.splice(dndState.src, 1);
+                writable.splice(dndState.dest, 0, temp);
+            } else {
+                writable.splice(dndState.dest + 1, 0, temp);
+                writable.splice(dndState.src, 1);
+            }
         }
 
         writable = writable.map((c, i) => ({

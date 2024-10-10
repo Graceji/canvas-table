@@ -92,6 +92,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
     const [dragCol, setDragCol] = React.useState<number>();
     const [dropCol, setDropCol] = React.useState<number>();
     const [dragColActive, setDragColActive] = React.useState(false);
+    const [dragGroupColActive, setDragGroupColActive] = React.useState(false);
     const [dragStartX, setDragStartX] = React.useState<number>();
 
     const [dragRow, setDragRow] = React.useState<number>();
@@ -142,7 +143,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
                 onItemHovered?.(args);
             }
         },
-        [dragCol, dragRow, dropCol, onItemHovered, lockColumns, resizeCol, dragColActive, dragRowActive]
+        [dragCol, dropCol, lockColumns, dragRow, resizeCol, dragColActive, dragRowActive, onItemHovered]
     );
 
     const canDragCol = onColumnMoved !== undefined;
@@ -169,7 +170,12 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
                     } else if ((args.kind === "header" || args.kind === "filterHeader") && canDragCol) {
                         setDragStartX(args.bounds.x);
                         setDragCol(col);
+                        setDragGroupColActive(false);
                     }
+                } else if (args.kind === "group-header") {
+                    setDragStartX(args.bounds.x);
+                    setDragCol(col);
+                    setDragGroupColActive(true);
                 } else if (
                     args.kind === "cell" &&
                     lockColumns > 0 &&
@@ -222,6 +228,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
         setDropCol(undefined);
         setDragStartX(undefined);
         setDragColActive(false);
+        setDragGroupColActive(false);
         setResizeCol(undefined);
         setResizeColStartX(undefined);
     }, []);
@@ -308,8 +315,9 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
         return {
             src: dragCol,
             dest: dropCol,
+            dragGroupColActive,
         };
-    }, [dragCol, dropCol, onColumnProposeMove]);
+    }, [dragCol, dropCol, onColumnProposeMove, dragGroupColActive]);
 
     const onMouseMove = React.useCallback(
         (event: MouseEvent) => {
@@ -344,6 +352,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
             }
         },
         [
+            canvasRef,
             dragCol,
             dragStartX,
             dragRow,
@@ -355,7 +364,6 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
             maxColumnWidth,
             onColumnResize,
             selectedColumns,
-            canvasRef,
         ]
     );
 
