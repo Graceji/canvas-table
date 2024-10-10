@@ -68,7 +68,7 @@ export function drawGridHeaders(
     if (totalHeaderHeight <= 0) return;
 
     ctx.fillStyle = outerTheme.bgHeader;
-    ctx.fillRect(0, 0, width, totalHeaderHeight);
+    ctx.fillRect(0, 0, width, totalHeaderHeight + filterHeight);
 
     const frameTime = performance.now();
     const hCol = hovered?.[0]?.[0];
