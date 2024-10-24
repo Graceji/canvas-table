@@ -71,6 +71,9 @@ const renderer: CustomRenderer<TreeCell> = {
                     size,
                     theme
                 );
+                if (isHovered) {
+                    args.overrideCursor?.("pointer");
+                }
             } else if (pid !== undefined) {
                 // 子元素绘制刻度线
                 ctx.fillStyle = "none";
