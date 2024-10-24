@@ -170,7 +170,7 @@ export function useSelectionBehavior(
             if (columnBehavior === "exclusive" && newCols.length > 0) {
                 newVal = {
                     current: undefined,
-                    rows: CompactSelection.empty(),
+                    rows: gridSelection.rows ?? CompactSelection.empty(),
                     columns: newCols,
                 };
             } else {

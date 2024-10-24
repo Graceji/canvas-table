@@ -304,8 +304,7 @@ export function drawGroups(
                         groupIconSize
                     );
                     const [mouseX, mouseY] = hovered?.[1] ?? [-1, -1];
-
-                    const iconHovered = pointInRect(box, mouseX + x, mouseY);
+                    const iconHovered = isHovered && pointInRect(box, mouseX + x, mouseY);
 
                     if (iconHovered) {
                         variant = "hovered";
@@ -385,7 +384,7 @@ export function drawGroups(
                         }
 
                         const box = actionBoxes[i];
-                        const actionHovered = pointInRect(box, mouseX + x, mouseY);
+                        const actionHovered = isHovered && pointInRect(box, mouseX + x, mouseY);
                         if (actionHovered) {
                             ctx.globalAlpha = 1;
                         }

@@ -48,7 +48,7 @@ export interface GroupDetails {
         readonly title: string;
         readonly onClick: (e: GridMouseGroupHeaderEventArgs) => void;
         readonly icon: GridColumnIcon | string;
-        readonly needHover?: boolean;
+        readonly needHover?: boolean; // 是否悬浮出现
         readonly iconSize?: number;
     }[];
 }

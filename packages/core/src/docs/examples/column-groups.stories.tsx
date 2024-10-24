@@ -93,6 +93,9 @@ export const ColumnGroups: React.VFC = () => {
                             },
                         },
                     ],
+                    overrideTheme: {
+                        groupHeaderIconHover: "red",
+                    },
                 } as any;
             }}
             rowMarkers={{
