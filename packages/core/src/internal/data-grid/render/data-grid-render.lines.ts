@@ -349,33 +349,6 @@ export function drawGridLines(
         }
     }
 
-    // 这一段逻辑保留，忘记什么作用了
-    // let freezeStartX = 0.5;
-    // let freezeEndX = 0.5;
-    // for (let index = 0; index < effectiveCols.length; index++) {
-    //     let freezeY = height + 0.5;
-    //     const c = effectiveCols[index];
-    //     if (c.width === 0) continue;
-    //     freezeEndX += c.width;
-    //     const tx = c.sticky ? freezeEndX : freezeEndX + translateX;
-
-    //     for (let i = rows - freezeTrailingRows; i < rows; i++) {
-    //         const rh = getRowHeight(i);
-    //         freezeY -= rh;
-    //         if (horizontalBorder(c.sourceIndex, i)) {
-    //             toDraw.push({
-    //                 x1: freezeStartX,
-    //                 y1: freezeY,
-    //                 x2: tx,
-    //                 y2: freezeY,
-    //                 color: hColor,
-    //             });
-    //         }
-    //     }
-
-    //     freezeStartX = tx;
-    // }
-
     let freezeY = height + 0.5;
     for (let i = rows - freezeTrailingRows; i < rows; i++) {
         const rh = getRowHeight(i);

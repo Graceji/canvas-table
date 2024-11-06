@@ -2187,6 +2187,28 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
             if (args?.kind === "header") {
                 isActivelyDraggingHeader.current = true;
+                const [col] = args.location;
+                const column = mangledCols[col];
+                let prevented = false;
+                if (column.customHeaderCell !== undefined) {
+                    const r = getCellRenderer(column.customHeaderCell);
+                    if (r !== undefined && r.onSelect !== undefined) {
+                        r.onSelect?.({
+                            ...args,
+                            cell: column.customHeaderCell,
+                            posX: args.localEventX,
+                            posY: args.localEventY,
+                            bounds: args.bounds,
+                            theme: themeForCell(column.customHeaderCell, args.location),
+                            preventDefault: (status?: boolean) => {
+                                prevented = status === undefined ? true : status;
+                            },
+                        });
+                    }
+                }
+                if (!prevented) {
+                    return;
+                }
             }
 
             const fh = args.kind === "cell" && args.isFillHandle;
@@ -2205,7 +2227,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 lastMouseSelectLocation.current = args.location;
             }
         },
-        [gridSelection, handleSelect]
+        [getCellRenderer, gridSelection, handleSelect, mangledCols, themeForCell]
     );
 
     const [renameGroup, setRenameGroup] = React.useState<{
