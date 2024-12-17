@@ -218,11 +218,11 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
     /** Emitted whenever a cell edit is completed.
      * @group Editing
      */
-    readonly onCellEdited?: (cell: Item, newValue: EditableGridCell) => void;
+    readonly onCellEdited?: (cell: Item, newValue: EditableGridCell, eventKey?: string) => void;
     /** Emitted whenever a cell mutation is completed and provides all edits inbound as a single batch.
      * @group Editing
      */
-    readonly onCellsEdited?: (newValues: readonly EditListItem[]) => boolean | void;
+    readonly onCellsEdited?: (newValues: readonly EditListItem[], eventKey?: string) => boolean | void;
     /** Emitted whenever a row append operation is requested. Append location can be set in callback.
      * @group Editing
      */
@@ -1227,7 +1227,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const mangledRows = showTrailingBlankRow ? rows + 1 : rows;
 
     const mangledOnCellsEdited = React.useCallback<NonNullable<typeof onCellsEdited>>(
-        (items: readonly EditListItem[]) => {
+        (items: readonly EditListItem[], eventKey?: string) => {
             const mangledItems =
                 rowMarkerOffset === 0
                     ? items
@@ -1236,10 +1236,10 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                           location: [x.location[0] - rowMarkerOffset, x.location[1]] as const,
                       }));
 
-            const r = onCellsEdited?.(mangledItems);
+            const r = onCellsEdited?.(mangledItems, eventKey);
 
             if (r !== true) {
-                for (const i of mangledItems) onCellEdited?.(i.location, i.value);
+                for (const i of mangledItems) onCellEdited?.(i.location, i.value, eventKey);
             }
 
             return r;
@@ -2187,7 +2187,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
             if (args?.kind === "header") {
                 isActivelyDraggingHeader.current = true;
-                const [col] = args.location;
+                const [col, row] = args.location;
                 const column = mangledCols[col];
                 let prevented = false;
                 if (column.customHeaderCell !== undefined) {
@@ -2206,7 +2206,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         });
                     }
                 }
-                if (!prevented) {
+                if (prevented) {
+                    // 这里修改是因为bug, 点击头部的radio cell(层级)，会触发选中。所以当调用onSelect时传入preventDefault方法来阻止默认行为，如果prevented为true,就不进行后续操作，主要是handleSelect
+                    lastMouseSelectLocation.current = [col, row];
                     return;
                 }
             }
@@ -3305,9 +3307,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     );
 
     const onFinishEditing = React.useCallback(
-        (newValue: GridCell | undefined, movement: readonly [-1 | 0 | 1, -1 | 0 | 1 | -3]) => {
+        (newValue: GridCell | undefined, movement: readonly [-1 | 0 | 1, -1 | 0 | 1 | -3], eventKey?: string) => {
             if (overlay?.cell !== undefined && newValue !== undefined && isEditableGridCell(newValue)) {
-                mangledOnCellsEdited([{ location: overlay.cell, value: newValue }]);
+                mangledOnCellsEdited([{ location: overlay.cell, value: newValue }], eventKey);
                 window.requestAnimationFrame(() => {
                     gridRef.current?.damage([
                         {

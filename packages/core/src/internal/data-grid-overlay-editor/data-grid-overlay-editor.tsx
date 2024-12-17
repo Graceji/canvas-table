@@ -1,6 +1,5 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
-
 import ClickOutsideContainer from "../click-outside-container/click-outside-container.js";
 import { makeCSSStyle, type Theme, ThemeContext } from "../../common/styles.js";
 import type { GetCellRendererCallback } from "../../cells/cell-types.js";
@@ -32,7 +31,11 @@ interface DataGridOverlayEditorProps {
     readonly initialValue?: string;
     readonly bloom?: readonly [number, number];
     readonly theme: Theme;
-    readonly onFinishEditing: (newCell: GridCell | undefined, movement: readonly [-1 | 0 | 1, -1 | 0 | 1 | -3]) => void;
+    readonly onFinishEditing: (
+        newCell: GridCell | undefined,
+        movement: readonly [-1 | 0 | 1, -1 | 0 | 1 | -3],
+        eventKey?: string
+    ) => void;
     readonly onEditing: (newCell: GridCell | undefined) => void;
     readonly forceEditMode: boolean;
     readonly highlight: boolean;
@@ -86,8 +89,8 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
     });
 
     const onFinishEditing = React.useCallback<typeof onFinishEditingIn>(
-        (newCell, movement) => {
-            onFinishEditingIn(isValid ? newCell : undefined, movement);
+        (newCell, movement, eventKey) => {
+            onFinishEditingIn(isValid ? newCell : undefined, movement, eventKey);
         },
         [isValid, onFinishEditingIn]
     );
@@ -120,8 +123,8 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
     }, [tempValue, onFinishEditing]);
 
     const onEditorFinished = React.useCallback(
-        (newValue: GridCell | undefined, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) => {
-            onFinishEditing(newValue, movement ?? customMotion.current ?? [0, 0]);
+        (newValue: GridCell | undefined, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1], eventKey?: string) => {
+            onFinishEditing(newValue, movement ?? customMotion.current ?? [0, 0], eventKey);
             finished.current = true;
         },
         [onFinishEditing]
@@ -240,12 +243,14 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
 
             window.setTimeout(() => {
                 if (!finished.current && customMotion.current !== undefined) {
-                    onFinishEditing(save ? tempValue : undefined, customMotion.current);
+                    // 这里将tempValue改成了lastValueRef.current， 是为了需求：批量编辑框enter不输入时清空。
+                    // 在input cell中的onPressEnter调用onChange方法，先更新了tempValue, 但是这里拿不到更新后的值，导致外面不会调用onCellEdited
+                    onFinishEditing(save ? lastValueRef.current : undefined, customMotion.current, event.key);
                     finished.current = true;
                 }
             }, 0);
         },
-        [gridSelection, maxCol, minCol, onFinishEditing, tempValue, editorProvider]
+        [gridSelection, maxCol, minCol, onFinishEditing, editorProvider]
     );
 
     const { ref, style: stayOnScreenStyle } = useStayOnScreen();
