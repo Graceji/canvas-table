@@ -236,7 +236,31 @@ export function useTheme(): Theme {
     return React.useContext(ThemeContext);
 }
 
+// 添加全局缓存
+const themeCache = new Map<string, FullTheme>();
+const MAX_CACHE_SIZE = 1000;
+
+// 创建缓存键
+function createThemeCacheKey(theme: Theme, overlays: Partial<Theme | undefined>[]): string {
+    // 使用快速哈希算法
+    const parts = [
+        theme.bgCell,
+        theme.baseFontStyle,
+        theme.fontFamily,
+        ...overlays.map(o => (o ? `${o.bgCell}|${o.baseFontStyle}` : "null")),
+    ];
+    return parts.join("::");
+}
+
 export function mergeAndRealizeTheme(theme: Theme, ...overlays: Partial<Theme | undefined>[]): FullTheme {
+    // 🔥 添加缓存逻辑
+    const cacheKey = createThemeCacheKey(theme, overlays);
+    const cacheContent = themeCache.get(cacheKey);
+
+    if (cacheContent !== undefined) {
+        return cacheContent;
+    }
+
     const merged: any = { ...theme };
 
     for (const overlay of overlays) {
@@ -277,6 +301,17 @@ export function mergeAndRealizeTheme(theme: Theme, ...overlays: Partial<Theme | 
     ) {
         merged.markerFontFull = `${merged.markerFontStyle} ${merged.fontFamily}`;
     }
+
+    // 🔥 缓存结果（LRU策略）
+    if (themeCache.size >= MAX_CACHE_SIZE) {
+        // 删除最早的条目
+        const firstKey = themeCache.keys().next().value;
+
+        if (firstKey !== undefined) {
+            themeCache.delete(firstKey);
+        }
+    }
+    themeCache.set(cacheKey, merged);
 
     return merged;
 }
