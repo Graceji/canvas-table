@@ -34,6 +34,7 @@ import {
     type CellActivationBehavior,
     type MarkerFn,
     type CellArray,
+    type MarkerMeta,
 } from "../internal/data-grid/data-grid-types.js";
 import DataGridSearch, { type DataGridSearchProps } from "../internal/data-grid-search/data-grid-search.js";
 import { browserIsOSX } from "../common/browser-detect.js";
@@ -573,7 +574,7 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
      * @param row The location of the row.
      * @returns row data.
      */
-    readonly getMarkerContent?: (row: number) => { node: any };
+    readonly getMarkerContent?: (row: number) => MarkerMeta | undefined;
 
     /**
      * Determines if row selection requires a modifier key to enable multi-selection or not. In auto mode it adapts to
@@ -1381,7 +1382,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     if (trailingRowOptions?.marker === true) {
                         const isFirst = col === 0;
 
-                        const maybeFirstColumnHint = isFirst ? trailingRowOptions?.hint ?? "" : "";
+                        const maybeFirstColumnHint = isFirst ? (trailingRowOptions?.hint ?? "") : "";
                         const c = mangledColsRef.current[col];
 
                         if (c?.trailingRowOptions?.disabled === true) {
@@ -1418,10 +1419,11 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     themeOverride: rowMarkersObj?.getTheme?.(mappedRow),
                 } as MarkerCell;
 
-                const outerResult = getMarkerContent?.(row);
+                // 通过外部getMarkerContent获取行数据相关的信息
+                const markerMeta = getMarkerContent?.(row);
 
-                if (outerResult?.node !== undefined) {
-                    result.node = outerResult.node;
+                if (markerMeta !== undefined) {
+                    result.meta = markerMeta;
                 }
 
                 return result;
@@ -1431,7 +1433,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
                 const maybeFirstColumnHint =
                     // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-                    isFirst && !trailingRowOptions?.marker ? trailingRowOptions?.hint ?? "" : "";
+                    isFirst && !trailingRowOptions?.marker ? (trailingRowOptions?.hint ?? "") : "";
                 const c = mangledColsRef.current[col];
 
                 if (c?.trailingRowOptions?.disabled === true) {
@@ -2670,7 +2672,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         const act =
                             a.isDoubleClick === true
                                 ? "double-click"
-                                : c.activationBehaviorOverride ?? cellActivationBehavior;
+                                : (c.activationBehaviorOverride ?? cellActivationBehavior);
                         const activationEvent: CellActivatedEventArgs = {
                             inputType: "pointer",
                             pointerActivation: act,
@@ -4086,7 +4088,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 formatted?: string | string[]
             ): EditListItem | undefined {
                 const stringifiedRawValue =
-                    typeof rawValue === "object" ? rawValue?.join("\n") ?? "" : rawValue?.toString() ?? "";
+                    typeof rawValue === "object" ? (rawValue?.join("\n") ?? "") : (rawValue?.toString() ?? "");
 
                 if (!isInnerOnlyCell(inner) && isReadWriteCell(inner) && inner.readonly !== true) {
                     const coerced = coercePasteValue?.(stringifiedRawValue, inner);
@@ -4470,7 +4472,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         (col: number) => {
             return typeof verticalBorder === "boolean"
                 ? verticalBorder
-                : verticalBorder?.(col - rowMarkerOffset) ?? true;
+                : (verticalBorder?.(col - rowMarkerOffset) ?? true);
         },
         [rowMarkerOffset, verticalBorder]
     );
@@ -4482,10 +4484,10 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         (col: number, row: number) => {
             return typeof horizontalBorder === "boolean"
                 ? horizontalBorder
-                : horizontalBorder?.(col, row) ??
+                : (horizontalBorder?.(col, row) ??
                       (col - rowMarkerOffset < 0
                           ? false
-                          : getCellContent([col - rowMarkerOffset, row])?.readonly === false);
+                          : getCellContent([col - rowMarkerOffset, row])?.readonly === false));
         },
         [horizontalBorder, rowMarkerOffset, getCellContent]
     );

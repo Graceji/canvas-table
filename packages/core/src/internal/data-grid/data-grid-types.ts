@@ -525,36 +525,34 @@ export interface NewRowCell extends BaseGridCell {
     readonly showAddIcon?: boolean;
 }
 
-export type TreeNode = {
+export type MarkerMeta = {
     id?: string;
-    name: string;
     depth?: number;
-    collapsed?: boolean;
-    children: TreeNode[];
     isLast?: boolean;
-    pid?: number | string;
     rowDef?: { [key: string]: any };
+    isLeaf?: boolean;
+    canOpen?: boolean;
+    isExpanded?: boolean;
+    node?: any;
 };
 
 export interface MarkerFn {
     key?: string;
     type: "icon" | "checkbox" | "delete" | "expand" | "number" | "text";
-    start: number;
-    end: number;
-    onClick?: (node?: any) => void;
-    content?: string | ((node?: any) => string);
+    onClick?: (row: number) => void;
+    content?: string | ((row: number) => string | undefined);
     spriteCbMap?: { [key: string]: Sprite };
-    order: number;
+    order?: number;
     size?: number;
-    disabled?: boolean | ((row: any) => boolean);
-    color?: string | ((node?: any) => string);
-    hoverColor?: string | ((node?: any) => string);
+    disabled?: boolean | ((row: number) => boolean);
+    visible?: boolean | ((row: number) => boolean);
+    color?: string | ((row: number, key?: "selected" | "hovered" | "normal") => string);
+    hoverColor?: string | ((row: number) => string);
     tooltip?: string;
     placement?: string;
     hoverEffect?: boolean;
-    rowDefKey?: string;
     selectedColor?: string;
-    getColor?: (key: "selected" | "hovered" | "normal", node?: any) => string;
+    selected?: boolean | ((row: number) => boolean);
 }
 
 /** @category Cells */
@@ -575,8 +573,7 @@ export interface MarkerCell extends BaseGridCell {
         | "expand-number"
         | "number-icon";
     readonly functions: MarkerFn[];
-    activeFn?: MarkerFn;
-    node?: TreeNode;
+    meta: MarkerMeta;
 }
 
 /** @category Selection */

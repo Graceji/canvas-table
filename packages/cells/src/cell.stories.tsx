@@ -827,11 +827,6 @@ export const CustomTreeCell: React.VFC = () => {
                 //         end: 0,
                 //     },
                 // ]}
-                getMarkerContent={row => {
-                    return {
-                        node: rows[row],
-                    };
-                }}
             />
         </BeautifulWrapper>
     );
