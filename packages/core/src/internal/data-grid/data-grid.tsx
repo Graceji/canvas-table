@@ -669,8 +669,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                             enableGroups && row === -2
                                 ? groupHeaderKind
                                 : showFilter && row === -3
-                                ? filterHeaderKind
-                                : headerKind,
+                                  ? filterHeaderKind
+                                  : headerKind,
                         location: [previousCol, row] as any,
                         bounds: bounds,
                         group: mappedColumns[previousCol].group ?? "",
@@ -691,8 +691,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                             enableGroups && row === -2
                                 ? groupHeaderKind
                                 : showFilter && row === -3
-                                ? filterHeaderKind
-                                : headerKind,
+                                  ? filterHeaderKind
+                                  : headerKind,
                         group: mappedColumns[col].group ?? "",
                         location: [col, row] as any,
                         bounds: bounds,
@@ -1040,20 +1040,20 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     }
     const canDrag = hoveredOnEdge ?? false;
     const cursor = isDragging
-        ? dragCursor ?? "move"
+        ? (dragCursor ?? "move")
         : canDrag || isResizing
-        ? "col-resize"
-        : overFill || isFilling
-        ? "crosshair"
-        : cursorOverride !== undefined
-        ? cursorOverride
-        : headerHovered || clickableInnerCellHovered || editableBoolHovered || groupHeaderHovered
-        ? "pointer"
-        : filterHovered
-        ? hasRowMarkers === true && hCol === 0
-            ? "pointer"
-            : "text"
-        : "default";
+          ? "col-resize"
+          : overFill || isFilling
+            ? "crosshair"
+            : cursorOverride !== undefined
+              ? cursorOverride
+              : headerHovered || clickableInnerCellHovered || editableBoolHovered || groupHeaderHovered
+                ? "pointer"
+                : filterHovered
+                  ? hasRowMarkers === true && hCol === 0
+                      ? "pointer"
+                      : "text"
+                  : "default";
     const style = React.useMemo(
         () => ({
             // width,
@@ -1197,14 +1197,23 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     const downPosition = React.useRef<Item>();
     const mouseDown = React.useRef(false);
     const onPointerDown = React.useCallback(
-        (ev: PointerEvent) => {
+        (ev: MouseEvent | TouchEvent) => {
             const canvas = ref.current;
             const eventTarget = eventTargetRef?.current;
             if (canvas === null || (ev.target !== canvas && ev.target !== eventTarget)) return;
             mouseDown.current = true;
 
-            const clientX = ev.clientX;
-            const clientY = ev.clientY;
+            // const clientX = ev.clientX;
+            // const clientY = ev.clientY;
+            let clientX: number;
+            let clientY: number;
+            if (ev instanceof MouseEvent) {
+                clientX = ev.clientX;
+                clientY = ev.clientY;
+            } else {
+                clientX = ev.touches[0].clientX;
+                clientY = ev.touches[0].clientY;
+            }
 
             if (ev.target === eventTarget && eventTarget !== null) {
                 const bounds = eventTarget.getBoundingClientRect();
@@ -1260,12 +1269,14 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             groupHeaderActionForEvent,
         ]
     );
-    useEventListener("pointerdown", onPointerDown, windowEventTarget, false);
+    // useEventListener("pointerdown", onPointerDown, windowEventTarget, false);
+    useEventListener("touchstart", onPointerDown, windowEventTarget, false);
+    useEventListener("mousedown", onPointerDown, windowEventTarget, false);
 
     const lastUpTime = React.useRef(0);
 
     const onPointerUp = React.useCallback(
-        (ev: PointerEvent) => {
+        (ev: PointerEvent | MouseEvent | TouchEvent) => {
             const lastUpTimeValue = lastUpTime.current;
             lastUpTime.current = Date.now();
             const canvas = ref.current;
@@ -1274,9 +1285,23 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             const eventTarget = eventTargetRef?.current;
 
             const isOutside = ev.target !== canvas && ev.target !== eventTarget;
-            const clientX = ev.clientX;
-            const clientY = ev.clientY;
-            const canCancel = ev.pointerType === "mouse" ? ev.button < 3 : true;
+            // const clientX = ev.clientX;
+            // const clientY = ev.clientY;
+            let clientX: number;
+            let clientY: number;
+            let canCancel = true;
+            if (ev instanceof MouseEvent) {
+                clientX = ev.clientX;
+                clientY = ev.clientY;
+                canCancel = ev.button < 3;
+                if ((ev as any).pointerType === "touch") {
+                    return;
+                }
+            } else {
+                clientX = ev.changedTouches[0].clientX;
+                clientY = ev.changedTouches[0].clientY;
+            }
+            // const canCancel = ev.pointerType === "mouse" ? ev.button < 3 : true;
 
             let args = getMouseArgsForPosition(canvas, clientX, clientY, ev);
 
@@ -1341,7 +1366,9 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             groupHeaderActionForEvent,
         ]
     );
-    useEventListener("pointerup", onPointerUp, windowEventTarget, false);
+    // useEventListener("pointerup", onPointerUp, windowEventTarget, false);
+    useEventListener("mouseup", onPointerUp, windowEventTarget, false);
+    useEventListener("touchend", onPointerUp, windowEventTarget, false);
 
     const onClickImpl = React.useCallback(
         (ev: MouseEvent | TouchEvent) => {
