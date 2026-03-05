@@ -321,7 +321,7 @@ export function drawGridLines(
         }
         ctx.clip("evenodd");
     }
-    const hColor = isHeader ? theme.headerBorderColor : theme.horizontalBorderColor ?? theme.borderColor;
+    const hColor = isHeader ? theme.headerBorderColor : (theme.horizontalBorderColor ?? theme.borderColor);
     const vColor = isHeader ? theme.headerBorderColor : theme.borderColor;
 
     const { minX, maxX, minY, maxY } = getMinMaxXY(drawRegions, width, height);
@@ -332,7 +332,6 @@ export function drawGridLines(
 
     // vertical lines
     let x = 0.5;
-    const h = getFreezeTrailingHeight(rows, freezeTrailingRows, getRowHeight);
     for (let index = 0; index < effectiveCols.length; index++) {
         const c = effectiveCols[index];
         if (c.width === 0) continue;
@@ -343,7 +342,7 @@ export function drawGridLines(
                 x1: tx,
                 y1: Math.max(effectiveCols[index + 1]?.group === undefined ? minY : groupHeaderHeight, minY),
                 x2: tx,
-                y2: Math.min(height - (freezeTrailingRows && isHeader !== true ? h : 0), maxY),
+                y2: Math.min(height, maxY),
                 color: vColor,
             });
         }
@@ -353,7 +352,7 @@ export function drawGridLines(
     for (let i = rows - freezeTrailingRows; i < rows; i++) {
         const rh = getRowHeight(i);
         freezeY -= rh;
-        // toDraw.push({ x1: minX, y1: freezeY, x2: maxX, y2: freezeY, color: hColor });
+        toDraw.push({ x1: minX, y1: freezeY, x2: maxX, y2: freezeY, color: hColor });
     }
 
     if (verticalOnly !== true) {
