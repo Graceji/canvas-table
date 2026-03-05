@@ -242,14 +242,45 @@ const MAX_CACHE_SIZE = 1000;
 
 // 创建缓存键
 function createThemeCacheKey(theme: Theme, overlays: Partial<Theme | undefined>[]): string {
-    // 使用快速哈希算法
-    const parts = [
-        theme.bgCell,
-        theme.baseFontStyle,
-        theme.fontFamily,
-        ...overlays.map(o => (o ? `${o.bgCell}|${o.baseFontStyle}` : "null")),
-    ];
-    return parts.join("::");
+    // 收集所有被 overlay 覆盖的属性名
+    const overlayKeys = new Set<string>();
+    for (const overlay of overlays) {
+        if (overlay) {
+            for (const key of Object.keys(overlay)) overlayKeys.add(key);
+        }
+    }
+
+    const bgParts: string[] = [];
+    const keyParts: string[] = [];
+
+    // 特殊处理：bgCell 会依次 blend，所有 overlay 的 bgCell 都要记录
+    if (overlayKeys.has("bgCell")) {
+        bgParts.push(`bg:${theme.bgCell}`);
+
+        // 记录所有 overlay 的 bgCell
+        for (const overlay of overlays) {
+            if (overlay?.bgCell !== undefined) {
+                bgParts.push(`bg_o:${overlay.bgCell}`);
+            }
+        }
+    }
+
+    // 处理其他属性
+    for (const key of overlayKeys) {
+        if (key !== "bgCell") {
+            let finalValue = (theme as any)[key];
+
+            for (const overlay of overlays) {
+                if (overlay && (overlay as any)[key] !== undefined) {
+                    finalValue = (overlay as any)[key];
+                }
+            }
+
+            keyParts.push(`${key}:${finalValue ?? ""}`);
+        }
+    }
+
+    return [...bgParts, ...keyParts, `ff:${theme.fontFamily}`, `bf:${theme.baseFontStyle}`].join("|");
 }
 
 export function mergeAndRealizeTheme(theme: Theme, ...overlays: Partial<Theme | undefined>[]): FullTheme {
