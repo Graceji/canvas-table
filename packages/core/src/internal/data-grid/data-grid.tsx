@@ -334,11 +334,6 @@ export interface DataGridProps {
     readonly dragCursor?: "move" | "not-allowed";
 
     readonly rowMarkerGroup?: string;
-
-    /**
-     * 自动focus焦点位置
-     */
-    readonly autoFocusLocation?: number[];
 }
 
 type DamageUpdateList = readonly {

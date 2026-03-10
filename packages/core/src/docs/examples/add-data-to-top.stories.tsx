@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { DataEditorAll as DataEditor } from "../../data-editor-all.js";
 import {
     BeautifulWrapper,
@@ -8,6 +8,8 @@ import {
     clearCell,
 } from "../../data-editor/stories/utils.js";
 import { SimpleThemeWrapper } from "../../stories/story-utils.js";
+import type { DataEditorRef } from "../../data-editor/data-editor.js";
+import { GridCellKind } from "../../index.js";
 
 export default {
     title: "Glide-Data-Grid/DataEditor Demos",
@@ -51,22 +53,19 @@ export const AddDataToTop: React.VFC = () => {
         return "top" as const;
     }, [getCellContent, numRows, setCellValueRaw]);
 
-    const [location, setLocation] = useState<number[]>([]);
-
-    useEffect(() => {
-        setLocation([Math.floor(Math.random() * 10), Math.ceil(Math.random() * 10)]);
-    }, []);
+    const tableRef = React.useRef<DataEditorRef>(null);
 
     return (
         <>
             <button
                 onClick={() => {
-                    setLocation([Math.floor(Math.random() * 10), Math.ceil(Math.random() * 10)]);
+                    tableRef.current?.focusCell(Math.floor(Math.random() * 10), Math.ceil(Math.random() * 10));
                 }}>
                 点击
             </button>
             <DataEditor
                 {...defaultProps}
+                ref={tableRef}
                 getCellContent={getCellContent}
                 columns={cols}
                 rowMarkers={"both"}
@@ -78,8 +77,20 @@ export const AddDataToTop: React.VFC = () => {
                 }}
                 rows={numRows}
                 onRowAppended={onRowAppended}
-                autoFocusLocation={location}
                 cellActivationBehavior="single-click"
+                onCellBlur={(cell, originalValue) => {
+                    // const [col, row] = cell;
+
+                    // 场景1：单元格原本无内容（空值）
+                    if (originalValue.kind === GridCellKind.Text && originalValue.data === "") {
+                        // 无内容失焦处理
+                    }
+
+                    // 场景2：单元格有内容但未修改
+                    if (originalValue.kind === GridCellKind.Text && originalValue.data !== "") {
+                        // 有内容但未编辑直接退出
+                    }
+                }}
             />
         </>
     );

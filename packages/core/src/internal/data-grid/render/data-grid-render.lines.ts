@@ -352,7 +352,7 @@ export function drawGridLines(
     for (let i = rows - freezeTrailingRows; i < rows; i++) {
         const rh = getRowHeight(i);
         freezeY -= rh;
-        toDraw.push({ x1: minX, y1: freezeY, x2: maxX, y2: freezeY, color: hColor });
+        // toDraw.push({ x1: minX, y1: freezeY, x2: maxX, y2: freezeY, color: hColor });
     }
 
     if (verticalOnly !== true) {

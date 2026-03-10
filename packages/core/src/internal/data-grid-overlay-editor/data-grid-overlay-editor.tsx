@@ -266,12 +266,13 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
                 if (!finished.current && customMotion.current !== undefined) {
                     // 这里将tempValue改成了lastValueRef.current， 是为了需求：批量编辑框enter不输入时清空。
                     // 在input cell中的onPressEnter调用onChange方法，先更新了tempValue, 但是这里拿不到更新后的值，导致外面不会调用onCellEdited
-                    onFinishEditing(save ? lastValueRef.current : undefined, customMotion.current, event.key);
+                    // onFinishEditing(save ? lastValueRef.current : undefined, customMotion.current, event.key);
+                    onFinishEditing(save ? tempValue : undefined, customMotion.current, event.key);
                     finished.current = true;
                 }
             }, 0);
         },
-        [gridSelection, onFinishEditing, editorProvider]
+        [editorProvider?.preventArrow, gridSelection, onFinishEditing, tempValue]
     );
 
     const { ref, style: stayOnScreenStyle } = useStayOnScreen();

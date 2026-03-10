@@ -222,6 +222,12 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
      * @group Editing
      */
     readonly onCellEdited?: (cell: Item, newValue: EditableGridCell, eventKey?: string) => void;
+    /** Emitted when a cell editor is closed without any edit (e.g. click outside or Enter with no input).
+     * `originalValue` is the cell's content at the time the editor was opened, which can be used to
+     * distinguish between "cell had no content" and "cell had content but was not modified".
+     * @group Editing
+     */
+    readonly onCellBlur?: (cell: Item, originalValue: GridCell) => void;
     /** Emitted whenever a cell mutation is completed and provides all edits inbound as a single batch.
      * @group Editing
      */
@@ -265,7 +271,7 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
     /** Emitted when editing has finished, regardless of data changing or not.
      * @group Editing
      */
-    readonly onFinishedEditing?: (newValue: GridCell | undefined, movement: Item) => void;
+    readonly onFinishedEditing?: (newValue: GridCell | undefined, movement: Item, eventKey?: string) => void;
 
     /** Emitted editing, regardless of data changing or not.
      * @group Editing
@@ -807,6 +813,12 @@ export interface DataEditorRef {
     getCanvasRect: () => DOMRect | undefined;
 
     closeEditor: () => void;
+    /**
+     * Programmatically focus a cell and open it in edit mode.
+     * @param col The column index (0-based, excluding row markers).
+     * @param row The row index (0-based).
+     */
+    focusCell: (col: number, row: number) => void;
 }
 
 const loadingCell: GridCell = {
@@ -873,6 +885,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         onGroupHeaderRenamed,
         onCellEdited,
         onCellsEdited,
+        onCellBlur,
         onSearchResultsChanged: onSearchResultsChangedIn,
         searchResults,
         onSearchValueChange,
@@ -962,7 +975,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         showFilter = false,
         filterHeight = 20,
         onCopy: onCopyOuter,
-        autoFocusLocation,
     } = p;
 
     const drawFocusRing = drawFocusRingIn === "no-editor" ? overlay === undefined : drawFocusRingIn;
@@ -1697,31 +1709,27 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         [getFilterCellContent, getMangledCellContent, scrollRef, setOverlaySimple]
     );
 
-    // 可编辑单元格自动获取焦点
-    React.useEffect(() => {
-        if (Array.isArray(autoFocusLocation) && autoFocusLocation.length === 2) {
-            const [col, row] = autoFocusLocation;
-            const focusResult = focusOnRowFromTrailingBlankRow(col, row);
+    // 可编辑单元格自动获取焦点;
+    const focusCellForEdit = React.useCallback(
+        (col: number, row: number) => {
+            const bounds = gridRef.current?.getBounds(col, row);
+            if (bounds === undefined || scrollRef.current === null) return;
 
-            if (focusResult) {
-                setCurrent(
-                    {
-                        cell: [col, row],
-                        range: {
-                            x: col,
-                            y: row,
-                            width: 1,
-                            height: 1,
-                        },
-                    },
-                    false,
-                    false,
-                    "edit"
-                );
-            }
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [autoFocusLocation, columnSelectionBlending, rowSelectionBlending]);
+            const content = getMangledCellContent([col, row]);
+            if (!content.allowOverlay || (content as any).readonly === true) return;
+
+            setOverlaySimple({
+                target: bounds,
+                content,
+                initialValue: undefined,
+                highlight: true,
+                cell: [col, row],
+                forceEditMode: false,
+                activation: { inputType: "programmatic" },
+            });
+        },
+        [getMangledCellContent, scrollRef, setOverlaySimple]
+    );
 
     const scrollTo = React.useCallback<ScrollToFn>(
         (col, row, dir = "both", paddingX = 0, paddingY = 0, options = undefined): void => {
@@ -3483,6 +3491,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         },
                     ]);
                 });
+            } else if (overlay?.cell !== undefined && newValue === undefined) {
+                onCellBlur?.([overlay.cell[0] - rowMarkerOffset, overlay.cell[1]], overlay.content);
             }
             focus(true);
             setOverlay(undefined);
@@ -3554,10 +3564,11 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     keyboardMoveFilterCell.current = false;
                 }
             }
-            onFinishedEditing?.(newValue, movement);
+            onFinishedEditing?.(newValue, movement, eventKey);
         },
         [
             overlay?.cell,
+            overlay?.content,
             focus,
             gridSelection,
             onFinishedEditing,
@@ -3572,6 +3583,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             getCustomNewRowTargetColumn,
             setGridSelection,
             focusOnRowFromTrailingBlankRow,
+            onCellBlur,
+            rowMarkerOffset,
         ]
     );
 
@@ -4635,6 +4648,21 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 // 退出编辑态
                 setOverlay(undefined);
             },
+            focusCell: (col: number, row: number) => {
+                const mangledCol = col + rowMarkerOffset;
+                setCurrent(
+                    {
+                        cell: [mangledCol, row],
+                        range: { x: mangledCol, y: row, width: 1, height: 1 },
+                    },
+                    false,
+                    false,
+                    "edit"
+                );
+                window.setTimeout(() => {
+                    focusCellForEdit(mangledCol, row);
+                }, 0);
+            },
         }),
         [
             appendRow,
@@ -4646,6 +4674,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             onPasteInternal,
             rowMarkerOffset,
             scrollTo,
+            setCurrent,
+            focusCellForEdit,
         ]
     );
 

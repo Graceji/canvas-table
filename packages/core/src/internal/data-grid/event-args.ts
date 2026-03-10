@@ -137,10 +137,16 @@ export interface PointerCellActivatedEvent extends BaseCellActivatedEvent {
     readonly pointerType?: "mouse" | "touch" | "pen";
 }
 
+/** Programmatic activation (e.g. via imperative focusCell API) */
+export interface ProgrammaticCellActivatedEvent extends BaseCellActivatedEvent {
+    readonly inputType: "programmatic";
+}
+
 /** The public event type the grid emits */
 export type CellActivatedEventArgs =
     | KeyboardCellActivatedEvent
-    | PointerCellActivatedEvent;
+    | PointerCellActivatedEvent
+    | ProgrammaticCellActivatedEvent;
 
 export interface FillPatternEventArgs extends PreventableEvent {
     patternSource: Rectangle;
