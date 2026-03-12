@@ -19,12 +19,12 @@ function getMockBooleanData(row: number): boolean | null | undefined {
 }
 
 export function sendClick(el: Element | Node | Document | Window, options?: any, runTimers?: boolean): void {
-    fireEvent.pointerDown(el, options);
+    fireEvent.mouseDown(el, options);
     if (runTimers === true)
         act(() => {
             vi.runAllTimers();
         });
-    fireEvent.pointerUp(el, options);
+    fireEvent.mouseUp(el, options);
     if (runTimers === true)
         act(() => {
             vi.runAllTimers();
@@ -33,14 +33,23 @@ export function sendClick(el: Element | Node | Document | Window, options?: any,
 }
 
 export function sendTouchClick(el: Element | Node | Document | Window, options?: any): void {
+    const touch = options?.touches?.[0] ?? {
+        clientX: options?.clientX,
+        clientY: options?.clientY,
+    };
     const mouseOptions = {
-        clientX: options?.touches?.[0]?.clientX,
-        clientY: options?.touches?.[0]?.clientY,
+        clientX: touch.clientX,
+        clientY: touch.clientY,
         pointerType: "touch",
         ...options,
-    }
-    fireEvent.pointerDown(el, mouseOptions);
-    fireEvent.pointerUp(el, mouseOptions);
+    };
+    const touchOptions = {
+        ...options,
+        touches: [touch],
+        changedTouches: [touch],
+    };
+    fireEvent.touchStart(el, touchOptions);
+    fireEvent.touchEnd(el, touchOptions);
     fireEvent.click(el, mouseOptions);
 }
 
@@ -271,7 +280,10 @@ export const EventedDataEditor = React.forwardRef<DataEditorRef, DataEditorProps
         void p.onColumnAppended?.();
     }, [p]);
 
-    const columns = React.useMemo(() => p.columns.concat(Array.from({ length: extraCols }, (_, i) => ({ title: `Z${i}`, width: 50 }))), [p.columns, extraCols]);
+    const columns = React.useMemo(
+        () => [...p.columns, ...Array.from({ length: extraCols }, (_, i) => ({ title: `Z${i}`, width: 50 }))],
+        [p.columns, extraCols]
+    );
 
     const getCellContent = React.useCallback(
         (cell: Item): GridCell => {

@@ -7,7 +7,13 @@ import {
     type FillHandle,
     DEFAULT_FILL_HANDLE,
 } from "../data-grid-types.js";
-import { getStickyWidth, type MappedGridColumn, computeBounds, getFreezeTrailingHeight } from "./data-grid-lib.js";
+import {
+    getStickyWidth,
+    type MappedGridColumn,
+    computeBounds,
+    getFreezeTrailingHeight,
+    getEffectiveCurrentRange,
+} from "./data-grid-lib.js";
 import { type FullTheme } from "../../../common/styles.js";
 import { blend, withAlpha } from "../color-parser.js";
 import { hugRectToTarget, intersectRect, rectContains, splitRectIntoRegions } from "../../../common/math.js";
@@ -31,7 +37,8 @@ export function drawHighlightRings(
     freezeTrailingRows: number,
     rows: number,
     allHighlightRegions: readonly Highlight[] | undefined,
-    theme: FullTheme
+    theme: FullTheme,
+    drawNow: boolean = true
 ): (() => void) | undefined {
     const highlightRegions = allHighlightRegions?.filter(x => x.style !== "no-outline");
 
@@ -42,7 +49,9 @@ export function drawHighlightRings(
     const splitIndicies = [freezeColumns, 0, mappedColumns.length, rows - freezeTrailingRows] as const;
     const splitLocations = [freezeLeft, 0, width, height - freezeBottom] as const;
 
-    const drawRects = highlightRegions.map(h => {
+    // 先把高亮区域拆到冻结区 / 主滚动区 / 底部冻结区等实际绘制分片中，
+    // 后面 dedupe 和 clip 都基于这些真实绘制矩形处理
+    const rawDrawRects = highlightRegions.flatMap(h => {
         const r = h.range;
         const style = h.style ?? "dashed";
 
@@ -97,6 +106,7 @@ export function drawHighlightRings(
             return {
                 color: h.color,
                 style,
+                requiresFullRedraw: h.requiresFullRedraw,
                 clip: arg.clip,
                 rect: hugRectToTarget(
                     {
@@ -113,47 +123,91 @@ export function drawHighlightRings(
         });
     });
 
+    // merged cell 场景下，focus ring 与 range outline 可能会落到同一块真实视觉区域上
+    // 如果不去重，就会重复 stroke，出现边框偏深、发黄或像“上下分层”的视觉问题
+    const drawRects = rawDrawRects.filter((candidate, candidateIndex) => {
+        const candidateRect = candidate.rect;
+        if (candidateRect === undefined) return false;
+        if (candidate.style !== "solid-outline") return true;
+
+        return !rawDrawRects.some((other, otherIndex) => {
+            const otherRect = other.rect;
+            if (otherRect === undefined) return false;
+            if (otherIndex === candidateIndex) return false;
+            if (other.style !== candidate.style) return false;
+            const canDedupeMergedOutline = candidate.requiresFullRedraw === true && other.requiresFullRedraw === true;
+            if (other.color !== candidate.color && !canDedupeMergedOutline) return false;
+
+            const sameRect =
+                otherRect.x === candidateRect.x &&
+                otherRect.y === candidateRect.y &&
+                otherRect.width === candidateRect.width &&
+                otherRect.height === candidateRect.height;
+            const sameClip =
+                other.clip.x === candidate.clip.x &&
+                other.clip.y === candidate.clip.y &&
+                other.clip.width === candidate.clip.width &&
+                other.clip.height === candidate.clip.height;
+
+            const otherContainsCandidate =
+                otherRect.x <= candidateRect.x &&
+                otherRect.y <= candidateRect.y &&
+                otherRect.x + otherRect.width >= candidateRect.x + candidateRect.width &&
+                otherRect.y + otherRect.height >= candidateRect.y + candidateRect.height;
+            const otherIsLarger = otherRect.width * otherRect.height > candidateRect.width * candidateRect.height;
+
+            return (
+                sameClip &&
+                (sameRect
+                    ? otherIndex > candidateIndex
+                    : canDedupeMergedOutline && otherContainsCandidate && otherIsLarger)
+            );
+        });
+    });
+
+    // 返回 drawCb 是为了让外层决定“现在画”还是“稍后画”
+    // data-grid-render 会先完成其它 overdraw，再统一把 ring 补到最上层
     const drawCb = () => {
         ctx.lineWidth = theme.accentWidth;
 
         let dashed = false;
 
-        for (const dr of drawRects) {
-            for (const s of dr) {
-                if (
-                    s?.rect !== undefined &&
-                    intersectRect(0, 0, width, height, s.rect.x, s.rect.y, s.rect.width, s.rect.height)
-                ) {
-                    const wasDashed: boolean = dashed;
-                    const needsClip = !rectContains(s.clip, s.rect);
-                    ctx.beginPath();
-                    if (needsClip) {
-                        ctx.save();
-                        ctx.rect(s.clip.x, s.clip.y, s.clip.width, s.clip.height);
-                        ctx.clip();
-                    }
-                    if (s.style === "dashed" && !dashed) {
-                        ctx.setLineDash([5, 3]);
-                        dashed = true;
-                    } else if ((s.style === "solid" || s.style === "solid-outline") && dashed) {
-                        ctx.setLineDash([]);
-                        dashed = false;
-                    }
-                    ctx.strokeStyle =
-                        s.style === "solid-outline"
-                            ? blend(blend(s.color, theme.borderColor), theme.bgCell)
-                            : withAlpha(s.color, 1);
-                    ctx.closePath();
-                    ctx.strokeRect(
-                        s.rect.x + theme.accentWidth / 2,
-                        s.rect.y + theme.accentWidth / 2,
-                        s.rect.width - theme.accentWidth,
-                        s.rect.height - theme.accentWidth
-                    );
-                    if (needsClip) {
-                        ctx.restore();
-                        dashed = wasDashed;
-                    }
+        // 这里没有沿用之前的双层循环，是因为 drawRects 在 flatMap + dedupe 之后
+        // 已经从“按 highlightRegion 分组的二维数组”变成了“一维绘制列表”
+        for (const s of drawRects) {
+            if (
+                s?.rect !== undefined &&
+                intersectRect(0, 0, width, height, s.rect.x, s.rect.y, s.rect.width, s.rect.height)
+            ) {
+                const wasDashed: boolean = dashed;
+                const needsClip = !rectContains(s.clip, s.rect);
+                ctx.beginPath();
+                if (needsClip) {
+                    ctx.save();
+                    ctx.rect(s.clip.x, s.clip.y, s.clip.width, s.clip.height);
+                    ctx.clip();
+                }
+                if (s.style === "dashed" && !dashed) {
+                    ctx.setLineDash([5, 3]);
+                    dashed = true;
+                } else if ((s.style === "solid" || s.style === "solid-outline") && dashed) {
+                    ctx.setLineDash([]);
+                    dashed = false;
+                }
+                ctx.strokeStyle =
+                    s.style === "solid-outline"
+                        ? blend(blend(s.color, theme.borderColor), theme.bgCell)
+                        : withAlpha(s.color, 1);
+                ctx.closePath();
+                ctx.strokeRect(
+                    s.rect.x + theme.accentWidth / 2,
+                    s.rect.y + theme.accentWidth / 2,
+                    s.rect.width - theme.accentWidth,
+                    s.rect.height - theme.accentWidth
+                );
+                if (needsClip) {
+                    ctx.restore();
+                    dashed = wasDashed;
                 }
             }
         }
@@ -163,7 +217,9 @@ export function drawHighlightRings(
         }
     };
 
-    drawCb();
+    if (drawNow) {
+        drawCb();
+    }
     return drawCb;
 }
 
@@ -212,7 +268,7 @@ export function drawFillHandle(
 
     const fill = typeof fillHandle === "object" ? { ...DEFAULT_FILL_HANDLE, ...fillHandle } : DEFAULT_FILL_HANDLE;
 
-    const range = selectedCell.current.range;
+    const range = getEffectiveCurrentRange(selectedCell.current, getCellContent, rows);
     const currentItem = selectedCell.current.cell;
     const fillHandleTarget = [range.x + range.width - 1, range.y + range.height - 1];
 

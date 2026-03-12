@@ -13,12 +13,15 @@ import {
     type InternalCellRenderer,
     AllCellRenderers,
     type ProvideEditorCallback,
+    type Rectangle,
 } from "../src/index.js";
 import type { CustomCell } from "../src/internal/data-grid/data-grid-types.js";
 import type { DataEditorRef } from "../src/data-editor/data-editor.js";
 import { assert } from "../src/common/support.js";
+import { expandSelectionOutlineToCellBounds } from "../src/data-editor/data-editor-fns.js";
 import { vi, type Mock, expect, describe, test, beforeEach, afterEach } from "vitest";
 import type { GridKeyEventArgs } from "../src/internal/data-grid/event-args.js";
+import { RowSpanGrouping } from "../src/docs/examples/row-grouping.stories.js";
 import {
     EventedDataEditor,
     basicProps,
@@ -30,6 +33,107 @@ import {
     standardBeforeEach,
     standardAfterEach,
 } from "./test-utils.js";
+
+const rowSpanSelectionColumns = [
+    {
+        title: "Group",
+        width: 120,
+    },
+    {
+        title: "Value",
+        width: 120,
+    },
+];
+
+const rowSpanSelectionCell = ([col, row]: Item): GridCell => {
+    if (col === 0 && row < 3) {
+        return {
+            kind: GridCellKind.Text,
+            allowOverlay: false,
+            data: "Group A",
+            displayData: "Group A",
+            rowSpan: 3,
+            rowSpanOffset: row,
+        };
+    }
+
+    return {
+        kind: GridCellKind.Text,
+        allowOverlay: false,
+        data: `${col}, ${row}`,
+        displayData: `${col}, ${row}`,
+    };
+};
+
+const rowSpanEditableCell = ([col, row]: Item): GridCell => {
+    if (col === 0 && row < 3) {
+        return {
+            kind: GridCellKind.Text,
+            allowOverlay: true,
+            readonly: false,
+            data: "Group A",
+            displayData: "Group A",
+            rowSpan: 3,
+            rowSpanOffset: row,
+        };
+    }
+
+    return {
+        kind: GridCellKind.Text,
+        allowOverlay: true,
+        readonly: false,
+        data: `${col}, ${row}`,
+        displayData: `${col}, ${row}`,
+    };
+};
+
+const spanAndRowSpanSelectionCell = ([col, row]: Item): GridCell => {
+    if ((col === 0 || col === 1) && row < 3) {
+        return {
+            kind: GridCellKind.Text,
+            allowOverlay: false,
+            data: "Merged",
+            displayData: "Merged",
+            span: [0, 1],
+            rowSpan: 3,
+            rowSpanOffset: row,
+        };
+    }
+
+    return {
+        kind: GridCellKind.Text,
+        allowOverlay: false,
+        data: `${col}, ${row}`,
+        displayData: `${col}, ${row}`,
+    };
+};
+
+const expectedRowSpanCellBounds = {
+    x: 0,
+    y: 36,
+    width: 121,
+    height: 97,
+};
+
+const DelayedSelectionDataEditor: React.FC<React.ComponentProps<typeof DataEditor>> = p => {
+    const [sel, setSel] = React.useState(
+        () =>
+            p.gridSelection ?? {
+                columns: CompactSelection.empty(),
+                rows: CompactSelection.empty(),
+            }
+    );
+
+    const onGridSelectionChange = React.useCallback(
+        (s: NonNullable<React.ComponentProps<typeof DataEditor>["gridSelection"]>) => {
+            window.setTimeout(() => setSel(s), 0);
+            p.onGridSelectionChange?.(s);
+        },
+        [p]
+    );
+
+    return <DataEditor {...p} gridSelection={sel} onGridSelectionChange={onGridSelectionChange} />;
+};
 
 describe("data-editor", () => {
     vi.mock("../src/common/resize-detector", () => {
@@ -2475,16 +2579,485 @@ describe("data-editor", () => {
         vi.useRealTimers();
         await act(() => new Promise(r => window.setTimeout(r, 10)));
         expect(navigator.clipboard.writeText).toBeCalledWith("1, 2\t2, 2");
-        expect(editSpy).toHaveBeenCalledWith([
+        expect(editSpy).toHaveBeenCalledWith(
+            [
+                {
+                    location: [1, 2],
+                    value: expect.objectContaining({ data: "" }),
+                },
+                {
+                    location: [2, 2],
+                    value: expect.objectContaining({ data: "" }),
+                },
+            ],
+            undefined
+        );
+    });
+
+    test("Copy expands a single row-span cell to the visible row-span range", async () => {
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanEditableCell}
+                getCellsForSelection={true}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 1],
+                        range: { x: 0, y: 1, width: 1, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
             {
-                location: [1, 2],
-                value: expect.objectContaining({ data: "" }),
-            },
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        vi.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
+
+        fireEvent.copy(window);
+        await act(() => new Promise(r => window.setTimeout(r, 10)));
+
+        expect(navigator.clipboard.writeText).toBeCalledWith("Group A\nGroup A\nGroup A");
+    });
+
+    test("Cut copies and deletes the same row-span range", async () => {
+        const editSpy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanEditableCell}
+                getCellsForSelection={true}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                onCellsEdited={editSpy}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 1],
+                        range: { x: 0, y: 1, width: 1, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
             {
-                location: [2, 2],
-                value: expect.objectContaining({ data: "" }),
-            },
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        vi.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
+
+        fireEvent.cut(window);
+        vi.useRealTimers();
+        await act(() => new Promise(r => window.setTimeout(r, 10)));
+
+        expect(navigator.clipboard.writeText).toBeCalledWith("Group A\nGroup A\nGroup A");
+        expect(editSpy).toHaveBeenCalledWith(
+            [
+                {
+                    location: [0, 0],
+                    value: expect.objectContaining({ data: "" }),
+                },
+                {
+                    location: [0, 1],
+                    value: expect.objectContaining({ data: "" }),
+                },
+                {
+                    location: [0, 2],
+                    value: expect.objectContaining({ data: "" }),
+                },
+            ],
+            undefined
+        );
+        expect(editSpy).toHaveBeenCalledTimes(1);
+    });
+
+    test("Copy does not include ordinary cells inside a row-span outline bounding box", async () => {
+        const cellSpy = vi.fn(rowSpanEditableCell);
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={cellSpy}
+                getCellsForSelection={true}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 1],
+                        range: { x: 0, y: 1, width: 2, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        vi.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
+        cellSpy.mockClear();
+
+        fireEvent.copy(window);
+        await act(() => new Promise(r => window.setTimeout(r, 10)));
+
+        expect(navigator.clipboard.writeText).toBeCalledWith("Group A\t\nGroup A\t1, 1\nGroup A\t");
+        expect(cellSpy).not.toHaveBeenCalledWith([1, 0]);
+        expect(cellSpy).not.toHaveBeenCalledWith([1, 2]);
+    });
+
+    test("Cut copies and deletes the same mixed row-span selection", async () => {
+        const editSpy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanEditableCell}
+                getCellsForSelection={true}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                onCellEdited={editSpy}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 1],
+                        range: { x: 0, y: 1, width: 2, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        vi.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
+
+        fireEvent.cut(window);
+        vi.useRealTimers();
+        await act(() => new Promise(r => window.setTimeout(r, 10)));
+
+        expect(navigator.clipboard.writeText).toBeCalledWith("Group A\t\nGroup A\t1, 1\nGroup A\t");
+        expect(editSpy.mock.calls.map(call => call[0])).toEqual([
+            [0, 0],
+            [0, 1],
+            [0, 2],
+            [1, 1],
         ]);
+    });
+
+    test("Cut copies and deletes row-span rangeStack selections", async () => {
+        const editSpy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanEditableCell}
+                getCellsForSelection={true}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                onCellEdited={editSpy}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [1, 4],
+                        range: { x: 1, y: 4, width: 1, height: 1 },
+                        rangeStack: [{ x: 0, y: 1, width: 1, height: 1 }],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        vi.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
+
+        fireEvent.cut(window);
+        vi.useRealTimers();
+        await act(() => new Promise(r => window.setTimeout(r, 10)));
+
+        expect(navigator.clipboard.writeText).toBeCalledWith("Group A\t\nGroup A\t\nGroup A\t\n\t\n\t1, 4");
+        expect(editSpy.mock.calls.map(call => call[0])).toEqual([
+            [1, 4],
+            [0, 0],
+            [0, 1],
+            [0, 2],
+        ]);
+    });
+
+    test("Copy keeps distant rangeStack selections compact", async () => {
+        const getCellsForSelection = vi.fn((selection: Rectangle): GridCell[][] => {
+            const result: GridCell[][] = [];
+            for (let row = selection.y; row < selection.y + selection.height; row++) {
+                const cells: GridCell[] = [];
+                for (let col = selection.x; col < selection.x + selection.width; col++) {
+                    cells.push({
+                        kind: GridCellKind.Text,
+                        allowOverlay: true,
+                        data: `${col}, ${row}`,
+                        displayData: `${col}, ${row}`,
+                    });
+                }
+                result.push(cells);
+            }
+            return result;
+        });
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                getCellsForSelection={getCellsForSelection}
+                rows={60_000}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 0],
+                        range: { x: 0, y: 0, width: 1, height: 1 },
+                        rangeStack: [{ x: 50_000, y: 50_000, width: 1, height: 1 }],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        vi.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
+
+        fireEvent.copy(window);
+        await act(() => new Promise(r => window.setTimeout(r, 10)));
+
+        expect(getCellsForSelection.mock.calls.map(call => call[0])).toEqual([
+            { x: 0, y: 0, width: 1, height: 1 },
+            { x: 50_000, y: 50_000, width: 1, height: 1 },
+        ]);
+        expect(navigator.clipboard.writeText).toBeCalledWith("0, 0\n50000, 50000");
+    });
+
+    test("Copy keeps ordinary rangeStack order on the old path", async () => {
+        const getCellsForSelection = vi.fn((selection: Rectangle): GridCell[][] => {
+            const result: GridCell[][] = [];
+            for (let row = selection.y; row < selection.y + selection.height; row++) {
+                const cells: GridCell[] = [];
+                for (let col = selection.x; col < selection.x + selection.width; col++) {
+                    cells.push({
+                        kind: GridCellKind.Text,
+                        allowOverlay: true,
+                        data: `${col}, ${row}`,
+                        displayData: `${col}, ${row}`,
+                    });
+                }
+                result.push(cells);
+            }
+            return result;
+        });
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                getCellsForSelection={getCellsForSelection}
+                rows={10}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 5],
+                        range: { x: 0, y: 5, width: 1, height: 1 },
+                        rangeStack: [{ x: 0, y: 1, width: 1, height: 1 }],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        vi.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
+
+        fireEvent.copy(window);
+        await act(() => new Promise(r => window.setTimeout(r, 10)));
+
+        expect(getCellsForSelection.mock.calls.map(call => call[0])).toEqual([
+            { x: 0, y: 5, width: 1, height: 1 },
+            { x: 0, y: 1, width: 1, height: 1 },
+        ]);
+    });
+
+    test("Cut copies before calling onDelete", async () => {
+        const editSpy = vi.fn();
+        const order: string[] = [];
+        const getCellContent = vi.fn(rowSpanEditableCell);
+        const getCellsForSelection = vi.fn((selection: Rectangle): GridCell[][] => {
+            order.push("copy");
+            const result: GridCell[][] = [];
+            for (let row = selection.y; row < selection.y + selection.height; row++) {
+                const cells: GridCell[] = [];
+                for (let col = selection.x; col < selection.x + selection.width; col++) {
+                    cells.push(rowSpanEditableCell([col, row]));
+                }
+                result.push(cells);
+            }
+            return result;
+        });
+        const deleteSpy = vi.fn(sel => {
+            order.push("delete");
+            return sel;
+        });
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={getCellContent}
+                getCellsForSelection={getCellsForSelection}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                onCellEdited={editSpy}
+                onDelete={deleteSpy}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 1],
+                        range: { x: 0, y: 1, width: 1, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        vi.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
+        order.length = 0;
+
+        fireEvent.cut(window);
+        vi.useRealTimers();
+        await act(() => new Promise(r => window.setTimeout(r, 10)));
+
+        expect(order[0]).toBe("copy");
+        expect(order).toContain("delete");
+        expect(order.indexOf("copy")).toBeLessThan(order.indexOf("delete"));
+        expect(navigator.clipboard.writeText).toBeCalledWith("Group A\nGroup A\nGroup A");
+        expect(editSpy.mock.calls.map(call => call[0])).toEqual([
+            [0, 0],
+            [0, 1],
+            [0, 2],
+        ]);
+    });
+
+    test("Copy keeps the fast path for ordinary large selections", async () => {
+        const cellSpy = vi.fn(
+            (item: Item): GridCell => ({
+                kind: GridCellKind.Text,
+                allowOverlay: true,
+                data: `${item[0]}, ${item[1]}`,
+                displayData: `${item[0]}, ${item[1]}`,
+            })
+        );
+        const getCellsForSelection = vi.fn((selection: Rectangle): GridCell[][] => {
+            const result: GridCell[][] = [];
+            for (let row = selection.y; row < selection.y + selection.height; row++) {
+                const cells: GridCell[] = [];
+                for (let col = selection.x; col < selection.x + selection.width; col++) {
+                    cells.push({
+                        kind: GridCellKind.Text,
+                        allowOverlay: true,
+                        data: `${col}, ${row}`,
+                        displayData: `${col}, ${row}`,
+                    });
+                }
+                result.push(cells);
+            }
+            return result;
+        });
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                getCellContent={cellSpy}
+                getCellsForSelection={getCellsForSelection}
+                rows={1000}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [1, 20],
+                        range: { x: 1, y: 20, width: 10, height: 980 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        vi.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
+        cellSpy.mockClear();
+
+        fireEvent.copy(window);
+        await act(() => new Promise(r => window.setTimeout(r, 10)));
+
+        expect(getCellsForSelection).toHaveBeenCalledTimes(1);
+        expect(getCellsForSelection).toHaveBeenCalledWith(
+            { x: 1, y: 20, width: 10, height: 980 },
+            expect.any(AbortSignal)
+        );
+        expect(cellSpy.mock.calls.length).toBeLessThan(2100);
     });
 
     test("Paste custom cell does not crash", async () => {
@@ -3059,6 +3632,1151 @@ describe("data-editor", () => {
         });
     });
 
+    test("Clicking a normal body cell selects its row", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(<EventedDataEditor {...basicProps} onGridSelectionChange={spy} />, {
+            wrapper: Context,
+        });
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.fromSingleSelection(2),
+            current: {
+                cell: [1, 2],
+                range: { x: 1, y: 2, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+    });
+
+    test("Clicking a normal readonly body cell twice clears the row selection", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(<EventedDataEditor {...basicProps} onGridSelectionChange={spy} />, {
+            wrapper: Context,
+        });
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+        spy.mockClear();
+
+        sendClick(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.empty(),
+            current: {
+                cell: [1, 2],
+                range: { x: 1, y: 2, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+    });
+
+    test("Shift clicking a normal body cell with row markers keeps the old row-selection path", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                rowMarkers="number"
+                rowSelectionBlending="mixed"
+                columnSelectionBlending="mixed"
+                onGridSelectionChange={spy}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 300,
+            clientY: 36 + 32 * 2 + 16,
+        });
+
+        spy.mockClear();
+
+        sendClick(canvas, {
+            shiftKey: true,
+            clientX: 300,
+            clientY: 36 + 32 * 5 + 16,
+        });
+
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.fromSingleSelection([2, 6]),
+            current: {
+                cell: [1, 5],
+                range: { x: 1, y: 5, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+    });
+
+    test("Clicking a row-span cell uses single-row selection by default", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanSelectionCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                onGridSelectionChange={spy}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 60,
+            clientY: 36 + 32 + 16,
+        });
+
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.fromSingleSelection(1),
+            current: {
+                cell: [0, 1],
+                range: { x: 0, y: 1, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+    });
+
+    test("Clicking a row-span cell can select the full merged row block", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanSelectionCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                cellRowSelectionBehavior="row-span"
+                onGridSelectionChange={spy}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 60,
+            clientY: 36 + 32 + 16,
+        });
+
+        expect(spy).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                columns: CompactSelection.empty(),
+                rows: CompactSelection.fromSingleSelection([0, 3]),
+            })
+        );
+    });
+
+    test("Clicking a row marker in row-span mode selects and outlines only the physical row", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanSelectionCell}
+                rows={6}
+                rowMarkers={{ kind: "number", width: 56 }}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                cellRowSelectionBehavior="row-span"
+                onGridSelectionChange={spy}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas") as HTMLCanvasElement;
+        const ctx = canvas.getContext("2d") as any;
+
+        sendClick(canvas, {
+            clientX: 56 + 60,
+            clientY: 36 + 32 + 32 + 16,
+        });
+        expect(spy).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                columns: CompactSelection.empty(),
+                rows: CompactSelection.fromSingleSelection([0, 3]),
+            })
+        );
+
+        ctx.__clearEvents();
+
+        sendClick(canvas, {
+            clientX: 28,
+            clientY: 36 + 32 * 4 + 16,
+        });
+
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.fromSingleSelection(4),
+            current: undefined,
+        });
+
+        const markerFocusRects = ctx
+            .__getEvents()
+            .filter((event: any) => event.type === "strokeRect")
+            .filter(
+                (event: any) =>
+                    event.props?.x === 0.5 &&
+                    event.props?.y === 164.5 &&
+                    event.props?.width === 56 &&
+                    event.props?.height === 32
+            );
+
+        expect(markerFocusRects.length).toBeGreaterThan(0);
+    });
+
+    test("Clicking a row marker in mixed mode preserves an ordinary current cell", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanSelectionCell}
+                rows={6}
+                rowMarkers={{ kind: "number", width: 56 }}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                cellRowSelectionBehavior="row-span"
+                rowSelectionBlending="mixed"
+                onGridSelectionChange={spy}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas") as HTMLCanvasElement;
+
+        sendClick(canvas, {
+            clientX: 180,
+            clientY: 36 + 32 * 4 + 16,
+        });
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.fromSingleSelection(4),
+            current: {
+                cell: [1, 4],
+                range: { x: 1, y: 4, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+
+        sendClick(canvas, {
+            clientX: 28,
+            clientY: 36 + 32 * 5 + 16,
+        });
+
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.fromSingleSelection(5),
+            current: {
+                cell: [1, 4],
+                range: { x: 1, y: 4, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+    });
+
+    test("Clicking row markers in controlled mode keeps the marker outline while selection props catch up", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <DelayedSelectionDataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanSelectionCell}
+                rows={6}
+                rowMarkers={{ kind: "number", width: 56 }}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                cellRowSelectionBehavior="row-span"
+                rowSelectionBlending="mixed"
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.fromSingleSelection(3),
+                }}
+                onGridSelectionChange={spy}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep(false);
+
+        const canvas = screen.getByTestId("data-grid-canvas") as HTMLCanvasElement;
+        const ctx = canvas.getContext("2d") as any;
+
+        sendClick(canvas, {
+            clientX: 28,
+            clientY: 36 + 32 * 4 + 16,
+        });
+
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.fromSingleSelection(4),
+            current: undefined,
+        });
+
+        ctx.__clearEvents();
+
+        act(() => {
+            vi.runAllTimers();
+        });
+
+        const markerFocusRectsAfterPropUpdate = ctx
+            .__getEvents()
+            .filter((event: any) => event.type === "strokeRect")
+            .filter(
+                (event: any) =>
+                    event.props?.x === 0.5 &&
+                    event.props?.y === 164.5 &&
+                    event.props?.width === 56 &&
+                    event.props?.height === 32
+            );
+
+        expect(markerFocusRectsAfterPropUpdate.length).toBeGreaterThan(0);
+    });
+
+    test("Row-span context menu events expose merged bounds", async () => {
+        const spy = vi.fn();
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanSelectionCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                onCellContextMenu={spy}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        const scroller = prep();
+
+        assert(scroller !== null);
+
+        fireEvent.contextMenu(scroller, {
+            clientX: 60,
+            clientY: 36 + 32 + 16,
+        });
+
+        expect(spy).toHaveBeenCalledWith(
+            [0, 1],
+            expect.objectContaining({
+                bounds: expectedRowSpanCellBounds,
+                localEventX: 60,
+                localEventY: 48,
+            })
+        );
+    });
+
+    test("Ref getBounds expands row-span cells", async () => {
+        vi.useFakeTimers();
+        const ref = React.createRef<DataEditorRef>();
+
+        render(
+            <DataEditor
+                {...basicProps}
+                ref={ref}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanSelectionCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep(false);
+
+        act(() => {
+            vi.runAllTimers();
+        });
+
+        expect(ref.current?.getBounds(0, 1)).toEqual(expectedRowSpanCellBounds);
+    });
+
+    test("Delete expands row-span current range to the full merged block", async () => {
+        const spy = vi.fn();
+        const deleteSpy = vi.fn(sel => sel);
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanEditableCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                onDelete={deleteSpy}
+                onCellEdited={spy}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 2],
+                        range: { x: 0, y: 2, width: 1, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        fireEvent.keyDown(screen.getByTestId("data-grid-canvas"), {
+            key: "Delete",
+        });
+
+        expect(deleteSpy).toHaveBeenCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.empty(),
+            current: {
+                cell: [0, 2],
+                range: { x: 0, y: 0, width: 1, height: 3 },
+                rangeStack: [],
+            },
+        });
+        expect(spy.mock.calls.map(call => call[0])).toEqual([
+            [0, 0],
+            [0, 1],
+            [0, 2],
+        ]);
+    });
+
+    test("Delete expands multi-cell row-span ranges to match the visible outline", async () => {
+        const spy = vi.fn();
+        const deleteSpy = vi.fn(sel => sel);
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanEditableCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                onDelete={deleteSpy}
+                onCellEdited={spy}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 1],
+                        range: { x: 0, y: 1, width: 1, height: 2 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        fireEvent.keyDown(screen.getByTestId("data-grid-canvas"), {
+            key: "Delete",
+        });
+
+        expect(deleteSpy).toHaveBeenCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.empty(),
+            current: {
+                cell: [0, 1],
+                range: { x: 0, y: 0, width: 1, height: 3 },
+                rangeStack: [],
+            },
+        });
+        expect(spy.mock.calls.map(call => call[0])).toEqual([
+            [0, 0],
+            [0, 1],
+            [0, 2],
+        ]);
+    });
+
+    test("Delete does not clear ordinary cells inside the row-span outline bounding box", async () => {
+        const spy = vi.fn();
+        const deleteSpy = vi.fn(sel => sel);
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanEditableCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                onDelete={deleteSpy}
+                onCellEdited={spy}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 1],
+                        range: { x: 0, y: 1, width: 2, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        fireEvent.keyDown(screen.getByTestId("data-grid-canvas"), {
+            key: "Delete",
+        });
+
+        expect(deleteSpy).toHaveBeenCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.empty(),
+            current: {
+                cell: [0, 1],
+                range: { x: 0, y: 0, width: 2, height: 3 },
+                rangeStack: [],
+            },
+        });
+        expect(spy.mock.calls.map(call => call[0])).toEqual([
+            [0, 0],
+            [0, 1],
+            [0, 2],
+            [1, 1],
+        ]);
+    });
+
+    test("Delete respects row-span onDelete selection overrides", async () => {
+        const spy = vi.fn();
+        const deleteSpy = vi.fn(() => ({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.empty(),
+            current: {
+                cell: [0, 2] as Item,
+                range: { x: 0, y: 2, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        }));
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanEditableCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                onDelete={deleteSpy}
+                onCellEdited={spy}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 2],
+                        range: { x: 0, y: 2, width: 1, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        fireEvent.keyDown(screen.getByTestId("data-grid-canvas"), {
+            key: "Delete",
+        });
+
+        expect(deleteSpy).toHaveBeenCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.empty(),
+            current: {
+                cell: [0, 2],
+                range: { x: 0, y: 0, width: 1, height: 3 },
+                rangeStack: [],
+            },
+        });
+        expect(spy.mock.calls.map(call => call[0])).toEqual([[0, 2]]);
+    });
+
+    test("Row-span selection mode still selects only the clicked row for normal cells", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanSelectionCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                cellRowSelectionBehavior="row-span"
+                onGridSelectionChange={spy}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 180,
+            clientY: 36 + 32 + 16,
+        });
+
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.fromSingleSelection(1),
+            current: {
+                cell: [1, 1],
+                range: { x: 1, y: 1, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+    });
+
+    test("Row-span selection mode keeps normal cell shift selection on the row path", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanSelectionCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                cellRowSelectionBehavior="row-span"
+                rangeSelect="none"
+                rowSelectionBlending="mixed"
+                onGridSelectionChange={spy}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 180,
+            clientY: 36 + 32 + 16,
+        });
+
+        spy.mockClear();
+
+        sendClick(canvas, {
+            shiftKey: true,
+            clientX: 180,
+            clientY: 36 + 32 * 4 + 16,
+        });
+
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.fromSingleSelection([1, 5]),
+            current: {
+                cell: [1, 4],
+                range: { x: 1, y: 4, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+    });
+
+    test("Row-span range outlines expand to the merged cell bounds", async () => {
+        vi.useFakeTimers();
+
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanSelectionCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                drawFocusRing={false}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 1],
+                        range: { x: 0, y: 1, width: 1, height: 2 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas") as HTMLCanvasElement;
+        const ctx = canvas.getContext("2d") as any;
+
+        const mergedStrokeRects = ctx
+            .__getEvents()
+            .filter((event: any) => event.type === "strokeRect")
+            .filter(
+                (event: any) =>
+                    event.props?.x === 0.5 &&
+                    event.props?.y === 36.5 &&
+                    event.props?.width === 120 &&
+                    event.props?.height === 96
+            );
+
+        const rawRangeStrokeRects = ctx
+            .__getEvents()
+            .filter((event: any) => event.type === "strokeRect")
+            .filter(
+                (event: any) =>
+                    event.props?.x === 0.5 &&
+                    event.props?.y === 68.5 &&
+                    event.props?.width === 120 &&
+                    event.props?.height === 64
+            );
+
+        expect(mergedStrokeRects).toHaveLength(1);
+        expect(rawRangeStrokeRects).toHaveLength(0);
+    });
+
+    test("Focus ring expands to both column span and row span bounds", async () => {
+        vi.useFakeTimers();
+
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={spanAndRowSpanSelectionCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 1],
+                        range: { x: 0, y: 1, width: 1, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas") as HTMLCanvasElement;
+        const ctx = canvas.getContext("2d") as any;
+
+        const mergedFocusRects = ctx
+            .__getEvents()
+            .filter((event: any) => event.type === "strokeRect")
+            .filter(
+                (event: any) =>
+                    event.props?.x === 0.5 &&
+                    event.props?.y === 36.5 &&
+                    event.props?.width === 239 &&
+                    event.props?.height === 96
+            );
+        const singleColumnFocusRects = ctx
+            .__getEvents()
+            .filter((event: any) => event.type === "strokeRect")
+            .filter(
+                (event: any) =>
+                    event.props?.x === 0.5 &&
+                    event.props?.y === 36.5 &&
+                    event.props?.width === 120 &&
+                    event.props?.height === 96
+            );
+
+        expect(mergedFocusRects).toHaveLength(1);
+        expect(singleColumnFocusRects).toHaveLength(0);
+    });
+
+    test("Row-span outline expansion only scans boundary cells", () => {
+        const spy = vi.fn(
+            (_cell: Item): InnerGridCell => ({
+                kind: GridCellKind.Text,
+                allowOverlay: false,
+                data: "x",
+                displayData: "x",
+            })
+        );
+
+        expect(
+            expandSelectionOutlineToCellBounds(
+                {
+                    x: 0,
+                    y: 0,
+                    width: 100,
+                    height: 100,
+                },
+                spy,
+                100,
+                100
+            )
+        ).toEqual([
+            {
+                x: 0,
+                y: 0,
+                width: 100,
+                height: 100,
+            },
+        ]);
+
+        expect(spy).toHaveBeenCalledTimes(396);
+    });
+
+    test("Row-span outline expansion keeps fully contained merged cells rectangular", () => {
+        const spy = vi.fn(([col, row]: Item): InnerGridCell => {
+            if (col === 0 && row < 2) {
+                return {
+                    kind: GridCellKind.Text,
+                    allowOverlay: false,
+                    data: "x",
+                    displayData: "x",
+                    rowSpan: 2,
+                    rowSpanOffset: row,
+                };
+            }
+
+            return {
+                kind: GridCellKind.Text,
+                allowOverlay: false,
+                data: "x",
+                displayData: "x",
+            };
+        });
+
+        expect(
+            expandSelectionOutlineToCellBounds(
+                {
+                    x: 0,
+                    y: 0,
+                    width: 3,
+                    height: 3,
+                },
+                spy,
+                3,
+                3
+            )
+        ).toEqual([
+            {
+                x: 0,
+                y: 0,
+                width: 3,
+                height: 3,
+            },
+        ]);
+
+        expect(spy).toHaveBeenCalledTimes(8);
+    });
+
+    test("Row-span outline expansion avoids full scans when boundary cells expand outside a large range", () => {
+        const spy = vi.fn(([col, row]: Item): InnerGridCell => {
+            if (col === 10 && row >= 5 && row < 10) {
+                return {
+                    kind: GridCellKind.Text,
+                    allowOverlay: false,
+                    data: "x",
+                    displayData: "x",
+                    rowSpan: 5,
+                    rowSpanOffset: row - 5,
+                };
+            }
+
+            return {
+                kind: GridCellKind.Text,
+                allowOverlay: false,
+                data: "x",
+                displayData: "x",
+            };
+        });
+
+        expect(
+            expandSelectionOutlineToCellBounds(
+                {
+                    x: 0,
+                    y: 8,
+                    width: 50,
+                    height: 1000,
+                },
+                spy,
+                50,
+                1008
+            )
+        ).toEqual([
+            {
+                x: 0,
+                y: 5,
+                width: 50,
+                height: 1003,
+            },
+        ]);
+
+        expect(spy.mock.calls.length).toBeLessThan(5_000);
+    });
+
+    test("Row-span range selection keeps the current merged block background highlighted", async () => {
+        vi.useFakeTimers();
+
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanSelectionCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 1],
+                        range: { x: 0, y: 1, width: 2, height: 2 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas") as HTMLCanvasElement;
+        const ctx = canvas.getContext("2d") as any;
+
+        const mergedBlockFillRects = ctx
+            .__getEvents()
+            .filter((event: any) => event.type === "fillRect")
+            .filter(
+                (event: any) =>
+                    event.props?.x === 0 &&
+                    [36, 68, 100].includes(event.props?.y) &&
+                    event.props?.width === 120 &&
+                    event.props?.height === 32
+            );
+
+        expect(mergedBlockFillRects.length).toBeGreaterThan(0);
+    });
+
+    test("Header clicks do not add column selection when columnSelect is none in row-span mode", async () => {
+        const headerSpy = vi.fn();
+        const selectionSpy = vi.fn();
+        vi.useFakeTimers();
+
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanSelectionCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                cellRowSelectionBehavior="row-span"
+                columnSelect="none"
+                onHeaderClicked={headerSpy}
+                onGridSelectionChange={selectionSpy}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 60,
+            clientY: 36 + 32 + 16,
+        });
+
+        expect(selectionSpy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.fromSingleSelection([0, 3]),
+            current: {
+                cell: [0, 1],
+                range: { x: 0, y: 1, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+
+        selectionSpy.mockClear();
+
+        sendClick(canvas, {
+            clientX: 60,
+            clientY: 16,
+        });
+
+        expect(headerSpy).toHaveBeenCalledWith(0, expect.anything());
+        expect(selectionSpy).not.toHaveBeenCalled();
+    });
+
+    test("Row-span grouping story supports ctrl multi-select", async () => {
+        vi.useFakeTimers();
+        render(<RowSpanGrouping />, { wrapper: Context });
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+
+        sendClick(canvas, {
+            clientX: 56 + 70,
+            clientY: 30 + 38 + 38 + 19,
+        });
+
+        sendClick(canvas, {
+            ctrlKey: true,
+            clientX: 56 + 70,
+            clientY: 30 + 38 + 38 * 8 + 19,
+        });
+
+        expect(document.body.textContent).toContain("gridSelection.rows -> [0, 1, 2, 3, 4, 5, 6, 7, 8]");
+    });
+
+    test("Row-span grouping story supports shift range select", async () => {
+        vi.useFakeTimers();
+        render(<RowSpanGrouping />, { wrapper: Context });
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+
+        sendClick(canvas, {
+            clientX: 56 + 70,
+            clientY: 30 + 38 + 38 + 19,
+        });
+
+        sendClick(canvas, {
+            shiftKey: true,
+            clientX: 56 + 70,
+            clientY: 30 + 38 + 38 * 10 + 19,
+        });
+
+        expect(document.body.textContent).toContain("gridSelection.rows -> [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]");
+    });
+
+    test("Row-span grouping story toggles row selection when clicking the same body cell twice", async () => {
+        vi.useFakeTimers();
+        render(<RowSpanGrouping />, { wrapper: Context });
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+
+        sendClick(canvas, {
+            clientX: 56 + 70,
+            clientY: 30 + 38 + 38 + 19,
+        });
+
+        expect(document.body.textContent).not.toContain("gridSelection.rows -> []");
+
+        sendClick(canvas, {
+            clientX: 56 + 70,
+            clientY: 30 + 38 + 38 + 19,
+        });
+
+        expect(document.body.textContent).toContain("gridSelection.rows -> []");
+    });
+
+    test("Row-span grouping story draws merged text once per visible merged block", async () => {
+        vi.useFakeTimers();
+        render(<RowSpanGrouping />, { wrapper: Context });
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas") as HTMLCanvasElement;
+        const ctx = canvas.getContext("2d") as any;
+        ctx.__clearEvents();
+
+        sendClick(canvas, {
+            clientX: 56 + 70,
+            clientY: 30 + 38 + 19,
+        });
+
+        const events = ctx.__getEvents().filter((event: any) => event.type === "fillText");
+        const targetTextEvents = events.filter((event: any) => event.props?.text === "资管行业配置");
+
+        expect(targetTextEvents).toHaveLength(1);
+    });
+
+    test("Row-span grouping story draws merged outline once on the main canvas", async () => {
+        vi.useFakeTimers();
+        render(<RowSpanGrouping />, { wrapper: Context });
+        prep();
+
+        const canvases = [...document.querySelectorAll("canvas")] as HTMLCanvasElement[];
+        const mainCanvas = canvases[0];
+        const mainCtx = mainCanvas.getContext("2d") as any;
+        mainCtx.__clearEvents();
+
+        sendClick(mainCanvas, {
+            clientX: 56 + 120,
+            clientY: 30 + 38 + 38 + 19,
+        });
+
+        const strokeRects = mainCtx
+            .__getEvents()
+            .filter((event: any) => event.type === "strokeRect")
+            .filter(
+                (event: any) =>
+                    event.props?.x === 56.5 &&
+                    event.props?.y === 68.5 &&
+                    event.props?.width === 140 &&
+                    event.props?.height === 266
+            );
+
+        expect(strokeRects).toHaveLength(1);
+    });
+
     test("Shift click row marker", async () => {
         const spy = vi.fn();
         vi.useFakeTimers();
@@ -3361,6 +5079,45 @@ describe("data-editor", () => {
         expect(multiSpy).toHaveBeenCalled();
     });
 
+    test("Fill right does not write ordinary cells inside the row-span outline bounding box", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={rowSpanSelectionColumns}
+                getCellContent={rowSpanEditableCell}
+                rows={6}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+                keybindings={{
+                    rightFill: true,
+                }}
+                onCellEdited={spy}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [0, 1],
+                        range: { x: 0, y: 1, width: 2, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        fireEvent.keyDown(screen.getByTestId("data-grid-canvas"), {
+            keyCode: 82,
+            ctrlKey: true,
+        });
+
+        expect(spy.mock.calls.map(call => call[0])).toEqual([[1, 1]]);
+    });
+
     test("Clear selection", async () => {
         const spy = vi.fn();
         vi.useFakeTimers();
@@ -3423,6 +5180,154 @@ describe("data-editor", () => {
         });
 
         expect(spy).toBeCalledTimes(10);
+    });
+
+    test("Delete range ignores co-selected rows when a body cell range is active", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                onCellEdited={spy}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.fromSingleSelection([2, 7]),
+                    current: {
+                        cell: [1, 2],
+                        range: { x: 1, y: 2, width: 2, height: 5 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        fireEvent.keyDown(screen.getByTestId("data-grid-canvas"), {
+            key: "Delete",
+        });
+
+        expect(spy).toBeCalledTimes(10);
+    });
+
+    test("Delete keeps explicitly keyboard-selected rows with an active current cell", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                onCellEdited={spy}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.fromSingleSelection(3),
+                    current: {
+                        cell: [1, 2],
+                        range: { x: 1, y: 2, width: 1, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        fireEvent.keyDown(screen.getByTestId("data-grid-canvas"), {
+            key: "Delete",
+        });
+
+        expect(spy.mock.calls.map(call => call[0])).toEqual([
+            [1, 2],
+            [1, 3],
+            [2, 3],
+            [3, 3],
+            [7, 3],
+            [8, 3],
+            [9, 3],
+            [10, 3],
+        ]);
+    });
+
+    test("Delete keeps ordinary large selections on the mutation fast path", async () => {
+        const editSpy = vi.fn();
+        const cellSpy = vi.fn(
+            (cell: Item): GridCell => ({
+                kind: GridCellKind.Text,
+                allowOverlay: true,
+                readonly: false,
+                data: `${cell[0]}, ${cell[1]}`,
+                displayData: `${cell[0]}, ${cell[1]}`,
+            })
+        );
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                getCellContent={cellSpy}
+                rows={1000}
+                onCellEdited={editSpy}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [1, 20],
+                        range: { x: 1, y: 20, width: 10, height: 980 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+        cellSpy.mockClear();
+
+        fireEvent.keyDown(screen.getByTestId("data-grid-canvas"), {
+            key: "Delete",
+        });
+
+        expect(editSpy).toHaveBeenCalled();
+        expect(cellSpy.mock.calls.length).toBeLessThan(16_000);
+    });
+
+    test("Delete passes ordinary selections to onDelete without row-span normalization", async () => {
+        const deleteSpy = vi.fn(sel => false);
+        const selection = {
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.empty(),
+            current: {
+                cell: [1, 20] as Item,
+                range: { x: 1, y: 20, width: 10, height: 980 },
+                rangeStack: [{ x: 0, y: 5, width: 1, height: 1 }],
+            },
+        };
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                rows={1000}
+                onDelete={deleteSpy}
+                gridSelection={selection}
+                onRowAppended={undefined}
+                trailingRowOptions={undefined}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        fireEvent.keyDown(screen.getByTestId("data-grid-canvas"), {
+            key: "Delete",
+        });
+
+        expect(deleteSpy).toHaveBeenCalledWith(selection);
     });
 
     test("Click out of bounds", async () => {

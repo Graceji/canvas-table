@@ -124,7 +124,7 @@ export function useSelectionBehavior(
     const setSelectedRowsAndCell = React.useCallback(
         (
             newRows: CompactSelection | undefined,
-            value: NonNullable<GridSelection["current"]> | undefined,
+            value: NonNullable<GridSelection["current"]> | null | undefined,
             append: Slice | number | undefined,
             allowMixed: boolean,
             trigger: SelectionTrigger = "click"
@@ -137,7 +137,7 @@ export function useSelectionBehavior(
             if (rowBehavior === "exclusive" && newRows.length > 0) {
                 newVal = {
                     current:
-                        value === undefined
+                        value === undefined || value === null
                             ? undefined
                             : {
                                   ...value,
@@ -154,6 +154,8 @@ export function useSelectionBehavior(
                     current:
                         value === undefined
                             ? current
+                            : value === null
+                              ? undefined
                             : ({
                                   ...current,
                                   ...value,

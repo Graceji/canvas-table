@@ -2,7 +2,12 @@
 /* eslint-disable unicorn/no-for-loop */
 import { type Rectangle } from "../data-grid-types.js";
 import { CellSet } from "../cell-set.js";
-import { getEffectiveColumns, type MappedGridColumn, rectBottomRight } from "./data-grid-lib.js";
+import {
+    getEffectiveColumns,
+    type MappedGridColumn,
+    rectBottomRight,
+    getEffectiveCurrentRange,
+} from "./data-grid-lib.js";
 import { blend } from "../color-parser.js";
 import { assert } from "../../../common/support.js";
 import type { DrawGridArg } from "./draw-grid-arg.js";
@@ -166,6 +171,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
         renderStateProvider,
         getCellRenderer,
         renderStrategy,
+        disableBlit,
         bufferACtx,
         bufferBCtx,
         damage,
@@ -180,7 +186,10 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
     const dpr = Math.min(maxScaleFactor, Math.ceil(window.devicePixelRatio ?? 1));
 
     // if we are double buffering we need to make sure we can blit. If we can't we need to redraw the whole thing
-    const canBlit = renderStrategy !== "direct" && computeCanBlit(arg, lastArg);
+    // rowSpan 的多行 outline 在滚动时会随着可见区域裁剪发生变化
+    // 如果继续复用上一帧做 blit，旧的边框像素可能被带进新位置，出现“残线 / 半条线 / 直接消失”的问题
+    // 这类场景退回全量重绘，优先保证视觉正确
+    const canBlit = disableBlit !== true && renderStrategy !== "direct" && computeCanBlit(arg, lastArg);
 
     const canvas = canvasCtx.canvas;
 
@@ -433,6 +442,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
                 translateY,
                 cellYOffset,
                 rows,
+                typeof rowHeight === "number" ? rowHeight : undefined,
                 getRowHeight,
                 getCellContent,
                 getGroupDetails,
@@ -461,12 +471,17 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             );
 
             const selectionCurrent = selection.current;
+            const effectiveSelectionRange =
+                selectionCurrent === undefined
+                    ? undefined
+                    : getEffectiveCurrentRange(selectionCurrent, getCellContent, rows);
 
             if (
-                (fillHandle !== false && fillHandle !== undefined) &&
+                fillHandle !== false &&
+                fillHandle !== undefined &&
                 drawFocus &&
-                selectionCurrent !== undefined &&
-                damage.has(rectBottomRight(selectionCurrent.range))
+                effectiveSelectionRange !== undefined &&
+                damage.has(rectBottomRight(effectiveSelectionRange))
             ) {
                 drawFillHandle(
                     ctx,
@@ -608,8 +623,11 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             freezeTrailingRows,
             rows,
             highlightRegions,
-            theme
+            theme,
+            false
         );
+        // highlight ring 先只计算、不立即绘制
+        // 中间还有 overdraw/focus/fillHandle 等后续步骤，提前落笔会被覆盖掉边缘，尤其是 merged outline
         // the overdraw may have nuked out our focus ring right edge.
         const focusRedraw = drawFocus
             ? drawFillHandle(
@@ -655,6 +673,7 @@ export function drawGrid(arg: DrawGridArg, lastArg: DrawGridArg | undefined) {
             translateY,
             cellYOffset,
             rows,
+            typeof rowHeight === "number" ? rowHeight : undefined,
             getRowHeight,
             getCellContent,
             getGroupDetails,

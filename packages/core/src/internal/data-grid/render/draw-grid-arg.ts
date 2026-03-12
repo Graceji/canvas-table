@@ -78,6 +78,7 @@ export interface DrawGridArg {
     readonly maxScaleFactor: number;
     readonly touchMode: boolean;
     readonly renderStrategy: "single-buffer" | "double-buffer" | "direct";
+    readonly disableBlit?: boolean;
     readonly enqueue: EnqueueCallback;
     readonly renderStateProvider: RenderStateProvider;
     readonly getCellRenderer: GetCellRendererCallback;

@@ -65,6 +65,128 @@ export interface Highlight {
     readonly color: string;
     readonly range: Rectangle;
     readonly style?: "dashed" | "solid" | "no-outline" | "solid-outline";
+    readonly requiresFullRedraw?: boolean;
+}
+
+interface RowSpanDrawContentInfo {
+    readonly drawContent: boolean;
+    readonly rect?: Rectangle;
+    readonly clip?: Rectangle;
+}
+
+function getRowSpanDrawContentInfo(
+    cell: InnerGridCell,
+    row: number,
+    x: number,
+    y: number,
+    width: number,
+    cellYOffset: number,
+    rows: number,
+    isSticky: boolean,
+    rowHeight: number | undefined,
+    getRowHeightSum: (start: number, end: number) => number
+): RowSpanDrawContentInfo | undefined {
+    const rowSpan = cell.rowSpan ?? 1;
+    if (rowSpan <= 1) {
+        return undefined;
+    }
+
+    const anchorRow = Math.max(0, row - (cell.rowSpanOffset ?? 0));
+    const spanEndRow = Math.min(rows, anchorRow + rowSpan);
+    const firstVisibleRowInSpan = isSticky ? anchorRow : Math.max(anchorRow, cellYOffset);
+
+    if (row !== firstVisibleRowInSpan) {
+        return {
+            drawContent: false,
+        };
+    }
+
+    let hiddenAboveHeight: number;
+    let totalHeight: number;
+    if (rowHeight !== undefined) {
+        hiddenAboveHeight = (firstVisibleRowInSpan - anchorRow) * rowHeight;
+        totalHeight = (spanEndRow - anchorRow) * rowHeight;
+    } else {
+        hiddenAboveHeight = getRowHeightSum(anchorRow, firstVisibleRowInSpan);
+        totalHeight = getRowHeightSum(anchorRow, spanEndRow);
+    }
+
+    return {
+        drawContent: true,
+        rect: {
+            x,
+            y: y - hiddenAboveHeight,
+            width,
+            height: totalHeight,
+        },
+        // 只在当前可见的合并块区域内放行默认内容绘制，避免上下视口切换时重复落字
+        clip: {
+            x,
+            y,
+            width,
+            height: totalHeight - hiddenAboveHeight,
+        },
+    };
+}
+
+function getThemeSourceRow(cell: InnerGridCell, row: number): number {
+    return Math.max(0, row - (cell.rowSpanOffset ?? 0));
+}
+
+function getThemeSourceCell(
+    cell: InnerGridCell,
+    col: number,
+    row: number,
+    getCellContent: (cell: Item) => InnerGridCell
+): InnerGridCell {
+    const themeSourceRow = getThemeSourceRow(cell, row);
+    return themeSourceRow === row ? cell : getCellContent([col, themeSourceRow]);
+}
+
+function hoverMatchesCell(hoveredItem: Item | undefined, col: number, row: number, cell: InnerGridCell): boolean {
+    if (hoveredItem === undefined || hoveredItem[0] !== col) return false;
+
+    const rowSpan = cell.rowSpan ?? 1;
+    if (rowSpan <= 1) {
+        return hoveredItem[1] === row;
+    }
+
+    const anchorRow = row - (cell.rowSpanOffset ?? 0);
+    return hoveredItem[1] >= anchorRow && hoveredItem[1] < anchorRow + rowSpan;
+}
+
+function findHoverValueForCell(
+    hoverValues: HoverValues,
+    col: number,
+    row: number,
+    cell: InnerGridCell
+): HoverValues[number] | undefined {
+    for (let i = 0; i < hoverValues.length; i++) {
+        const hv = hoverValues[i];
+        if (hoverMatchesCell(hv.item, col, row, cell)) {
+            return hv;
+        }
+    }
+
+    return undefined;
+}
+
+function intersectRectangle(a: Rectangle, b: Rectangle): Rectangle | undefined {
+    const x = Math.max(a.x, b.x);
+    const y = Math.max(a.y, b.y);
+    const right = Math.min(a.x + a.width, b.x + b.width);
+    const bottom = Math.min(a.y + a.height, b.y + b.height);
+
+    if (right <= x || bottom <= y) {
+        return undefined;
+    }
+
+    return {
+        x,
+        y,
+        width: right - x,
+        height: bottom - y,
+    };
 }
 
 // preppable items:
@@ -90,6 +212,7 @@ export function drawCells(
     translateY: number,
     cellYOffset: number,
     rows: number,
+    rowHeight: number | undefined,
     getRowHeight: (row: number) => number,
     getCellContent: (cell: Item) => InnerGridCell,
     getGroupDetails: GroupDetailsCallback,
@@ -118,6 +241,11 @@ export function drawCells(
 ): Rectangle[] | undefined {
     let toDraw = damage?.size ?? Number.MAX_SAFE_INTEGER;
     const frameTime = performance.now();
+    const hasRangeSelection =
+        selection.current !== undefined &&
+        (selection.current.range.width > 1 ||
+            selection.current.range.height > 1 ||
+            selection.current.rangeStack.length > 0);
     let font = outerTheme.baseFontFull;
     ctx.font = font;
     const deprepArg = { ctx };
@@ -126,6 +254,21 @@ export function drawCells(
         freezeTrailingRows > 0 ? getFreezeTrailingHeight(rows, freezeTrailingRows, getRowHeight) : 0;
     let result: Rectangle[] | undefined;
     let handledSpans: Set<string> | undefined = undefined;
+    const rowHeightSumCache = new Map<string, number>();
+    const getRowHeightSum = (start: number, end: number): number => {
+        if (start >= end) return 0;
+
+        const key = `${start}:${end}`;
+        const cached = rowHeightSumCache.get(key);
+        if (cached !== undefined) return cached;
+
+        let sum = 0;
+        for (let row = start; row < end; row++) {
+            sum += getRowHeight(row);
+        }
+        rowHeightSumCache.set(key, sum);
+        return sum;
+    };
 
     const skipPoint = getSkipPoint(drawRegions);
 
@@ -175,6 +318,7 @@ export function drawCells(
             }
             reclip();
             let prepResult: PrepResult | undefined = undefined;
+            const deferredRowSpanDraws: Array<() => void> = [];
 
             walkRowsInCol(
                 startRow,
@@ -268,15 +412,21 @@ export function drawCells(
                         }
                     }
 
-                    const rowTheme = getRowThemeOverride?.(row);
+                    const themeSourceRow = getThemeSourceRow(cell, row);
+                    // rowSpan 的背景来源需要跟随锚点单元格，而不是当前物理行
+                    // 否则外层如果把斑马纹挂在 cell.themeOverride 上，同一个合并块仍然会被逐行切开
+                    const themeSourceCell = getThemeSourceCell(cell, c.sourceIndex, row, getCellContent);
+                    const rowTheme = getRowThemeOverride?.(themeSourceRow);
                     const trailingTheme =
                         isTrailingRow && c.trailingRowOptions?.themeOverride !== undefined
                             ? c.trailingRowOptions?.themeOverride
                             : undefined;
                     const theme =
-                        cell.themeOverride === undefined && rowTheme === undefined && trailingTheme === undefined
+                        themeSourceCell.themeOverride === undefined &&
+                        rowTheme === undefined &&
+                        trailingTheme === undefined
                             ? colTheme
-                            : mergeAndRealizeTheme(colTheme, rowTheme, trailingTheme, cell.themeOverride); //alloc
+                            : mergeAndRealizeTheme(colTheme, rowTheme, trailingTheme, themeSourceCell.themeOverride); //alloc
 
                     ctx.beginPath();
 
@@ -291,10 +441,12 @@ export function drawCells(
                     if (
                         isSelected &&
                         drawFocus &&
+                        !hasRangeSelection &&
                         (cell.allowOverlay === true && cell.readonly === false ? false : !rowSelected)
                     ) {
-                        // 绘制focus边框: 单元格选中，但是行没有选中时，不需要填充accentLight背景色；
-                        // 原本是与focus相关，foucus时不填充背景色，就会导致行选中后，cell失去焦点后，只有边框，没有背景色。
+                        // 绘制focus边框: 单元格选中，但是行没有选中时，不需要填充accentLight背景色
+                        // 这里仍然只针对“单格 focus”生效
+                        // 如果已经进入 range 选中，当前格也应继续保留背景，否则会出现大块发白、与外框不同步的问题
                         accentCount = 0;
                     } else if (isSelected && drawFocus) {
                         accentCount = Math.max(accentCount, 1);
@@ -323,9 +475,9 @@ export function drawCells(
                     }
 
                     const bgCell =
-                        cell.kind === GridCellKind.Protected
+                        themeSourceCell.kind === GridCellKind.Protected
                             ? theme.bgCellMedium
-                            : cell.readonly === false
+                            : themeSourceCell.readonly === false
                               ? theme.editBgCell
                               : theme.bgCell;
                     let fill: string | undefined;
@@ -371,6 +523,18 @@ export function drawCells(
                         }
                     }
 
+                    const rowSpanDrawContentInfo = getRowSpanDrawContentInfo(
+                        cell,
+                        row,
+                        cellX,
+                        drawY,
+                        cellWidth,
+                        cellYOffset,
+                        rows,
+                        isSticky,
+                        rowHeight,
+                        getRowHeightSum
+                    );
                     let didDamageClip = false;
                     if (damage !== undefined) {
                         // we want to clip each cell individually rather than form a super clip region. The reason for
@@ -424,14 +588,7 @@ export function drawCells(
                         ctx.globalAlpha = 0.6;
                     }
 
-                    let hoverValue: HoverValues[number] | undefined;
-                    for (let i = 0; i < hoverValues.length; i++) {
-                        const hv = hoverValues[i];
-                        if (hv.item[0] === c.sourceIndex && hv.item[1] === row) {
-                            hoverValue = hv;
-                            break;
-                        }
-                    }
+                    const hoverValue = findHoverValueForCell(hoverValues, c.sourceIndex, row, cell);
 
                     if (cellWidth > minimumCellWidth && !skipContents) {
                         const cellFont = theme.baseFontFull;
@@ -439,33 +596,123 @@ export function drawCells(
                             ctx.font = cellFont;
                             font = cellFont;
                         }
-                        prepResult = drawCell(
-                            ctx,
-                            cell,
-                            c.sourceIndex,
-                            row,
-                            isLastColumn,
-                            isLastRow,
-                            cellX,
-                            drawY,
-                            cellWidth,
-                            rh,
-                            accentCount > 0,
-                            theme,
-                            fill ?? theme.bgCell,
-                            imageLoader,
-                            spriteManager,
-                            hoverValue?.hoverAmount ?? 0,
-                            hoverInfo,
-                            hyperWrapping,
-                            frameTime,
-                            drawCellCallback,
-                            prepResult,
-                            enqueue,
-                            renderStateProvider,
-                            getCellRenderer,
-                            overrideCursor
-                        );
+                        if ((cell.rowSpan ?? 1) > 1 && rowSpanDrawContentInfo?.drawContent === true) {
+                            const anchorRow = row - (cell.rowSpanOffset ?? 0);
+                            const spanEnd = Math.min(rows, anchorRow + (cell.rowSpan ?? 1));
+                            const fullyRowSpanSelected = selection.rows.hasAll([anchorRow, spanEnd]);
+                            const rowSpanHasDirectCellSelection =
+                                isSelected || cellIsInRange(cellIndex, cell, selection, drawFocus) > 0;
+                            const deferredCell = cell;
+                            const deferredCol = c.sourceIndex;
+                            const deferredRow = row;
+                            const deferredX = cellX;
+                            const deferredY = drawY;
+                            const deferredW = cellWidth;
+                            const deferredH = rh;
+                            const deferredHighlighted = rowSpanHasDirectCellSelection || fullyRowSpanSelected;
+                            const deferredTheme = theme;
+                            const deferredFill = fill ?? theme.bgCell;
+                            const deferredHoverAmount = hoverValue?.hoverAmount ?? 0;
+                            const deferredSourceClip = rowSpanDrawContentInfo.clip;
+                            let deferredClip = deferredSourceClip;
+                            if (deferredSourceClip !== undefined) {
+                                const spanClipOffset = drawingSpan ? Math.max(0, clipX - cellX) : 0;
+                                const activeClip = {
+                                    x: drawingSpan ? cellX + spanClipOffset : colDrawX,
+                                    y: deferredSourceClip.y,
+                                    width: drawingSpan ? cellWidth - spanClipOffset : colWidth,
+                                    height: deferredSourceClip.height,
+                                };
+                                deferredClip = intersectRectangle(deferredSourceClip, activeClip);
+                            }
+
+                            // 合并块文本/自定义内容放到本列所有小格背景都画完之后再补，
+                            // 避免后续 offset 行的背景把已经绘制的内容重新盖掉
+                            if (deferredSourceClip === undefined || deferredClip !== undefined) {
+                                const deferredOuterClip = deferredClip;
+                                const deferredRowSpanInfo =
+                                    deferredClip === deferredSourceClip
+                                        ? rowSpanDrawContentInfo
+                                        : {
+                                              ...rowSpanDrawContentInfo,
+                                              clip: deferredClip,
+                                          };
+
+                                deferredRowSpanDraws.push(() => {
+                                    ctx.save();
+                                    if (deferredOuterClip !== undefined) {
+                                        ctx.beginPath();
+                                        ctx.rect(
+                                            deferredOuterClip.x,
+                                            deferredOuterClip.y,
+                                            deferredOuterClip.width,
+                                            deferredOuterClip.height
+                                        );
+                                        ctx.clip();
+                                    }
+
+                                    const deferredPrep = drawCell(
+                                        ctx,
+                                        deferredCell,
+                                        deferredCol,
+                                        deferredRow,
+                                        isLastColumn,
+                                        isLastRow,
+                                        deferredX,
+                                        deferredY,
+                                        deferredW,
+                                        deferredH,
+                                        deferredHighlighted,
+                                        deferredTheme,
+                                        deferredFill,
+                                        imageLoader,
+                                        spriteManager,
+                                        deferredHoverAmount,
+                                        hoverInfo,
+                                        hyperWrapping,
+                                        frameTime,
+                                        drawCellCallback,
+                                        undefined,
+                                        enqueue,
+                                        renderStateProvider,
+                                        getCellRenderer,
+                                        overrideCursor,
+                                        deferredRowSpanInfo
+                                    );
+                                    deferredPrep?.deprep?.(deprepArg);
+                                    ctx.restore();
+                                });
+                            }
+                        } else {
+                            prepResult = drawCell(
+                                ctx,
+                                cell,
+                                c.sourceIndex,
+                                row,
+                                isLastColumn,
+                                isLastRow,
+                                cellX,
+                                drawY,
+                                cellWidth,
+                                rh,
+                                accentCount > 0,
+                                theme,
+                                fill ?? theme.bgCell,
+                                imageLoader,
+                                spriteManager,
+                                hoverValue?.hoverAmount ?? 0,
+                                hoverInfo,
+                                hyperWrapping,
+                                frameTime,
+                                drawCellCallback,
+                                prepResult,
+                                enqueue,
+                                renderStateProvider,
+                                getCellRenderer,
+                                overrideCursor,
+                                rowSpanDrawContentInfo
+                            );
+                        }
                     }
 
                     if (didDamageClip) {
@@ -491,6 +738,11 @@ export function drawCells(
             );
 
             ctx.restore();
+
+            for (const drawDeferredRowSpan of deferredRowSpanDraws) {
+                drawDeferredRowSpan();
+            }
+
             return toDraw <= 0;
         }
     );
@@ -532,11 +784,16 @@ export function drawCell(
     enqueue: EnqueueCallback | undefined,
     renderStateProvider: RenderStateProvider,
     getCellRenderer: GetCellRendererCallback,
-    overrideCursor: (cursor: GridMouseCursor) => void
+    overrideCursor: (cursor: GridMouseCursor) => void,
+    rowSpanDrawContentInfo?: RowSpanDrawContentInfo
 ): PrepResult | undefined {
+    if (rowSpanDrawContentInfo?.drawContent === false) {
+        return lastPrep;
+    }
+
     let hoverX: number | undefined;
     let hoverY: number | undefined;
-    if (hoverInfo !== undefined && hoverInfo[0][0] === col && hoverInfo[0][1] === row) {
+    if (hoverInfo !== undefined && hoverMatchesCell(hoverInfo[0], col, row, cell)) {
         hoverX = hoverInfo[1][0];
         hoverY = hoverInfo[1][1];
     }
@@ -576,7 +833,14 @@ export function drawCell(
         overrideCursor: hoverX !== undefined ? overrideCursor : undefined,
         requestAnimationFrame: animRequest,
     };
-    const needsAnim = drawLastUpdateUnderlay(args, cell.lastUpdated, frameTime, lastPrep, isLastCol, isLastRow);
+    const drawArgs =
+        rowSpanDrawContentInfo?.rect === undefined
+            ? args
+            : {
+                  ...args,
+                  rect: rowSpanDrawContentInfo.rect,
+              };
+    const needsAnim = drawLastUpdateUnderlay(drawArgs, cell.lastUpdated, frameTime, lastPrep, isLastCol, isLastRow);
 
     const r = getCellRenderer(cell);
     if (r !== undefined) {
@@ -584,11 +848,32 @@ export function drawCell(
             lastPrep?.deprep?.(args);
             lastPrep = undefined;
         }
-        const partialPrepResult = r.drawPrep?.(args, lastPrep);
+        const partialPrepResult = r.drawPrep?.(drawArgs, lastPrep);
+        const drawDefaultContent = () => {
+            if (rowSpanDrawContentInfo?.clip !== undefined) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(
+                    rowSpanDrawContentInfo.clip.x,
+                    rowSpanDrawContentInfo.clip.y,
+                    rowSpanDrawContentInfo.clip.width,
+                    rowSpanDrawContentInfo.clip.height
+                );
+                ctx.clip();
+                r.draw(drawArgs, cell);
+                ctx.restore();
+                return;
+            }
+
+            r.draw(drawArgs, cell);
+        };
+
         if (drawCellCallback !== undefined && !isInnerOnlyCell(args.cell)) {
-            drawCellCallback(args as DrawArgs<GridCell>, () => r.draw(args, cell));
+            // 对 rowSpan 锚点行，把“展开后的真实绘制矩形”透传给 drawCell，
+            // 这样外部回调与内核默认内容都基于同一块大单元格绘制
+            drawCellCallback(drawArgs as DrawArgs<GridCell>, drawDefaultContent);
         } else {
-            r.draw(args, cell);
+            drawDefaultContent();
         }
         result =
             partialPrepResult === undefined

@@ -4,6 +4,8 @@ import {
     computeBounds,
     getColumnIndexForX,
     getEffectiveColumns,
+    getEffectiveCurrentRange,
+    getFreezeTrailingHeight,
     getRowIndexForY,
     getStickyWidth,
     rectBottomRight,
@@ -337,6 +339,10 @@ export interface DataGridProps {
     readonly rowMarkerGroup?: string;
 }
 
+type ResolvedGridMouseEventArgs = GridMouseEventArgs & {
+    readonly resolvedCell?: InnerGridCell;
+};
+
 type DamageUpdateList = readonly {
     cell: Item;
     // newValue: GridCell,
@@ -489,6 +495,144 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     }, [cellYOffset, cellXOffset, translateX, translateY, enableFirefoxRescaling, enableSafariRescaling]);
 
     const mappedColumns = useMappedColumns(columns, freezeColumns);
+    // damage redraw 只会局部重绘，因此这里先缓存当前真正会参与绘制的列范围，
+    // 后面可以快速判断某个 damage 是否会影响到屏幕中的 merged cell / outline
+    const visibleDamageColumns = React.useMemo(
+        () =>
+            new Set(
+                getEffectiveColumns(mappedColumns, cellXOffset, width, dragAndDropState, translateX).map(
+                    x => x.sourceIndex
+                )
+            ),
+        [mappedColumns, cellXOffset, width, dragAndDropState, translateX]
+    );
+    const freezeTrailingRowsHeight = React.useMemo(
+        () => (freezeTrailingRows > 0 ? getFreezeTrailingHeight(rows, freezeTrailingRows, rowHeight) : 0),
+        [freezeTrailingRows, rowHeight, rows]
+    );
+    const lastScrollableDamageRow = React.useMemo(() => {
+        const scrollableRows = rows - freezeTrailingRows;
+        if (scrollableRows <= 0) return undefined;
+
+        const scrollableBottomY = height - freezeTrailingRowsHeight - 1;
+        if (scrollableBottomY < 0) return undefined;
+
+        const row = getRowIndexForY(
+            scrollableBottomY,
+            height,
+            enableGroups,
+            headerHeight,
+            groupHeaderHeight,
+            showFilter ? filterHeight : 0,
+            scrollableRows,
+            rowHeight,
+            cellYOffset,
+            translateY,
+            0
+        );
+
+        if (row === undefined || row < 0) return undefined;
+        return Math.min(row, scrollableRows - 1);
+    }, [
+        cellYOffset,
+        enableGroups,
+        filterHeight,
+        freezeTrailingRows,
+        freezeTrailingRowsHeight,
+        groupHeaderHeight,
+        headerHeight,
+        height,
+        rowHeight,
+        rows,
+        showFilter,
+        translateY,
+    ]);
+    // 屏幕内存在跨多行 outline 时，滚动 blit 仍需要禁用；但局部 damage
+    // 只有真正命中这些 outline 范围时才需要升级成全量重绘
+    const visibleMultiRowOutlineRanges = React.useMemo<readonly Rectangle[]>(() => {
+        if (highlightRegions === undefined || highlightRegions.length === 0) return [];
+
+        const freezeStart = rows - freezeTrailingRows;
+        const visibleStartRow = cellYOffset;
+        const visibleEndRow = lastScrollableDamageRow ?? cellYOffset - 1;
+        const result: Rectangle[] = [];
+
+        for (const region of highlightRegions) {
+            if (region.style !== "solid-outline" || region.requiresFullRedraw !== true) continue;
+
+            const regionStartCol = region.range.x;
+            const regionEndCol = region.range.x + region.range.width - 1;
+            let intersectsVisibleCols = false;
+            for (const col of visibleDamageColumns) {
+                if (col >= regionStartCol && col <= regionEndCol) {
+                    intersectsVisibleCols = true;
+                    break;
+                }
+            }
+
+            if (!intersectsVisibleCols) continue;
+
+            const regionStartRow = region.range.y;
+            const regionEndRow = region.range.y + region.range.height - 1;
+            const intersectsScrollableRows =
+                regionEndRow >= visibleStartRow &&
+                lastScrollableDamageRow !== undefined &&
+                regionStartRow <= visibleEndRow;
+            const intersectsFrozenTrailingRows =
+                freezeTrailingRows > 0 && regionEndRow >= freezeStart && regionStartRow < rows;
+
+            if (intersectsScrollableRows || intersectsFrozenTrailingRows) {
+                result.push(region.range);
+            }
+        }
+
+        return result;
+    }, [highlightRegions, rows, freezeTrailingRows, cellYOffset, lastScrollableDamageRow, visibleDamageColumns]);
+    const hasVisibleMultiRowOutlineHighlight = visibleMultiRowOutlineRanges.length > 0;
+    const visibleRowSpanRanges = React.useMemo(() => {
+        if (rows <= 0) return [];
+
+        const freezeStart = rows - freezeTrailingRows;
+        const firstVisibleRow = Math.max(0, cellYOffset);
+        const lastScrollableRow =
+            lastScrollableDamageRow === undefined ? undefined : Math.min(freezeStart - 1, lastScrollableDamageRow);
+        const rowCandidates = new Set<number>();
+        if (lastScrollableRow !== undefined && firstVisibleRow <= lastScrollableRow) {
+            rowCandidates.add(firstVisibleRow);
+            rowCandidates.add(lastScrollableRow);
+        }
+        if (freezeTrailingRows > 0 && freezeStart < rows) {
+            rowCandidates.add(Math.max(0, freezeStart));
+            rowCandidates.add(rows - 1);
+        }
+
+        const result: Array<{ col: number; anchorRow: number; spanEnd: number }> = [];
+        for (const col of visibleDamageColumns) {
+            for (const row of rowCandidates) {
+                try {
+                    const cell = getCellContent([col, row], true);
+                    const rowSpan = cell.rowSpan ?? 1;
+                    const rowSpanOffset = cell.rowSpanOffset ?? 0;
+                    if (rowSpan <= 1 && rowSpanOffset <= 0) continue;
+
+                    const anchorRow = clamp(row - rowSpanOffset, 0, rows - 1);
+                    const spanEnd = Math.min(rows, anchorRow + rowSpan);
+                    const intersectsScrollableRows =
+                        lastScrollableRow !== undefined && spanEnd > firstVisibleRow && anchorRow <= lastScrollableRow;
+                    const intersectsFrozenTrailingRows =
+                        freezeTrailingRows > 0 && spanEnd > freezeStart && anchorRow < rows;
+
+                    if (intersectsScrollableRows || intersectsFrozenTrailingRows) {
+                        result.push({ col, anchorRow, spanEnd });
+                    }
+                } catch {
+                    // Ignore content providers that cannot serve the sampled boundary cell.
+                }
+            }
+        }
+
+        return result;
+    }, [cellYOffset, freezeTrailingRows, getCellContent, lastScrollableDamageRow, rows, visibleDamageColumns]);
     const stickyX = React.useMemo(
         () => (fixedShadowX ? getStickyWidth(mappedColumns, dragAndDropState) : 0),
         [mappedColumns, dragAndDropState, fixedShadowX]
@@ -555,13 +699,53 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         ]
     );
 
+    const getBoundsForBodyCell = React.useCallback(
+        (canvas: HTMLCanvasElement, col: number, row: number, cell?: InnerGridCell): Rectangle | undefined => {
+            const baseBounds = getBoundsForItem(canvas, col, row);
+            if (baseBounds === undefined || col < 0 || row < 0 || row >= rows) {
+                return baseBounds;
+            }
+
+            try {
+                const resolvedCell = cell ?? getCellContent([col, row]);
+                const colSpan = resolvedCell.span ?? [col, col];
+                const rowSpan = resolvedCell.rowSpan ?? 1;
+                if (rowSpan <= 1 && colSpan[0] === colSpan[1]) {
+                    return baseBounds;
+                }
+
+                const firstCol = clamp(colSpan[0], 0, mappedColumns.length - 1);
+                const lastCol = clamp(colSpan[1], firstCol, mappedColumns.length - 1);
+                const anchorRow = clamp(row - (resolvedCell.rowSpanOffset ?? 0), 0, rows - 1);
+                const lastRow = clamp(anchorRow + rowSpan - 1, anchorRow, rows - 1);
+                const topLeftBounds = getBoundsForItem(canvas, firstCol, anchorRow);
+                const bottomRightBounds = getBoundsForItem(canvas, lastCol, lastRow);
+
+                if (topLeftBounds === undefined || bottomRightBounds === undefined) {
+                    return baseBounds;
+                }
+
+                return {
+                    ...baseBounds,
+                    x: topLeftBounds.x,
+                    y: topLeftBounds.y,
+                    width: bottomRightBounds.x + bottomRightBounds.width - topLeftBounds.x,
+                    height: bottomRightBounds.y + bottomRightBounds.height - topLeftBounds.y,
+                };
+            } catch {
+                return baseBounds;
+            }
+        },
+        [getBoundsForItem, getCellContent, mappedColumns.length, rows]
+    );
+
     const getMouseArgsForPosition = React.useCallback(
         (
             canvas: HTMLCanvasElement,
             posX: number,
             posY: number,
             ev?: PointerEvent | MouseEvent | TouchEvent
-        ): GridMouseEventArgs => {
+        ): ResolvedGridMouseEventArgs => {
             const rect = canvas.getBoundingClientRect();
             const scale = rect.width / width;
             const x = (posX - rect.left) / scale;
@@ -614,7 +798,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 y < totalHeaderHeight ? -1 : height < y ? 1 : 0,
             ];
 
-            let result: GridMouseEventArgs;
+            let result: ResolvedGridMouseEventArgs;
             if (col === -1 || y < 0 || x < 0 || row === undefined || x > width || y > height) {
                 const horizontal = x > width ? 1 : x < 0 ? -1 : 0;
                 const vertical = y > height ? 1 : y < 0 ? -1 : 0;
@@ -709,7 +893,14 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     };
                 }
             } else {
-                const bounds = getBoundsForItem(canvas, col, row);
+                let resolvedCell: InnerGridCell | undefined;
+                try {
+                    resolvedCell = getCellContent([col, row]);
+                } catch {
+                    resolvedCell = undefined;
+                }
+
+                const bounds = getBoundsForBodyCell(canvas, col, row, resolvedCell);
                 assert(bounds !== undefined);
                 const isEdge = bounds !== undefined && bounds.x + bounds.width - posX < edgeDetectionBuffer;
 
@@ -718,8 +909,16 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     const fillHandleClickSize = fillHandleOptions.size;
                     const half = fillHandleClickSize / 2;
 
-                    const fillHandleLocation = rectBottomRight(selection.current.range);
-                    const fillBounds = getBoundsForItem(canvas, fillHandleLocation[0], fillHandleLocation[1]);
+                    const effectiveCurrentRange = getEffectiveCurrentRange(selection.current, getCellContent, rows);
+                    const fillHandleLocation = rectBottomRight(effectiveCurrentRange);
+                    const selectedCell = getCellContent(selection.current.cell);
+                    const useMergedFillBounds =
+                        (selectedCell.rowSpan ?? 1) > 1 ||
+                        (selectedCell.rowSpanOffset ?? 0) > 0 ||
+                        selectedCell.span !== undefined;
+                    const fillBounds = useMergedFillBounds
+                        ? getBoundsForBodyCell(canvas, fillHandleLocation[0], fillHandleLocation[1])
+                        : getBoundsForItem(canvas, fillHandleLocation[0], fillHandleLocation[1]);
 
                     if (fillBounds !== undefined) {
                         // Handle center sits exactly on the bottom-right corner of the cell.
@@ -749,6 +948,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     button,
                     buttons,
                     scrollEdge,
+                    resolvedCell,
                 };
             }
             return result;
@@ -768,6 +968,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             translateY,
             freezeTrailingRows,
             getBoundsForItem,
+            getBoundsForBodyCell,
+            getCellContent,
             fillHandleOptions,
             selection,
             totalHeaderHeight,
@@ -898,6 +1100,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             enqueue: enqueueRef.current,
             renderStateProvider,
             renderStrategy: experimental?.renderStrategy ?? (browserIsSafari.value ? "double-buffer" : "single-buffer"),
+            disableBlit: hasVisibleMultiRowOutlineHighlight,
             getCellRenderer,
             minimumCellWidth,
             resizeIndicator,
@@ -962,6 +1165,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         drawHeaderCallback,
         prelightCells,
         highlightRegions,
+        hasVisibleMultiRowOutlineHighlight,
         imageLoader,
         spriteManager,
         scrolling,
@@ -991,11 +1195,99 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         void fn();
     }, []);
 
-    const damageInternal = React.useCallback((locations: CellSet) => {
-        damageRegion.current = locations;
-        lastDrawRef.current();
-        damageRegion.current = undefined;
-    }, []);
+    const shouldForceFullRedrawForDamage = React.useCallback(
+        (locations: CellSet) => {
+            for (const cell of locations.values()) {
+                const [col, row] = cell;
+                if (!visibleDamageColumns.has(col)) continue;
+                if (row < 0 || row >= rows) continue;
+
+                const freezeStart = rows - freezeTrailingRows;
+                const isStickyTrailingRow = freezeTrailingRows > 0 && row >= freezeStart;
+                const isVisibleRow =
+                    isStickyTrailingRow ||
+                    (row >= cellYOffset && lastScrollableDamageRow !== undefined && row <= lastScrollableDamageRow);
+
+                if (!isVisibleRow) {
+                    for (const range of visibleRowSpanRanges) {
+                        if (range.col === col && row >= range.anchorRow && row < range.spanEnd) {
+                            return true;
+                        }
+                    }
+                }
+
+                for (const range of visibleMultiRowOutlineRanges) {
+                    if (
+                        col >= range.x &&
+                        col < range.x + range.width &&
+                        row >= range.y &&
+                        row < range.y + range.height
+                    ) {
+                        return true;
+                    }
+                }
+
+                if (!isVisibleRow) continue;
+
+                const content = getCellContent(cell, true);
+                const rowSpan = content.rowSpan ?? 1;
+                const rowSpanOffset = content.rowSpanOffset ?? 0;
+                // 只要 damage 命中了 rowSpan 任意一行，就不能只擦当前小格子
+                // 否则背景、高亮和边框会与真实合并块边界不同步
+                if (rowSpan > 1 || rowSpanOffset > 0) {
+                    const anchorRow = clamp(row - rowSpanOffset, 0, rows - 1);
+                    const spanEnd = Math.min(rows, anchorRow + rowSpan);
+                    const intersectsScrollableRows =
+                        lastScrollableDamageRow !== undefined &&
+                        spanEnd > cellYOffset &&
+                        anchorRow <= lastScrollableDamageRow;
+                    const intersectsFrozenTrailingRows =
+                        freezeTrailingRows > 0 && spanEnd > freezeStart && anchorRow < rows;
+
+                    if (intersectsScrollableRows || intersectsFrozenTrailingRows) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        },
+        [
+            cellYOffset,
+            freezeTrailingRows,
+            getCellContent,
+            lastScrollableDamageRow,
+            rows,
+            visibleDamageColumns,
+            visibleMultiRowOutlineRanges,
+            visibleRowSpanRanges,
+        ]
+    );
+
+    const drawWithDamage = React.useCallback(
+        (locations: CellSet) => {
+            // merged cell / merged outline 命中时退化成全量重绘，
+            // 其它普通场景仍保留原来的高性能局部 damage
+            if (shouldForceFullRedrawForDamage(locations)) {
+                damageRegion.current = undefined;
+                lastArgsRef.current = undefined;
+                lastDrawRef.current();
+                return;
+            }
+
+            damageRegion.current = locations;
+            lastDrawRef.current();
+            damageRegion.current = undefined;
+        },
+        [shouldForceFullRedrawForDamage]
+    );
+
+    const damageInternal = React.useCallback(
+        (locations: CellSet) => {
+            drawWithDamage(locations);
+        },
+        [drawWithDamage]
+    );
 
     const enqueue = useAnimationQueue(damageInternal);
     enqueueRef.current = enqueue;
@@ -1456,12 +1748,14 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     );
     useEventListener("contextmenu", onContextMenuImpl, eventTargetRef?.current ?? null, false);
 
-    const onAnimationFrame = React.useCallback<StepCallback>(values => {
-        damageRegion.current = new CellSet(values.map(x => x.item));
-        hoverValues.current = values;
-        lastDrawRef.current();
-        damageRegion.current = undefined;
-    }, []);
+    const onAnimationFrame = React.useCallback<StepCallback>(
+        values => {
+            hoverValues.current = values;
+            // hover 动画也复用同一套 damage 策略，避免 hover 时再次把合并块边缘擦坏
+            drawWithDamage(new CellSet(values.map(x => x.item)));
+        },
+        [drawWithDamage]
+    );
 
     const animManagerValue = React.useMemo(() => new AnimationManager(onAnimationFrame), [onAnimationFrame]);
     const animationManager = React.useRef(animManagerValue);
@@ -1528,14 +1822,22 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             ) {
                 let needsDamageCell = false;
                 let needsHoverPosition = true;
+                let shouldRefireHover = false;
 
                 if (args.kind === "cell") {
-                    const toCheck = getCellContent(args.location);
+                    const toCheck = args.resolvedCell ?? getCellContent(args.location);
                     const rendererNeeds = getCellRenderer(toCheck)?.needsHoverPosition;
                     // custom cells we will assume need the position if they don't explicitly say they don't, everything
                     // else we will assume doesn't need it.
                     needsHoverPosition = rendererNeeds ?? toCheck.kind === GridCellKind.Custom;
                     needsDamageCell = needsHoverPosition;
+
+                    const sameLocalPosition =
+                        hoveredRef.current?.kind === "cell" &&
+                        hoveredRef.current.localEventX === args.localEventX &&
+                        hoveredRef.current.localEventY === args.localEventY;
+                    shouldRefireHover =
+                        needsHoverPosition && !sameLocalPosition && !(hasRowMarkers === true && args.location[0] === 0);
                 } else {
                     needsDamageCell = true;
                 }
@@ -1543,6 +1845,11 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 const newInfo: typeof hoverInfoRef.current = [args.location, [args.localEventX, args.localEventY]];
                 maybeSetHoveredInfo(newInfo, needsHoverPosition);
                 hoverInfoRef.current = newInfo;
+                hoveredRef.current = args;
+                if (shouldRefireHover) {
+                    setDrawCursorOverride(undefined);
+                    onItemHovered?.(args);
+                }
                 if (needsDamageCell) {
                     damageInternal(new CellSet([args.location]));
                 }
@@ -1591,7 +1898,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             let bounds: Rectangle | undefined;
             let location: Item | undefined = undefined;
             if (selection.current !== undefined) {
-                bounds = getBoundsForItem(canvas, selection.current.cell[0], selection.current.cell[1]);
+                bounds = getBoundsForBodyCell(canvas, selection.current.cell[0], selection.current.cell[1]);
                 location = selection.current.cell;
             }
 
@@ -1610,7 +1917,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 location,
             });
         },
-        [onKeyDown, selection, getBoundsForItem]
+        [onKeyDown, selection, getBoundsForBodyCell]
     );
 
     const onKeyUpImpl = React.useCallback(
@@ -1621,7 +1928,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             let bounds: Rectangle | undefined;
             let location: Item | undefined = undefined;
             if (selection.current !== undefined) {
-                bounds = getBoundsForItem(canvas, selection.current.cell[0], selection.current.cell[1]);
+                bounds = getBoundsForBodyCell(canvas, selection.current.cell[0], selection.current.cell[1]);
                 location = selection.current.cell;
             }
 
@@ -1640,7 +1947,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 location,
             });
         },
-        [onKeyUp, selection, getBoundsForItem]
+        [onKeyUp, selection, getBoundsForBodyCell]
     );
 
     const refImpl = React.useCallback(
@@ -1928,7 +2235,11 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     return undefined;
                 }
 
-                return getBoundsForItem(canvasRef.current, col ?? 0, row ?? -1);
+                const resolvedCol = col ?? 0;
+                const resolvedRow = row ?? -1;
+                return resolvedRow >= 0
+                    ? getBoundsForBodyCell(canvasRef.current, resolvedCol, resolvedRow)
+                    : getBoundsForItem(canvasRef.current, resolvedCol, resolvedRow);
             },
             damage,
             getMouseArgsForPosition: (posX: number, posY: number, ev?: MouseEvent | TouchEvent) => {
@@ -1939,7 +2250,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 return getMouseArgsForPosition(canvasRef.current, posX, posY, ev);
             },
         }),
-        [canvasRef, damage, getBoundsForItem, getMouseArgsForPosition]
+        [canvasRef, damage, getBoundsForBodyCell, getBoundsForItem, getMouseArgsForPosition]
     );
 
     const lastFocusedSubdomNode = React.useRef<Item>();
@@ -2029,7 +2340,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                                                 const canvas = canvasRef?.current;
                                                 if (canvas === null || canvas === undefined) return;
                                                 return onKeyDown?.({
-                                                    bounds: getBoundsForItem(canvas, col, row),
+                                                    bounds: getBoundsForBodyCell(canvas, col, row),
                                                     cancel: () => undefined,
                                                     preventDefault: () => undefined,
                                                     stopPropagation: () => undefined,
@@ -2079,7 +2390,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             getCellContent,
             canvasRef,
             onKeyDown,
-            getBoundsForItem,
+            getBoundsForBodyCell,
             onCellFocused,
         ],
         200

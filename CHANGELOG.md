@@ -45,3 +45,11 @@
 
 - [markerCell] 完善 marker-cell functions 类型判断, 无长度时提前结束逻辑
 - [cell ring] 恢复选中 cell 高亮框贴边绘制行为，不再使用内嵌绘制
+
+# 1.3.4-beta.0
+
+- [row-span-grouping] 支持单元格合并
+
+# 1.3.4-beta.1
+
+- [row-span-grouping] 支持单元格合并功能导致shift选中的回退问题

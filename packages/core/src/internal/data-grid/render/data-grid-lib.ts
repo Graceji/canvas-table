@@ -81,13 +81,27 @@ export function isGroupEqual(left: string | undefined, right: string | undefined
 export function cellIsSelected(location: Item, cell: InnerGridCell, selection: GridSelection): boolean {
     if (selection.current === undefined) return false;
 
-    if (location[1] !== selection.current.cell[1]) return false;
+    const selCell = selection.current.cell;
+    const [col, row] = location;
 
-    if (cell.span === undefined) {
-        return selection.current.cell[0] === location[0];
+    // Handle rowSpan: check if the selected cell's row falls within this cell's row span
+    if (cell.rowSpan !== undefined && cell.rowSpan > 1) {
+        const anchorRow = row - (cell.rowSpanOffset ?? 0);
+        const rowInSpan = selCell[1] >= anchorRow && selCell[1] < anchorRow + cell.rowSpan;
+        if (!rowInSpan) return false;
+        if (cell.span === undefined) {
+            return selCell[0] === col;
+        }
+        return selCell[0] >= cell.span[0] && selCell[0] <= cell.span[1];
     }
 
-    return selection.current.cell[0] >= cell.span[0] && selection.current.cell[0] <= cell.span[1];
+    if (row !== selCell[1]) return false;
+
+    if (cell.span === undefined) {
+        return selCell[0] === col;
+    }
+
+    return selCell[0] >= cell.span[0] && selCell[0] <= cell.span[1];
 }
 
 export function itemIsInRect(location: Item, rect: Rectangle): boolean {
@@ -104,6 +118,45 @@ export function rectBottomRight(rect: Rectangle): Item {
     return [rect.x + rect.width - 1, rect.y + rect.height - 1];
 }
 
+export function getEffectiveCurrentRange(
+    current: NonNullable<GridSelection["current"]>,
+    getCellContent: (cell: Item) => BaseGridCell,
+    maxRows?: number
+): Rectangle {
+    if (current.range.width !== 1 || current.range.height !== 1) {
+        return current.range;
+    }
+
+    const [col, row] = current.cell;
+    if (row < 0) {
+        return current.range;
+    }
+
+    try {
+        const cell = getCellContent([col, row]);
+        const rowSpan = cell.rowSpan ?? 1;
+
+        if (rowSpan <= 1) {
+            return current.range;
+        }
+
+        let anchorRow = row - (cell.rowSpanOffset ?? 0);
+        if (maxRows !== undefined) {
+            anchorRow = Math.max(0, Math.min(anchorRow, Math.max(0, maxRows - 1)));
+        }
+
+        const height = maxRows === undefined ? rowSpan : Math.min(rowSpan, Math.max(0, maxRows - anchorRow));
+
+        return {
+            ...current.range,
+            y: anchorRow,
+            height,
+        };
+    } catch {
+        return current.range;
+    }
+}
+
 function cellIsInRect(location: Item, cell: InnerGridCell, rect: Rectangle): boolean {
     const startX = rect.x;
     const endX = rect.x + rect.width - 1;
@@ -111,7 +164,15 @@ function cellIsInRect(location: Item, cell: InnerGridCell, rect: Rectangle): boo
     const endY = rect.y + rect.height - 1;
 
     const [cellCol, cellRow] = location;
-    if (cellRow < startY || cellRow > endY) return false;
+
+    // Handle rowSpan: a row-spanning cell overlaps the rect if any of its rows fall within [startY, endY]
+    if (cell.rowSpan !== undefined && cell.rowSpan > 1) {
+        const anchorRow = cellRow - (cell.rowSpanOffset ?? 0);
+        const cellEndRow = anchorRow + cell.rowSpan - 1;
+        if (anchorRow > endY || cellEndRow < startY) return false;
+    } else {
+        if (cellRow < startY || cellRow > endY) return false;
+    }
 
     if (cell.span === undefined) {
         return cellCol >= startX && cellCol <= endX;
@@ -559,11 +620,11 @@ function drawMultiLineText(
     let truncated = false;
     const fontStyle = theme.baseFontFull;
     const fontSize = extractFontSizeNumber(fontStyle);
-    // 在需求截断的情况下，若w - theme.cellHorizontalPadding * 2小于字体宽度大小，截断将会很耗时，卡死页面。
+    // 在需求截断的情况下，若w - theme.cellHorizontalPadding * 2小于字体宽度大小，截断将会很耗时，卡死页面
     // 原因：
-    // 13px 微软雅黑字体宽度远大于 12px（尤其是中文字符一个可能宽到 13~15px，英文字符也不会太窄）。
-    // 于是 split() 可能始终测不出能放得下的字符，就会陷入无限尝试测量每个字符是否能“放下”的循环。
-    // 最终造成 CPU 占用激增，浏览器冻结。
+    // 13px 微软雅黑字体宽度远大于 12px（尤其是中文字符一个可能宽到 13~15px，英文字符也不会太窄）
+    // 于是 split() 可能始终测不出能放得下的字符，就会陷入无限尝试测量每个字符是否能“放下”的循环
+    // 最终造成 CPU 占用激增，浏览器冻结
     const canTruncateWidth =
         fontSize !== null && w - theme.cellHorizontalPadding * 2 < fontSize + 2
             ? fontSize + 2

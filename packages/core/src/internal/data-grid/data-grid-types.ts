@@ -324,6 +324,21 @@ export interface BaseGridCell {
     readonly style?: "normal" | "faded";
     readonly themeOverride?: Partial<Theme>;
     readonly span?: readonly [start: number, end: number];
+    /**
+     * Total number of rows this cell participates in as a vertical row-span group.
+     * Every physical row within the span should return the same `rowSpan` value.
+     * Combined with `rowSpanOffset`, this lets the grid draw the focus ring and
+     * selection highlight over the full merged area.
+     * @example A 3-row span: anchor row → `rowSpan: 3, rowSpanOffset: 0`;
+     *          second row → `rowSpan: 3, rowSpanOffset: 1`;
+     *          third row  → `rowSpan: 3, rowSpanOffset: 2`.
+     */
+    readonly rowSpan?: number;
+    /**
+     * How many rows below the span anchor this physical row sits (0 = anchor).
+     * Must be set together with `rowSpan`.
+     */
+    readonly rowSpanOffset?: number;
     readonly contentAlign?: "left" | "right" | "center";
     readonly cursor?: GridMouseCursor;
     readonly copyData?: string;
