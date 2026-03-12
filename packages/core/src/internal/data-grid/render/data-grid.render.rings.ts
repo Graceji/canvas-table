@@ -75,7 +75,7 @@ export function drawHighlightRings(
                           width,
                           height,
                           groupHeaderHeight,
-                          headerHeight + groupHeaderHeight,
+                          headerHeight + groupHeaderHeight + filterHeight,
                           filterHeight,
                           cellXOffset,
                           cellYOffset,
