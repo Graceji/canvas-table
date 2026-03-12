@@ -26,3 +26,7 @@
 # 1.3.2-beta.8
 
 - [onCellBlur] 增加onCellBlur传参，originValue。方便外部判断两种场景：1. 单元格原本无内容 2. 单元格原本有内容，但无修改
+
+# 1.3.2-beta.9
+
+- [onCellBlur] 增加onCellBlur传参，eventKey。方便外部判断单元格触发blur事件时，当前单元格对应的key

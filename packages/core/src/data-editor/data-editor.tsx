@@ -227,7 +227,7 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
      * distinguish between "cell had no content" and "cell had content but was not modified".
      * @group Editing
      */
-    readonly onCellBlur?: (cell: Item, originalValue: GridCell) => void;
+    readonly onCellBlur?: (cell: Item, originalValue: GridCell, eventKey?: string) => void;
     /** Emitted whenever a cell mutation is completed and provides all edits inbound as a single batch.
      * @group Editing
      */
@@ -3492,7 +3492,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     ]);
                 });
             } else if (overlay?.cell !== undefined && newValue === undefined) {
-                onCellBlur?.([overlay.cell[0] - rowMarkerOffset, overlay.cell[1]], overlay.content);
+                onCellBlur?.([overlay.cell[0] - rowMarkerOffset, overlay.cell[1]], overlay.content, eventKey);
             }
             focus(true);
             setOverlay(undefined);

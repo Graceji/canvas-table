@@ -78,7 +78,7 @@ export const AddDataToTop: React.VFC = () => {
                 rows={numRows}
                 onRowAppended={onRowAppended}
                 cellActivationBehavior="single-click"
-                onCellBlur={(cell, originalValue) => {
+                onCellBlur={(cell, originalValue, eventKey) => {
                     // const [col, row] = cell;
 
                     // 场景1：单元格原本无内容（空值）
