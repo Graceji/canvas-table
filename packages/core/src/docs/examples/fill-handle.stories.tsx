@@ -123,6 +123,8 @@ export const FillHandle: React.VFC<{
     return (
         <DataEditor
             {...defaultProps}
+            showFilter
+            filterHeight={30}
             getCellContent={getCellContentMangled}
             columns={cols}
             rowMarkers={"both"}
@@ -136,7 +138,7 @@ export const FillHandle: React.VFC<{
                 tint: true,
                 hint: "New row...",
             }}
-            rows={numRows}
+            rows={12}
             onRowAppended={onRowAppended}
         />
     );

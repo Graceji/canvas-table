@@ -81,13 +81,27 @@ export function isGroupEqual(left: string | undefined, right: string | undefined
 export function cellIsSelected(location: Item, cell: InnerGridCell, selection: GridSelection): boolean {
     if (selection.current === undefined) return false;
 
-    if (location[1] !== selection.current.cell[1]) return false;
+    const selCell = selection.current.cell;
+    const [col, row] = location;
 
-    if (cell.span === undefined) {
-        return selection.current.cell[0] === location[0];
+    // Handle rowSpan: check if the selected cell's row falls within this cell's row span
+    if (cell.rowSpan !== undefined && cell.rowSpan > 1) {
+        const anchorRow = row - (cell.rowSpanOffset ?? 0);
+        const rowInSpan = selCell[1] >= anchorRow && selCell[1] < anchorRow + cell.rowSpan;
+        if (!rowInSpan) return false;
+        if (cell.span === undefined) {
+            return selCell[0] === col;
+        }
+        return selCell[0] >= cell.span[0] && selCell[0] <= cell.span[1];
     }
 
-    return selection.current.cell[0] >= cell.span[0] && selection.current.cell[0] <= cell.span[1];
+    if (row !== selCell[1]) return false;
+
+    if (cell.span === undefined) {
+        return selCell[0] === col;
+    }
+
+    return selCell[0] >= cell.span[0] && selCell[0] <= cell.span[1];
 }
 
 export function itemIsInRect(location: Item, rect: Rectangle): boolean {
@@ -111,7 +125,15 @@ function cellIsInRect(location: Item, cell: InnerGridCell, rect: Rectangle): boo
     const endY = rect.y + rect.height - 1;
 
     const [cellCol, cellRow] = location;
-    if (cellRow < startY || cellRow > endY) return false;
+
+    // Handle rowSpan: a row-spanning cell overlaps the rect if any of its rows fall within [startY, endY]
+    if (cell.rowSpan !== undefined && cell.rowSpan > 1) {
+        const anchorRow = cellRow - (cell.rowSpanOffset ?? 0);
+        const cellEndRow = anchorRow + cell.rowSpan - 1;
+        if (anchorRow > endY || cellEndRow < startY) return false;
+    } else {
+        if (cellRow < startY || cellRow > endY) return false;
+    }
 
     if (cell.span === undefined) {
         return cellCol >= startX && cellCol <= endX;

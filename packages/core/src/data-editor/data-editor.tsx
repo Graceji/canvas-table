@@ -35,6 +35,7 @@ import {
     type MarkerFn,
     type CellArray,
     type MarkerMeta,
+    type BaseGridCell,
 } from "../internal/data-grid/data-grid-types.js";
 import DataGridSearch, { type DataGridSearchProps } from "../internal/data-grid-search/data-grid-search.js";
 import { browserIsOSX } from "../common/browser-detect.js";
@@ -1315,6 +1316,15 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const highlightFocus = drawFocusRing ? gridSelection.current?.cell : undefined;
     const highlightFocusCol = highlightFocus?.[0];
     const highlightFocusRow = highlightFocus?.[1];
+    const highlightFocusRowSpan = React.useMemo(() => {
+        if (highlightFocusCol === undefined || highlightFocusRow === undefined) return { rowSpan: 1, rowSpanOffset: 0 };
+        try {
+            const cell = getCellContent([highlightFocusCol - rowMarkerOffset, highlightFocusRow]) as BaseGridCell;
+            return { rowSpan: cell.rowSpan ?? 1, rowSpanOffset: cell.rowSpanOffset ?? 0 };
+        } catch {
+            return { rowSpan: 1, rowSpanOffset: 0 };
+        }
+    }, [getCellContent, highlightFocusCol, highlightFocusRow, rowMarkerOffset]);
 
     const highlightRegions = React.useMemo(() => {
         if (
@@ -1363,9 +1373,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 color: mergedTheme.accentColor,
                 range: {
                     x: highlightFocusCol,
-                    y: highlightFocusRow,
+                    y: highlightFocusRow - highlightFocusRowSpan.rowSpanOffset,
                     width: 1,
-                    height: 1,
+                    height: highlightFocusRowSpan.rowSpan,
                 },
                 style: "solid-outline",
             });
@@ -1377,6 +1387,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         highlightRange,
         highlightFocusCol,
         highlightFocusRow,
+        highlightFocusRowSpan,
         fillHighlightRegion,
         mangledCols.length,
         rowMarkerOffset,
