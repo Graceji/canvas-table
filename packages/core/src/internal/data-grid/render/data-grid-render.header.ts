@@ -15,6 +15,7 @@ import {
     type DrawCellCallback,
     type InnerGridCell,
     type Item,
+    type GridMouseCursor,
     GridCellKind,
 } from "../data-grid-types.js";
 import type { ImageWindowLoader } from "../image-window-loader-interface.js";
@@ -59,7 +60,7 @@ export function drawGridHeaders(
     hyperWrapping: boolean,
     enqueue: (item: Item) => void,
     renderStateProvider: RenderStateProvider,
-    overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
+    overrideCursor: (cursor: GridMouseCursor) => void,
     getFilterCellRenderer: GetCellRendererCallback,
     getFilterCellContent: (cell: number) => InnerGridCell
 ) {
@@ -847,7 +848,7 @@ export function drawFilterCell(
     enqueue: (item: Item) => void,
     frameTime: number,
     renderStateProvider: RenderStateProvider,
-    overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
+    overrideCursor: (cursor: GridMouseCursor) => void,
     getFilterCellRenderer: GetCellRendererCallback,
     getFilterCellContent?: (cell: number) => InnerGridCell
 ) {

@@ -1,5 +1,5 @@
 import type { FullTheme } from "../../../common/styles.js";
-import type { Rectangle, HoverEffectTheme } from "../../../index.js";
+import type { Rectangle, HoverEffectTheme, GridMouseCursor } from "../data-grid-types.js";
 import { roundedRect, measureTextCached } from "./data-grid-lib.js";
 import { withAlpha } from "../color-parser.js";
 
@@ -10,7 +10,7 @@ export function drawEditHoverIndicator(
     displayData: string,
     rect: Rectangle,
     hoverAmount: number,
-    overrideCursor: ((cursor: React.CSSProperties["cursor"] | undefined) => void) | undefined
+    overrideCursor: ((cursor: GridMouseCursor | undefined) => void) | undefined
 ) {
     ctx.textBaseline = "alphabetic";
 

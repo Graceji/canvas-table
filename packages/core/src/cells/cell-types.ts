@@ -1,4 +1,3 @@
-import type React from "react";
 import type { SpriteManager } from "../internal/data-grid/data-grid-sprites.js";
 import type {
     InnerGridCell,
@@ -9,6 +8,7 @@ import type {
     BooleanIndeterminate,
     Item,
     GridSelection,
+    GridMouseCursor,
 } from "../internal/data-grid/data-grid-types.js";
 import type { FullTheme } from "../common/styles.js";
 import type { ImageWindowLoader } from "../internal/data-grid/image-window-loader-interface.js";
@@ -44,7 +44,7 @@ export interface DrawArgs<T extends InnerGridCell> extends BaseDrawArgs {
     requestAnimationFrame: (state?: any) => void;
     drawState: DrawStateTuple;
     frameTime: number;
-    overrideCursor: ((cursor: React.CSSProperties["cursor"]) => void) | undefined;
+    overrideCursor: ((cursor: GridMouseCursor) => void) | undefined;
 }
 
 // intentionally mutable

@@ -24,6 +24,7 @@ import {
     type InnerGridColumn,
     type DrawCellCallback,
     type FillHandle,
+    type GridMouseCursor,
     DEFAULT_FILL_HANDLE,
 } from "./data-grid-types.js";
 import { CellSet } from "./cell-set.js";
@@ -450,7 +451,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     const [hoveredItemInfo, setHoveredItemInfo] = React.useState<[Item, readonly [number, number]] | undefined>();
     const [hoveredOnEdge, setHoveredOnEdge] = React.useState<boolean>();
     const overlayRef = React.useRef<HTMLCanvasElement | null>(null);
-    const [drawCursorOverride, setDrawCursorOverride] = React.useState<React.CSSProperties["cursor"] | undefined>();
+    const [drawCursorOverride, setDrawCursorOverride] = React.useState<GridMouseCursor | undefined>();
 
     const [lastWasTouch, setLastWasTouch] = React.useState(false);
     const lastWasTouchRef = React.useRef(lastWasTouch);
@@ -466,6 +467,10 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     );
     const totalHeaderHeight =
         (enableGroups ? groupHeaderHeight + headerHeight : headerHeight) + (showFilter ? filterHeight : 0);
+    const fillHandleOptions = React.useMemo(() => {
+        if (fillHandle === false || fillHandle === undefined) return undefined;
+        return typeof fillHandle === "object" ? { ...DEFAULT_FILL_HANDLE, ...fillHandle } : DEFAULT_FILL_HANDLE;
+    }, [fillHandle]);
 
     const scrollingStopRef = React.useRef(-1);
     const enableFirefoxRescaling = (experimental?.enableFirefoxRescaling ?? false) && browserIsFirefox.value;
@@ -709,14 +714,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 const isEdge = bounds !== undefined && bounds.x + bounds.width - posX < edgeDetectionBuffer;
 
                 let isFillHandle = false;
-                const drawFill = fillHandle !== false && fillHandle !== undefined;
-                if (drawFill && selection.current !== undefined) {
-                    const fill =
-                        typeof fillHandle === "object"
-                            ? { ...DEFAULT_FILL_HANDLE, ...fillHandle }
-                            : DEFAULT_FILL_HANDLE;
-
-                    const fillHandleClickSize = fill.size;
+                if (fillHandleOptions !== undefined && selection.current !== undefined) {
+                    const fillHandleClickSize = fillHandleOptions.size;
                     const half = fillHandleClickSize / 2;
 
                     const fillHandleLocation = rectBottomRight(selection.current.range);
@@ -725,8 +724,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     if (fillBounds !== undefined) {
                         // Handle center sits exactly on the bottom-right corner of the cell.
                         // Offset by half pixel to align with grid lines.
-                        const centerX = fillBounds.x + fillBounds.width + fill.offsetX - half + 0.5;
-                        const centerY = fillBounds.y + fillBounds.height + fill.offsetY - half + 0.5;
+                        const centerX = fillBounds.x + fillBounds.width + fillHandleOptions.offsetX - half + 0.5;
+                        const centerY = fillBounds.y + fillBounds.height + fillHandleOptions.offsetY - half + 0.5;
 
                         // Check if posX and posY are within fillHandleClickSize from handleLogicalCenter
                         isFillHandle =
@@ -769,7 +768,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             translateY,
             freezeTrailingRows,
             getBoundsForItem,
-            fillHandle,
+            fillHandleOptions,
             selection,
             totalHeaderHeight,
             showFilter,
@@ -838,7 +837,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         }
 
         let didOverride = false;
-        const overrideCursor = (cursor: React.CSSProperties["cursor"]) => {
+        const overrideCursor = (cursor: GridMouseCursor) => {
             didOverride = true;
             setDrawCursorOverride(cursor);
         };
@@ -1024,7 +1023,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
 
     let clickableInnerCellHovered = false;
     let editableBoolHovered = false;
-    let cursorOverride: React.CSSProperties["cursor"] | undefined = drawCursorOverride;
+    let cursorOverride: GridMouseCursor | undefined = drawCursorOverride;
     if (cursorOverride === undefined && hCol !== undefined && hRow !== undefined && hRow > -1 && hRow < rows) {
         const cell = getCellContent([hCol, hRow], true);
         clickableInnerCellHovered =
@@ -1039,7 +1038,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         : canDrag || isResizing
           ? "col-resize"
           : overFill || isFilling
-            ? "crosshair"
+            ? (fillHandleOptions?.cursor ?? "crosshair")
             : cursorOverride !== undefined
               ? cursorOverride
               : headerHovered || clickableInnerCellHovered || editableBoolHovered || groupHeaderHovered
@@ -1049,22 +1048,23 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                       ? "pointer"
                       : "text"
                   : "default";
-    const style = React.useMemo(
+    const style = React.useMemo<React.CSSProperties>(
         () => ({
             // width,
             // height,
             contain: "strict",
             display: "block",
-            cursor,
+            cursor: cursor as React.CSSProperties["cursor"],
         }),
         [cursor]
     );
 
-    const lastSetCursor = React.useRef<typeof cursor>("default");
+    const styleCursor = style.cursor ?? "default";
+    const lastSetCursor = React.useRef<GridMouseCursor>(styleCursor);
     const target = eventTargetRef?.current;
-    if (target !== null && target !== undefined && lastSetCursor.current !== style.cursor) {
+    if (target !== null && target !== undefined && lastSetCursor.current !== styleCursor) {
         // because we have an event target we need to set its cursor instead.
-        target.style.cursor = lastSetCursor.current = style.cursor;
+        target.style.cursor = lastSetCursor.current = styleCursor;
     }
 
     const groupHeaderActionForEvent = React.useCallback(

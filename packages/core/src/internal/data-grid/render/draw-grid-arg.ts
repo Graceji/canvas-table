@@ -14,6 +14,7 @@ import type {
     CellList,
     DrawCellCallback,
     FillHandle,
+    GridMouseCursor,
 } from "../data-grid-types.js";
 import type { CellSet } from "../cell-set.js";
 import type { EnqueueCallback } from "../use-animation-queue.js";
@@ -61,7 +62,7 @@ export interface DrawGridArg {
     readonly rows: number;
     readonly getCellContent: (cell: Item) => InnerGridCell;
     readonly getFilterCellContent: (cell: number) => InnerGridCell;
-    readonly overrideCursor: (cursor: React.CSSProperties["cursor"]) => void;
+    readonly overrideCursor: (cursor: GridMouseCursor) => void;
     readonly getGroupDetails: GroupDetailsCallback;
     readonly getRowThemeOverride: GetRowThemeCallback | undefined;
     readonly drawHeaderCallback: DrawHeaderCallback | undefined;

@@ -12,6 +12,7 @@ import {
     type DrawCellCallback,
     isInnerOnlyCell,
     type GridCell,
+    type GridMouseCursor,
 } from "../data-grid-types.js";
 import { CellSet } from "../cell-set.js";
 import type { HoverValues } from "../animation-manager.js";
@@ -112,7 +113,7 @@ export function drawCells(
     enqueue: EnqueueCallback,
     renderStateProvider: RenderStateProvider,
     getCellRenderer: GetCellRendererCallback,
-    overrideCursor: (cursor: React.CSSProperties["cursor"]) => void,
+    overrideCursor: (cursor: GridMouseCursor) => void,
     minimumCellWidth: number
 ): Rectangle[] | undefined {
     let toDraw = damage?.size ?? Number.MAX_SAFE_INTEGER;
@@ -530,7 +531,7 @@ export function drawCell(
     enqueue: EnqueueCallback | undefined,
     renderStateProvider: RenderStateProvider,
     getCellRenderer: GetCellRendererCallback,
-    overrideCursor: (cursor: React.CSSProperties["cursor"]) => void
+    overrideCursor: (cursor: GridMouseCursor) => void
 ): PrepResult | undefined {
     let hoverX: number | undefined;
     let hoverY: number | undefined;

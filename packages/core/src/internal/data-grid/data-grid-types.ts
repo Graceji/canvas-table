@@ -325,7 +325,7 @@ export interface BaseGridCell {
     readonly themeOverride?: Partial<Theme>;
     readonly span?: readonly [start: number, end: number];
     readonly contentAlign?: "left" | "right" | "center";
-    readonly cursor?: CSSProperties["cursor"];
+    readonly cursor?: GridMouseCursor;
     readonly copyData?: string;
     readonly activationBehaviorOverride?: CellActivationBehavior;
     readonly readonly?: boolean;
@@ -581,6 +581,9 @@ export type Slice = [start: number, end: number];
 /** @category Selection */
 export type CompactSelectionRanges = readonly Slice[];
 
+/** @category Types */
+export type GridMouseCursor = CSSProperties["cursor"] | (string & {});
+
 export type FillHandleDirection = "horizontal" | "vertical" | "orthogonal" | "any";
 
 /**
@@ -591,6 +594,8 @@ export type FillHandleDirection = "horizontal" | "vertical" | "orthogonal" | "an
  *  `offsetX` – Horizontal offset from the bottom-right corner of the cell (positive is →). Default is `-2`.
  *  `offsetY` – Vertical offset from the bottom-right corner of the cell (positive is ↓). Default is `-2`.
  *  `outline` – Width of the outline stroke in CSS pixels. Default is `0`.
+ *  `cursor`  – Full CSS cursor declaration shown while hovering or dragging the fill handle.
+ *              Examples: `crosshair`, `cell`, `url("/cursors/fill.cur") 7 7, crosshair`.
  */
 export type FillHandleConfig = {
     readonly shape: "square" | "circle";
@@ -598,6 +603,7 @@ export type FillHandleConfig = {
     readonly offsetX: number;
     readonly offsetY: number;
     readonly outline: number;
+    readonly cursor: GridMouseCursor;
 };
 
 export type FillHandle = boolean | Partial<FillHandleConfig>;
@@ -611,6 +617,7 @@ export const DEFAULT_FILL_HANDLE: Readonly<FillHandleConfig> = {
     offsetX: -2,
     offsetY: -2,
     outline: 0,
+    cursor: "crosshair",
 } as const;
 
 function mergeRanges(input: CompactSelectionRanges) {

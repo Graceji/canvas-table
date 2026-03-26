@@ -30,3 +30,13 @@
 # 1.3.2-beta.9
 
 - [onCellBlur] 增加onCellBlur传参，eventKey。方便外部判断单元格触发blur事件时，当前单元格对应的key
+
+# 1.3.2-beta.10
+
+- [data-grid.render.rings] 修复拖拽过程中高亮框绘制高度错误问题, 缺少 filterHeight
+
+# 1.3.3-beta.0
+
+- [fillHandle] 支持通过 fillHandle.cursor 自定义拖拽填充时的鼠标样式，兼容完整 CSS cursor 声明与图片光标
+- [cursor] 放宽网格内部 cursor 类型，支持自定义 cursor 字符串传递
+- [stories] 增加 fill handle 自定义图片光标示例，便于验证不同系统下的显示效果
