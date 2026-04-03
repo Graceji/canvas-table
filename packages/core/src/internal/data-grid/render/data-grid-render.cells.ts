@@ -326,8 +326,8 @@ export function drawCells(
                         cell.kind === GridCellKind.Protected
                             ? theme.bgCellMedium
                             : cell.readonly === false
-                            ? theme.editBgCell
-                            : theme.bgCell;
+                              ? theme.editBgCell
+                              : theme.bgCell;
                     let fill: string | undefined;
                     if (isSticky || bgCell !== outerTheme.bgCell) {
                         fill = blend(bgCell, fill);
@@ -343,8 +343,8 @@ export function drawCells(
                                     ? blend(theme.bgCellAccent, theme.accentLight)
                                     : blend(theme.bgCellAccent, fill)
                                 : cell.readonly === false && cell.allowOverlay === true && isSelected
-                                ? blend(theme.accentMask, fill)
-                                : blend(theme.accentLight, fill);
+                                  ? blend(theme.accentMask, fill)
+                                  : blend(theme.accentLight, fill);
                         }
                     } else if (prelightCells !== undefined) {
                         for (const pre of prelightCells) {
@@ -407,12 +407,13 @@ export function drawCells(
                         if (damage !== undefined) {
                             // this accounts for the fill handle outline being drawn inset on these cells. We do this
                             // because technically the bottom right corner of the outline are on other cells.
-                            // 单元格高亮框绘制在单元格边框内部，参考data-grid.render.rings#L139中绘制的起点。这里的偏差值需要做同步
+                            // “局部重绘”，不是整张网格重画，所以它不能像全量绘制那样把整个 cell 铺满，否则会把已经画好的边框像素擦掉
+                            const accentWidth = theme.accentWidth ?? 1;
                             ctx.fillRect(
-                                cellX + 2,
-                                drawY + 2,
-                                cellWidth - (isLastColumn ? 4 : 3),
-                                rh - (isLastRow ? 4 : 3)
+                                cellX + accentWidth,
+                                drawY + accentWidth,
+                                cellWidth - (isLastColumn ? accentWidth * 2 : accentWidth + 1),
+                                rh - (isLastRow ? accentWidth * 2 : accentWidth + 1)
                             );
                         } else {
                             ctx.fillRect(cellX, drawY, cellWidth, rh);

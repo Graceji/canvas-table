@@ -40,3 +40,8 @@
 - [fillHandle] 支持通过 fillHandle.cursor 自定义拖拽填充时的鼠标样式，兼容完整 CSS cursor 声明与图片光标
 - [cursor] 放宽网格内部 cursor 类型，支持自定义 cursor 字符串传递
 - [stories] 增加 fill handle 自定义图片光标示例，便于验证不同系统下的显示效果
+
+# 1.3.3-beta.1
+
+- [markerCell] 完善 marker-cell functions 类型判断, 无长度时提前结束逻辑
+- [cell ring] 恢复选中 cell 高亮框贴边绘制行为，不再使用内嵌绘制

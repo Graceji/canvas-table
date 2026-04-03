@@ -144,8 +144,12 @@ export function drawHighlightRings(
                             ? blend(blend(s.color, theme.borderColor), theme.bgCell)
                             : withAlpha(s.color, 1);
                     ctx.closePath();
-                    // ctx.strokeRect(s.rect.x + 0.5, s.rect.y + 0.5, s.rect.width - 1, s.rect.height - 1);
-                    ctx.strokeRect(s.rect.x + 1.5, s.rect.y + 1.5, s.rect.width - 3, s.rect.height - 3);
+                    ctx.strokeRect(
+                        s.rect.x + theme.accentWidth / 2,
+                        s.rect.y + theme.accentWidth / 2,
+                        s.rect.width - theme.accentWidth,
+                        s.rect.height - theme.accentWidth
+                    );
                     if (needsClip) {
                         ctx.restore();
                         dashed = wasDashed;

@@ -20,12 +20,12 @@ export const markerCellRenderer: InternalCellRenderer<MarkerCell> = {
     onClick: e => {
         const { bounds, cell, posX: x, posY: y } = e;
 
-        if (cell.functions?.length === 0) return undefined;
+        if (!Array.isArray(cell.functions) || !cell.functions?.length) return undefined;
 
         const meta = cell.meta;
 
         // 计算边界时应该按照每一项的盒子来计算
-        const isOverHeaderMarkerfn = cell.functions.find(
+        const isOverHeaderMarkerfn = cell.functions?.find(
             item => x >= (item as FullMarkerFn).start && x <= (item as FullMarkerFn).end && y >= 0 && y <= bounds.height
         );
 
