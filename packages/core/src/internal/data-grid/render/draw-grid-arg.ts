@@ -61,7 +61,8 @@ export interface DrawGridArg {
     readonly hyperWrapping: boolean;
     readonly rows: number;
     readonly getCellContent: (cell: Item) => InnerGridCell;
-    readonly getFilterCellContent: (cell: number) => InnerGridCell;
+    readonly getFilterCellContent?: (cell: number) => InnerGridCell;
+    readonly getRowMarkerFilterCellContent?: () => InnerGridCell;
     readonly overrideCursor: (cursor: GridMouseCursor) => void;
     readonly getGroupDetails: GroupDetailsCallback;
     readonly getRowThemeOverride: GetRowThemeCallback | undefined;

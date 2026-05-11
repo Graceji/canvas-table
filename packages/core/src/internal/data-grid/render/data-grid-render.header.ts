@@ -62,7 +62,9 @@ export function drawGridHeaders(
     renderStateProvider: RenderStateProvider,
     overrideCursor: (cursor: GridMouseCursor) => void,
     getFilterCellRenderer: GetCellRendererCallback,
-    getFilterCellContent: (cell: number) => InnerGridCell
+    getFilterCellContent: ((cell: number) => InnerGridCell) | undefined,
+    getRowMarkerFilterCellContent?: () => InnerGridCell,
+    hasRowMarkers?: boolean
 ) {
     const totalHeaderHeight = headerHeight + groupHeaderHeight;
     if (totalHeaderHeight <= 0) return;
@@ -191,7 +193,9 @@ export function drawGridHeaders(
                 renderStateProvider,
                 overrideCursor,
                 getFilterCellRenderer,
-                getFilterCellContent
+                getFilterCellContent,
+                getRowMarkerFilterCellContent,
+                hasRowMarkers
             );
         }
 
@@ -850,10 +854,15 @@ export function drawFilterCell(
     renderStateProvider: RenderStateProvider,
     overrideCursor: (cursor: GridMouseCursor) => void,
     getFilterCellRenderer: GetCellRendererCallback,
-    getFilterCellContent?: (cell: number) => InnerGridCell
+    getFilterCellContent?: (cell: number) => InnerGridCell,
+    getRowMarkerFilterCellContent?: () => InnerGridCell,
+    hasRowMarkers?: boolean
 ) {
     let prepResult: PrepResult | undefined = undefined;
-    const filterCell = getFilterCellContent?.(c.sourceIndex) ?? loadingCell;
+    const filterCell =
+        c.sourceIndex === 0 && hasRowMarkers === true
+            ? (getRowMarkerFilterCellContent?.() ?? loadingCell)
+            : (getFilterCellContent?.(c.sourceIndex) ?? loadingCell);
 
     ctx.fillStyle = filterCell.themeOverride?.filterHeaderBg ?? theme.filterHeaderBg ?? theme.bgHeader;
     ctx.fillRect(x, y, c.width, filterHeight);

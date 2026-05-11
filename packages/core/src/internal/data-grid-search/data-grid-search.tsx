@@ -577,6 +577,7 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
                 resizeIndicator={p.resizeIndicator}
                 setScrollDir={p.setScrollDir}
                 getFilterCellContent={p.getFilterCellContent}
+                getRowMarkerFilterCellContent={p.getRowMarkerFilterCellContent}
             />
             {searchbox}
         </>

@@ -126,6 +126,7 @@ export interface DataGridProps {
 
     readonly getCellContent: (cell: Item, forceStrict?: boolean) => InnerGridCell;
     readonly getFilterCellContent?: (col: number) => InnerGridCell;
+    readonly getRowMarkerFilterCellContent?: () => InnerGridCell;
 
     /**
      * Provides additional details about groups to extend group functionality.
@@ -437,6 +438,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         showFilter,
         filterHeight,
         getFilterCellContent,
+        getRowMarkerFilterCellContent,
         hasRowMarkers,
         dragCursor,
         rowMarkerGroup,
@@ -1083,6 +1085,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             drawFocus: drawFocusRing,
             getCellContent,
             getFilterCellContent,
+            getRowMarkerFilterCellContent,
             getGroupDetails: getGroupDetails ?? (name => ({ name })),
             getRowThemeOverride,
             drawHeaderCallback,
@@ -1104,6 +1107,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             getCellRenderer,
             minimumCellWidth,
             resizeIndicator,
+            hasRowMarkers,
             rowMarkerGroup,
         } as DrawGridArg;
 
@@ -1160,6 +1164,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         drawFocusRing,
         getCellContent,
         getFilterCellContent,
+        getRowMarkerFilterCellContent,
+        hasRowMarkers,
         getGroupDetails,
         getRowThemeOverride,
         drawHeaderCallback,
@@ -1450,7 +1456,10 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                     ),
                 };
 
-                const filterCell = getFilterCellContent?.(col);
+                const filterCell =
+                    col === 0 && hasRowMarkers === true
+                        ? getRowMarkerFilterCellContent?.()
+                        : getFilterCellContent?.(col);
 
                 if (
                     filterLayout.actionBounds !== undefined &&
@@ -1472,6 +1481,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
         [
             getBoundsForItem,
             getFilterCellContent,
+            getRowMarkerFilterCellContent,
+            hasRowMarkers,
             hoveredOnEdge,
             isDragging,
             isResizing,

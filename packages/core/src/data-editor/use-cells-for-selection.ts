@@ -8,6 +8,7 @@ export function useCellsForSelection(
     getCellsForSelectionIn: CellsForSelectionCallback | true | undefined,
     getCellContent: DataEditorProps["getCellContent"],
     getFilterCellContent: DataEditorProps["getFilterCellContent"],
+    getRowMarkerFilterCellContent: DataEditorProps["getRowMarkerFilterCellContent"],
     rowMarkerOffset: number,
     abortController: AbortController,
     rows: number
@@ -27,9 +28,12 @@ export function useCellsForSelection(
                             });
                         } else if (rect.y === -3) {
                             // filter行
-                            if (getFilterCellContent) {
-                                row.push(getFilterCellContent(x));
-                            }
+                            row.push(
+                                getFilterCellContent?.(x) ?? {
+                                    kind: GridCellKind.Loading,
+                                    allowOverlay: false,
+                                }
+                            );
                         } else {
                             row.push(getCellContent([x, y]));
                         }
@@ -56,20 +60,21 @@ export function useCellsForSelection(
                 newRect.x = 0;
                 newRect.width--;
                 const r = getCellsForSelectionDirect(newRect, abortController.signal);
+                const rowMarkerFilterCell = getRowMarkerFilterCellContent?.() ?? {
+                    kind: GridCellKind.Loading,
+                    allowOverlay: false,
+                };
 
                 if (typeof r === "function") {
                     return async () =>
                         // eslint-disable-next-line unicorn/no-await-expression-member
-                        (await r()).map<CellArray[0]>(row => [
-                            { kind: GridCellKind.Loading, allowOverlay: false },
-                            ...row,
-                        ]);
+                        (await r()).map<CellArray[0]>(row => [rowMarkerFilterCell, ...row]);
                 }
-                return r.map(row => [{ kind: GridCellKind.Loading, allowOverlay: false }, ...row]);
+                return r.map(row => [rowMarkerFilterCell, ...row]);
             }
             return getCellsForSelectionDirect(newRect, abortController.signal);
         },
-        [abortController.signal, getCellsForSelectionDirect, rowMarkerOffset]
+        [abortController.signal, getCellsForSelectionDirect, getRowMarkerFilterCellContent, rowMarkerOffset]
     );
 
     const getCellsForSelection = getCellsForSelectionIn !== undefined ? getCellsForSelectionMangled : undefined;

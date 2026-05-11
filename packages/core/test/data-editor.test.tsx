@@ -4777,6 +4777,64 @@ describe("data-editor", () => {
         expect(strokeRects).toHaveLength(1);
     });
 
+    test("Filter row uses business column indexes when row markers are shown", async () => {
+        const getFilterCellContent = vi.fn((col: number): GridCell => {
+            return {
+                kind: GridCellKind.Text,
+                allowOverlay: true,
+                data: `filter-${col}`,
+                displayData: `filter-${col}`,
+            };
+        });
+        const getRowMarkerFilterCellContent = vi.fn(
+            (): GridCell => ({
+                kind: GridCellKind.Text,
+                allowOverlay: false,
+                data: "marker-filter",
+                displayData: "marker-filter",
+            })
+        );
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                rowMarkers="number"
+                showFilter
+                getFilterCellContent={getFilterCellContent}
+                getRowMarkerFilterCellContent={getRowMarkerFilterCellContent}
+            />,
+            { wrapper: Context }
+        );
+        prep();
+
+        expect(getRowMarkerFilterCellContent).toHaveBeenCalled();
+        expect(getFilterCellContent).toHaveBeenCalledWith(0);
+        expect(getFilterCellContent).toHaveBeenCalledWith(1);
+        expect(getFilterCellContent.mock.calls.slice(0, 2).map(([col]) => col)).toEqual([0, 1]);
+    });
+
+    test("Filter row does not reuse the first business filter cell for row markers", async () => {
+        const getFilterCellContent = vi.fn((col: number): GridCell => {
+            return {
+                kind: GridCellKind.Text,
+                allowOverlay: true,
+                data: `filter-${col}`,
+                displayData: `filter-${col}`,
+            };
+        });
+
+        vi.useFakeTimers();
+        render(<DataEditor {...basicProps} rowMarkers="number" showFilter getFilterCellContent={getFilterCellContent} />, {
+            wrapper: Context,
+        });
+        prep();
+
+        expect(getFilterCellContent).toHaveBeenCalledWith(0);
+        expect(getFilterCellContent).toHaveBeenCalledWith(1);
+        expect(getFilterCellContent.mock.calls.slice(0, 2).map(([col]) => col)).toEqual([0, 1]);
+    });
+
     test("Shift click row marker", async () => {
         const spy = vi.fn();
         vi.useFakeTimers();

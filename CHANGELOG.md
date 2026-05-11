@@ -52,4 +52,13 @@
 
 # 1.3.4-beta.1
 
-- [row-span-grouping] 支持单元格合并功能导致shift选中的回退问题
+- [row-span-grouping] 修复单元格合并功能导致shift选中回退问题
+
+# 1.3.4-beta.2
+
+- [filter row] 修复开启 row marker/index 列后，filter row 内部列号与业务列号不一致导致的筛选列错位问题；该问题在 `showIndex`/`markerActions` 与 `filterMarker="none"` 同时使用时更容易暴露
+- [filter row] 拆分 row marker filter cell 与业务列 filter cell 语义，新增 `getRowMarkerFilterCellContent`，`getFilterCellContent` 统一只接收业务列索引
+- [filter row] 修复 filter row 绘制、点击激活、overlay 打开、清除按钮命中、复制/选区导出等路径使用不同列号语义的问题
+- [filter row] row marker filter cell 不再默认复用第一业务列 filter cell，未显式提供时回退为不可交互的 loading cell
+- [filter clear] 防止 row marker 虚拟列触发清除筛选时向外抛出负数业务列索引
+- [test] 增加 row marker 场景下 filter row 业务列索引、row marker filter cell 独立性、复制/选区导出语义的回归测试

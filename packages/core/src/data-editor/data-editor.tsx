@@ -634,6 +634,7 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
     readonly getCellContent: (cell: Item) => GridCell;
 
     readonly getFilterCellContent?: (col: number) => GridCell;
+    readonly getRowMarkerFilterCellContent?: () => GridCell;
 
     /**
      * The primary callback for getting marker cell data into the data grid.
@@ -817,9 +818,16 @@ type ScrollToFn = (
     }
 ) => void;
 
-const defaultFilterCell = {
+const defaultFilterCell: GridCell = {
     kind: GridCellKind.Text,
     allowOverlay: true,
+    data: "",
+    displayData: "",
+};
+
+const defaultRowMarkerFilterCell: GridCell = {
+    kind: GridCellKind.Loading,
+    allowOverlay: false,
 };
 
 /** @category DataEditor */
@@ -924,6 +932,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         getCellContent,
         getMarkerContent,
         getFilterCellContent,
+        getRowMarkerFilterCellContent: getRowMarkerFilterCellContentIn,
         onCellClicked,
         onCellActivated,
         onFillPattern,
@@ -1119,10 +1128,31 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
     React.useEffect(() => () => abortControllerRef?.current.abort(), []);
 
+    const getRowMarkerFilterCellContent = React.useCallback((): GridCell => {
+        return getRowMarkerFilterCellContentIn?.() ?? defaultRowMarkerFilterCell;
+    }, [getRowMarkerFilterCellContentIn]);
+
+    const getMangledFilterCellContent = React.useCallback(
+        (col: number): GridCell => {
+            if (col < rowMarkerOffset) {
+                return getRowMarkerFilterCellContent();
+            }
+            return getFilterCellContent?.(col - rowMarkerOffset) ?? defaultFilterCell;
+        },
+        [getFilterCellContent, getRowMarkerFilterCellContent, rowMarkerOffset]
+    );
+    const getMangledFilterCellContentForGrid =
+        getFilterCellContent === undefined && getRowMarkerFilterCellContentIn === undefined
+            ? undefined
+            : getMangledFilterCellContent;
+    const getRowMarkerFilterCellContentForGrid =
+        getRowMarkerFilterCellContentIn === undefined ? undefined : getRowMarkerFilterCellContent;
+
     const [getCellsForSelection, getCellsForSeletionDirect] = useCellsForSelection(
         getCellsForSelectionIn,
         getCellContent,
         getFilterCellContent,
+        getRowMarkerFilterCellContentForGrid,
         rowMarkerOffset,
         abortControllerRef.current,
         rows
@@ -1517,8 +1547,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     }
                 }
                 let result =
-                    row === -3 && getFilterCellContent
-                        ? getFilterCellContent(outerCol)
+                    row === -3 && getMangledFilterCellContentForGrid !== undefined
+                        ? getMangledFilterCellContentForGrid(col)
                         : getCellContent([outerCol, row]);
                 if (rowMarkerOffset !== 0 && result?.span !== undefined) {
                     result = {
@@ -1546,7 +1576,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             trailingRowOptions?.addIcon,
             rowMarkerOffset,
             experimental?.strict,
-            getFilterCellContent,
+            getMangledFilterCellContentForGrid,
             getCellContent,
         ]
     );
@@ -1777,7 +1807,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             if (gridSelection.current === undefined) return;
 
             const [col, row] = gridSelection.current.cell;
-            const c = getFilterCellContent?.(col) ?? defaultFilterCell;
+            const c = getMangledFilterCellContent(col);
             // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
             if (c.kind !== GridCellKind.Boolean && c.allowOverlay) {
                 let content = c as any;
@@ -1828,7 +1858,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 gridRef.current?.damage([{ cell: gridSelection.current.cell }]);
             }
         },
-        [getFilterCellContent, gridSelection, mangledOnCellsEdited, setOverlaySimple]
+        [getMangledFilterCellContent, gridSelection, mangledOnCellsEdited, setOverlaySimple]
     );
 
     const focusOnRowFromTrailingBlankRow = React.useCallback(
@@ -1838,9 +1868,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 return false;
             }
 
-            const content = row === -3 ? getFilterCellContent?.(col) : getMangledCellContent([col, row]);
+            const content = row === -3 ? getMangledFilterCellContent(col) : getMangledCellContent([col, row]);
 
-            if (!content || !content?.allowOverlay || (content as any).readonly === true) {
+            if (content.allowOverlay !== true || (content as any).readonly === true) {
                 return false;
             }
 
@@ -1855,7 +1885,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             });
             return true;
         },
-        [getFilterCellContent, getMangledCellContent, scrollRef, setOverlaySimple]
+        [getMangledFilterCellContent, getMangledCellContent, scrollRef, setOverlaySimple]
     );
 
     // 可编辑单元格自动获取焦点;
@@ -3356,7 +3386,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             const handleFilterMaybeClick = (a: GridMouseFilterHeaderEventArgs): boolean => {
                 if (!isPrevented.current) {
                     const [activeCol] = args.location;
-                    const result = getFilterCellContent?.(activeCol) ?? (defaultFilterCell as any);
+                    const result = getMangledFilterCellContent(activeCol) as any;
 
                     const r = getCellRenderer(result);
 
@@ -3523,7 +3553,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [
-            getFilterCellContent,
+            getMangledFilterCellContent,
             mouseState,
             gridSelection,
             rowMarkerOffset,
@@ -3586,6 +3616,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
     const onFilterClearClickInner = React.useCallback(
         (col: number, screenPosition: Rectangle) => {
+            if (col < rowMarkerOffset) return;
             onFilterClearClick?.(col - rowMarkerOffset, screenPosition);
         },
         [onFilterClearClick, rowMarkerOffset]
@@ -5822,7 +5853,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     getCellRenderer={getCellRenderer}
                     resizeIndicator={resizeIndicator}
                     setScrollDir={setScrollDir}
-                    getFilterCellContent={getFilterCellContent}
+                    getFilterCellContent={getMangledFilterCellContentForGrid}
+                    getRowMarkerFilterCellContent={getRowMarkerFilterCellContentForGrid}
                 />
                 {renameGroupNode}
                 {overlay !== undefined && (
