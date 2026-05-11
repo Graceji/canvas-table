@@ -62,3 +62,10 @@
 - [filter row] row marker filter cell 不再默认复用第一业务列 filter cell，未显式提供时回退为不可交互的 loading cell
 - [filter clear] 防止 row marker 虚拟列触发清除筛选时向外抛出负数业务列索引
 - [test] 增加 row marker 场景下 filter row 业务列索引、row marker filter cell 独立性、复制/选区导出语义的回归测试
+
+# 1.3.4-beta.3
+
+- [selection] 新增 `keepRowSelectionOnCellClick`，支持业务侧在点击已选中行的正文单元格时决定是否保留行选中状态
+- [selection] 修复已选中行的可编辑正文单元格在普通点击、Ctrl/Command 点击、Shift 点击下仍会变更行选中结果的问题；命中该场景时会直接保留已选中行，与普通 Table 保持一致
+- [selection] row marker 点击仍保持原有 toggle 行为，不受 `keepRowSelectionOnCellClick` 影响
+- [test] 增加可编辑单元格普通点击、Ctrl/Command 点击、Shift 点击、不可编辑单元格反选、row marker toggle 的回归测试

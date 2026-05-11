@@ -144,6 +144,7 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
             onGridSelectionChange={newSelection => {
                 setSelection(newSelection);
             }}
+            keepRowSelectionOnCellClick={() => true}
             rangeSelect="none"
             // customRenderers={allCells}
             // drawCell={args => {

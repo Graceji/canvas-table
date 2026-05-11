@@ -302,6 +302,19 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
      * @group Events
      */
     readonly onCellClicked?: (cell: Item, event: CellClickedEventArgs) => void;
+    /**
+     * 点击已选中行的正文单元格时调用。返回 true 时保留当前行选中结果，不进入后续反选/范围选择逻辑
+     * @group Events
+     */
+    readonly keepRowSelectionOnCellClick?: (args: {
+        readonly cell: Item;
+        readonly gridCell: GridCell;
+        readonly targetRowSlice: readonly [start: number, end: number];
+        readonly selectedRows: CompactSelection;
+        readonly isSelected: boolean;
+        readonly isMultiKey: boolean;
+        readonly shiftKey: boolean;
+    }) => boolean;
     /** Emitted when a cell is activated, by pressing Enter, Space or double clicking it.
      * @group Events
      */
@@ -934,6 +947,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         getFilterCellContent,
         getRowMarkerFilterCellContent: getRowMarkerFilterCellContentIn,
         onCellClicked,
+        keepRowSelectionOnCellClick,
         onCellActivated,
         onFillPattern,
         onCellEditing,
@@ -2691,6 +2705,40 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
                     const targetSelection = CompactSelection.fromSingleSelection(targetRowSlice);
                     const isSelected = selectedRows.hasAll(targetRowSlice);
+                    // 业务侧可在这里复刻普通 Table 的“可编辑单元格不能反选”语义：
+                    // 命中已选中行的正文可编辑单元格时，在 Shift/Ctrl/普通点击选区分支之前拦截
+                    const keepSelectedRowsOnCellClick =
+                        col >= rowMarkerOffset &&
+                        isSelected &&
+                        keepRowSelectionOnCellClick?.({
+                            cell: [col - rowMarkerOffset, row],
+                            gridCell: cell as GridCell,
+                            targetRowSlice,
+                            selectedRows,
+                            isSelected,
+                            isMultiKey,
+                            shiftKey: args.shiftKey,
+                        }) === true;
+                    // 保留旧行为兼容：readonly === false 仍只作为原有单击保留选中的兜底判断
+                    const keepSelectedRowsForSingleCellClick =
+                        keepSelectedRowsOnCellClick || (col >= rowMarkerOffset && (cell as any).readonly === false);
+
+                    if (keepSelectedRowsOnCellClick) {
+                        // 这里保留 rows 并提前结束行选区计算，避免 Shift 扩选或 Ctrl/普通点击反选
+                        const allowMixedForKeepSelection =
+                            isMultiRow || args.isTouch || rowSelectionMode === "multi"
+                                ? true
+                                : rowSelectionBlending === "mixed" && columnSelectionBlending === "mixed";
+                        setSelectedRowsAndCell(
+                            selectedRows,
+                            selectionCurrentForClick,
+                            undefined,
+                            allowMixedForKeepSelection
+                        );
+                        coSelectedRowsForCurrentRef.current = selectedRows;
+                        return;
+                    }
+
                     const lastHighlightedSlice = lastSelectedRowRangeRef.current;
                     const isRowSpanCell = (cell.rowSpan ?? 1) > 1 || (cell.rowSpanOffset ?? 0) > 0;
                     const shouldUseBodyCurrentSelection =
@@ -2737,7 +2785,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             isSelected &&
                             selectedRows.equals(targetSelection)
                         ) {
-                            const keepRowSelection = (cell as any).readonly === false;
+                            const keepRowSelection = keepSelectedRowsForSingleCellClick;
                             rowsForCurrent = keepRowSelection ? targetSelection : CompactSelection.empty();
                         }
                         const shouldToggleBodyRows =
@@ -2746,7 +2794,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             isSelected &&
                             selectedRows.equals(targetSelection);
                         const autoCoSelectedRows = shouldToggleBodyRows
-                            ? (cell as any).readonly === false
+                            ? keepSelectedRowsForSingleCellClick
                                 ? targetSelection
                                 : CompactSelection.empty()
                             : (rowsForCurrent ?? targetSelection);
@@ -2796,7 +2844,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             }
                         } else if (isMultiRow || args.isTouch || rowSelectionMode === "multi") {
                             if (isSelected) {
-                                const nextRows = selectedRows.remove(targetRowSlice);
+                                const nextRows = keepSelectedRowsOnCellClick
+                                    ? selectedRows
+                                    : selectedRows.remove(targetRowSlice);
                                 setSelectedRowsAndCell(nextRows, selectionCurrentForClick, undefined, true);
                                 coSelectedRowsForCurrentRef.current =
                                     col >= rowMarkerOffset ? nextRows : CompactSelection.empty();
@@ -2813,7 +2863,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             // 单选，选中行情况下，仅对可编辑单元格保留同行高亮
                             // 索引列 / Marker 重复点击仍应走“取消当前行选中”，
                             // 否则会把 row-marker 的 toggle 行为吃掉
-                            const keepRowSelection = (cell as any).readonly === false;
+                            const keepRowSelection = keepSelectedRowsForSingleCellClick;
                             setSelectedRowsAndCell(
                                 keepRowSelection ? targetSelection : CompactSelection.empty(),
                                 selectionCurrentForClick,
@@ -2962,6 +3012,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             appendRow,
             getSelectedRowSlice,
             cellRowSelectionBehavior,
+            keepRowSelectionOnCellClick,
             rowGroupingNavBehavior,
             mapper,
             setCurrent,

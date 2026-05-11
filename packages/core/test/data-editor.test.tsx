@@ -3688,6 +3688,223 @@ describe("data-editor", () => {
         });
     });
 
+    test("keepRowSelectionOnCellClick keeps selected editable body rows on repeated clicks", async () => {
+        const spy = vi.fn();
+        const keepRowSelectionOnCellClick = vi.fn(() => true);
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                onGridSelectionChange={spy}
+                keepRowSelectionOnCellClick={keepRowSelectionOnCellClick}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+        spy.mockClear();
+
+        sendClick(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        expect(keepRowSelectionOnCellClick).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                cell: [1, 2],
+                targetRowSlice: [2, 3],
+                isSelected: true,
+                isMultiKey: false,
+                shiftKey: false,
+            })
+        );
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.fromSingleSelection(2),
+            current: {
+                cell: [1, 2],
+                range: { x: 1, y: 2, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+    });
+
+    test("keepRowSelectionOnCellClick keeps selected editable body rows on ctrl clicks", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                onGridSelectionChange={spy}
+                keepRowSelectionOnCellClick={() => true}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+        spy.mockClear();
+
+        sendClick(canvas, {
+            ctrlKey: true,
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.fromSingleSelection(2),
+            current: {
+                cell: [1, 2],
+                range: { x: 1, y: 2, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+    });
+
+    test("keepRowSelectionOnCellClick keeps selected editable body rows before shift range selection", async () => {
+        const spy = vi.fn();
+        const keepRowSelectionOnCellClick = vi.fn(() => true);
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                onGridSelectionChange={spy}
+                keepRowSelectionOnCellClick={keepRowSelectionOnCellClick}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+        sendClick(canvas, {
+            ctrlKey: true,
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 4 + 16, // Row 4 (0 indexed)
+        });
+        spy.mockClear();
+        keepRowSelectionOnCellClick.mockClear();
+
+        sendClick(canvas, {
+            shiftKey: true,
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 4 + 16, // Row 4 (0 indexed)
+        });
+
+        expect(keepRowSelectionOnCellClick).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                cell: [1, 4],
+                targetRowSlice: [4, 5],
+                isSelected: true,
+                isMultiKey: false,
+                shiftKey: true,
+            })
+        );
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.empty().add(2).add(4),
+            current: {
+                cell: [1, 4],
+                range: { x: 1, y: 4, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+    });
+
+    test("keepRowSelectionOnCellClick false keeps the existing body-cell deselect behavior", async () => {
+        const spy = vi.fn();
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                onGridSelectionChange={spy}
+                keepRowSelectionOnCellClick={() => false}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+        spy.mockClear();
+
+        sendClick(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.empty(),
+            current: {
+                cell: [1, 2],
+                range: { x: 1, y: 2, width: 1, height: 1 },
+                rangeStack: [],
+            },
+        });
+    });
+
+    test("keepRowSelectionOnCellClick does not affect row marker toggles", async () => {
+        const spy = vi.fn();
+        const keepRowSelectionOnCellClick = vi.fn(() => true);
+        vi.useFakeTimers();
+        render(
+            <EventedDataEditor
+                {...basicProps}
+                onGridSelectionChange={spy}
+                rowMarkers="both"
+                keepRowSelectionOnCellClick={keepRowSelectionOnCellClick}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+        spy.mockClear();
+
+        sendClick(canvas, {
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        expect(keepRowSelectionOnCellClick).not.toHaveBeenCalled();
+        expect(spy).toHaveBeenLastCalledWith({
+            columns: CompactSelection.empty(),
+            rows: CompactSelection.empty(),
+            current: undefined,
+        });
+    });
+
     test("Shift clicking a normal body cell with row markers keeps the old row-selection path", async () => {
         const spy = vi.fn();
         vi.useFakeTimers();
