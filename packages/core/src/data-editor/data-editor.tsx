@@ -127,10 +127,6 @@ interface MouseState {
     readonly fillHandle?: boolean;
 }
 
-type HoverResolvedGridMouseEventArgs = GridMouseEventArgs & {
-    readonly resolvedCell?: InnerGridCell;
-};
-
 export type CellRowSelectionBehavior = "single-row" | "row-span";
 export type RowSpanBorderBehavior = "default" | "collapse-inner";
 
@@ -290,6 +286,10 @@ export interface DataEditorProps extends Props, Pick<DataGridSearchProps, "image
      * @group Events
      */
     readonly onHeaderClicked?: (colIndex: number, event: HeaderClickedEventArgs) => void;
+    /** Emitted when the row marker header is clicked.
+     * @group Events
+     */
+    readonly onRowMarkerHeaderClicked?: (event: HeaderClickedEventArgs) => void;
     /** Emitted when a group header is clicked.
      * @group Events
      */
@@ -957,6 +957,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         drawCell: drawCellIn,
         editorBloom,
         onHeaderClicked,
+        onRowMarkerHeaderClicked,
         onColumnProposeMove,
         rangeSelectionColumnSpanning = true,
         spanRangeBehavior = "default",
@@ -3518,9 +3519,14 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         break;
                     }
                     case headerKind: {
-                        // 索引列表头 clickLocation 可能为 -1，这种场景只走选择逻辑，不向外抛业务列点击事件
                         if (clickLocation >= 0) {
                             onHeaderClicked?.(clickLocation, {
+                                ...args,
+                                preventDefault,
+                                sourceEvent,
+                            });
+                        } else {
+                            onRowMarkerHeaderClicked?.({
                                 ...args,
                                 preventDefault,
                                 sourceEvent,
@@ -3564,6 +3570,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     }
                     if (clickLocation >= 0) {
                         onHeaderClicked?.(clickLocation, { ...args, preventDefault, sourceEvent });
+                    } else {
+                        onRowMarkerHeaderClicked?.({ ...args, preventDefault, sourceEvent });
                     }
                 }
             }
@@ -3625,6 +3633,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             handleSelect,
             onGroupHeaderClicked,
             onHeaderClicked,
+            onRowMarkerHeaderClicked,
             normalSizeColumn,
             handleGroupHeaderSelection,
             reselectFilter,
@@ -3828,30 +3837,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const onItemHoveredImpl = React.useCallback(
         (args: GridMouseEventArgs) => {
             // make sure we still have a button down
-            // if (mouseEventArgsAreEqual(args, hoveredRef.current)) return;
-            const isSameHoverTarget =
-                mouseEventArgsAreEqual(args, hoveredRef.current) && !(hasRowMarkers && args.location[0] === 0);
-            if (isSameHoverTarget) {
-                let needsHoverPosition = false;
-
-                if (args.kind === "cell") {
-                    const resolvedCell =
-                        (args as HoverResolvedGridMouseEventArgs).resolvedCell ?? getMangledCellContent(args.location);
-                    const rendererNeeds = getCellRenderer(resolvedCell)?.needsHoverPosition;
-                    needsHoverPosition = rendererNeeds ?? resolvedCell.kind === GridCellKind.Custom;
-                }
-
-                const sameLocalPosition =
-                    args.kind !== "cell" ||
-                    hoveredRef.current?.kind !== "cell" ||
-                    (args.localEventX === hoveredRef.current.localEventX &&
-                        args.localEventY === hoveredRef.current.localEventY);
-
-                if (!needsHoverPosition || sameLocalPosition) {
-                    return;
-                }
-            }
-
+            if (mouseEventArgsAreEqual(args, hoveredRef.current)) return;
             hoveredRef.current = args;
             if (mouseDownData?.current?.button !== undefined && mouseDownData.current.button >= 1) return;
             // if (
@@ -3931,14 +3917,11 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             onItemHovered?.({ ...args, location: [args.location[0] - rowMarkerOffset, args.location[1]] as any });
         },
         [
-            hasRowMarkers,
             mouseState,
             gridSelection,
             rangeSelect,
             onItemHovered,
             rowMarkerOffset,
-            getMangledCellContent,
-            getCellRenderer,
             showTrailingBlankRow,
             rows,
             allowedFillDirections,

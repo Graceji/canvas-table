@@ -1043,6 +1043,25 @@ describe("data-editor", () => {
         expect(spy).not.toHaveBeenCalled();
     });
 
+    test("Emits row marker header click", async () => {
+        const spy = vi.fn();
+
+        vi.useFakeTimers();
+        render(<DataEditor {...basicProps} rowMarkers="both" onRowMarkerHeaderClicked={spy} />, {
+            wrapper: Context,
+        });
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 10,
+            clientY: 16,
+        });
+
+        expect(spy).toHaveBeenCalled();
+        expect(spy).toHaveBeenCalledWith(expect.objectContaining({ localEventX: expect.any(Number) }));
+    });
+
     test("Group header sections", async () => {
         const spy = vi.fn();
 
@@ -1232,6 +1251,29 @@ describe("data-editor", () => {
 
         expect(spy).toHaveBeenCalled();
         expect(spy).toHaveBeenCalledWith(expect.objectContaining({ location: [1, 1] }));
+    });
+
+    test("Does not re-emit row marker header hover while moving within the same header cell", async () => {
+        const spy = vi.fn();
+
+        vi.useFakeTimers();
+        render(<DataEditor {...basicProps} rowMarkers="both" onItemHovered={spy} />, {
+            wrapper: Context,
+        });
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        fireEvent.pointerMove(canvas, {
+            clientX: 10,
+            clientY: 16,
+        });
+        fireEvent.pointerMove(canvas, {
+            clientX: 20,
+            clientY: 16,
+        });
+
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy).toHaveBeenCalledWith(expect.objectContaining({ location: [-1, -1] }));
     });
 
     test("Emits mouse move on correct location", async () => {

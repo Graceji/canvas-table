@@ -69,3 +69,10 @@
 - [selection] 修复已选中行的可编辑正文单元格在普通点击、Ctrl/Command 点击、Shift 点击下仍会变更行选中结果的问题；命中该场景时会直接保留已选中行，与普通 Table 保持一致
 - [selection] row marker 点击仍保持原有 toggle 行为，不受 `keepRowSelectionOnCellClick` 影响
 - [test] 增加可编辑单元格普通点击、Ctrl/Command 点击、Shift 点击、不可编辑单元格反选、row marker toggle 的回归测试
+
+# 1.3.4-beta.4
+
+- [header marker] 新增 `onRowMarkerHeaderClicked`，用于单独处理索引列表头点击，避免将 row marker header click 混入业务列 `onHeaderClicked` 语义
+- [header marker] 修复开启 `showCopy`、`showSelectAll` 或自定义 `headerMarkerfns` 时，索引列表头功能 icon 点击不触发的问题
+- [hover] 恢复 `DataEditor` 对同一 hover 单元格的去重逻辑，修复鼠标在索引列表头同一单元格内移动时，表头 hover 态和 tooltip 反复刷新导致的闪烁问题
+- [test] 增加 row marker header click 事件与索引列表头 hover 去重的回归测试
