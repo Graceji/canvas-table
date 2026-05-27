@@ -1,12 +1,13 @@
 /* eslint-disable sonarjs/no-duplicate-string */
 import type { BaseDrawArgs } from "../src/index.js";
-import { getDataEditorTheme, mergeAndRealizeTheme, type FullTheme } from "../src/common/styles.js";
+import { getDataEditorTheme, makeCSSStyle, mergeAndRealizeTheme, type FullTheme } from "../src/common/styles.js";
+import { drawCheckbox } from "../src/internal/data-grid/render/draw-checkbox.js";
 import {
     remapForDnDState,
     type MappedGridColumn,
     drawLastUpdateUnderlay,
 } from "../src/internal/data-grid/render/data-grid-lib.js";
-import { GridCellKind, type Rectangle } from "../src/internal/data-grid/data-grid-types.js";
+import { BooleanIndeterminate, GridCellKind, type Rectangle } from "../src/internal/data-grid/data-grid-types.js";
 import { vi, type Mocked, expect, describe, test, it, beforeEach } from "vitest";
 import { drawImage } from "../src/cells/image-cell.js";
 import type { ImageWindowLoader } from "../src/internal/data-grid/image-window-loader-interface.js";
@@ -453,5 +454,50 @@ describe("drawWithLastUpdate", () => {
         );
 
         expect(mockLastPrep.fillStyle).toBe(mockTheme.bgSearchResult);
+    });
+});
+
+describe("drawCheckbox", () => {
+    it("does not expose indeterminate inner size as a css variable", () => {
+        const cssStyle = makeCSSStyle(getDataEditorTheme());
+
+        expect(cssStyle).not.toHaveProperty("--gdg-checkbox-indeterminate-inner-size");
+    });
+
+    it("uses theme token for indeterminate inner size", () => {
+        const mockCtx: Mocked<CanvasRenderingContext2D> = {
+            beginPath: vi.fn(),
+            fill: vi.fn(),
+            fillRect: vi.fn(),
+            moveTo: vi.fn(),
+            arcTo: vi.fn(),
+        } as any;
+        const theme = mergeAndRealizeTheme(getDataEditorTheme(), { checkboxIndeterminateInnerSize: 7 });
+
+        drawCheckbox(mockCtx, theme, BooleanIndeterminate, 10, 20, 40, 34, false, undefined, undefined, 16);
+
+        expect(mockCtx.fillRect).toHaveBeenCalledWith(26.5, 33.5, 7, 7);
+    });
+
+    it("keeps indeterminate hover visually distinct from unchecked hover", () => {
+        const fillStyles: string[] = [];
+        const mockCtx: Mocked<CanvasRenderingContext2D> = {
+            beginPath: vi.fn(),
+            fill: vi.fn(),
+            fillRect: vi.fn(),
+            moveTo: vi.fn(),
+            arcTo: vi.fn(),
+        } as any;
+        Object.defineProperty(mockCtx, "fillStyle", {
+            set: value => {
+                fillStyles.push(value);
+            },
+        });
+        const theme = mergeAndRealizeTheme(getDataEditorTheme());
+
+        drawCheckbox(mockCtx, theme, BooleanIndeterminate, 10, 20, 40, 34, false, 20, 17, 16);
+
+        expect(fillStyles).toEqual([theme.checkboxBg, theme.checkboxActiveBg]);
+        expect(mockCtx.fillRect).toHaveBeenCalledWith(26, 33, 8, 8);
     });
 });

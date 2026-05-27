@@ -76,3 +76,10 @@
 - [header marker] 修复开启 `showCopy`、`showSelectAll` 或自定义 `headerMarkerfns` 时，索引列表头功能 icon 点击不触发的问题
 - [hover] 恢复 `DataEditor` 对同一 hover 单元格的去重逻辑，修复鼠标在索引列表头同一单元格内移动时，表头 hover 态和 tooltip 反复刷新导致的闪烁问题
 - [test] 增加 row marker header click 事件与索引列表头 hover 去重的回归测试
+
+# 1.3.4-beta.5
+
+- [checkbox] 修复半选状态 checkbox hover 时背景被绘制为全选蓝色的问题，半选 hover 下仍保持未选背景，仅绘制内部半选标识
+- [theme] 新增 `checkboxIndeterminateInnerSize` 主题变量，支持通过 styles/theme 配置半选内部方块尺寸，不暴露为 CSS 变量
+- [docs] 补充 checkbox boolean column 示例与 theme 字段说明
+- [test] 增加半选 checkbox hover 绘制与半选内部尺寸配置的回归测试

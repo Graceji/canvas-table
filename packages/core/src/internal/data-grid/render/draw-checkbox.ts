@@ -104,28 +104,29 @@ export function drawCheckbox(
                 rectBordRadius
             );
 
-            ctx.fillStyle = hovered ? theme.checkboxActiveBg : theme.checkboxBg;
+            ctx.fillStyle = theme.checkboxBg;
             ctx.fill();
 
-            if (!hovered) {
-                if (style === "circle") {
-                    checkBoxHalfWidth *= 0.8;
-                    checkBoxWidth *= 0.8;
-                }
-
-                ctx.beginPath();
-                ctx.fillStyle = theme.checkboxActiveBg;
-                ctx.fillRect(posX - 4, centerY - 4, 8, 8);
-                ctx.fill();
-
-                // 原来是横线
-                // ctx.moveTo(posX - checkBoxWidth / 3, centerY);
-                // ctx.lineTo(posX + checkBoxWidth / 3, centerY);
-                // ctx.strokeStyle = theme.bgCell;
-                // ctx.lineCap = "round";
-                // ctx.lineWidth = 1.9;
-                // ctx.stroke();
+            if (style === "circle") {
+                checkBoxHalfWidth *= 0.8;
+                checkBoxWidth *= 0.8;
             }
+
+            const innerSize = theme.checkboxIndeterminateInnerSize;
+            const innerSizeHalf = innerSize / 2;
+
+            ctx.beginPath();
+            ctx.fillStyle = theme.checkboxActiveBg;
+            ctx.fillRect(posX - innerSizeHalf, centerY - innerSizeHalf, innerSize, innerSize);
+            ctx.fill();
+
+            // 原来是横线
+            // ctx.moveTo(posX - checkBoxWidth / 3, centerY);
+            // ctx.lineTo(posX + checkBoxWidth / 3, centerY);
+            // ctx.strokeStyle = theme.bgCell;
+            // ctx.lineCap = "round";
+            // ctx.lineWidth = 1.9;
+            // ctx.stroke();
 
             break;
         }

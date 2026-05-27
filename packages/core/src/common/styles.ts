@@ -111,6 +111,7 @@ export interface Theme {
     lineWidth: number;
     lineHeight: number;
     checkboxMaxSize: number;
+    checkboxIndeterminateInnerSize: number;
 
     resizeIndicatorColor?: string;
     horizontalBorderColor?: string;
@@ -209,6 +210,7 @@ const dataEditorBaseTheme: Theme = {
     editorFontSize: "13px",
     lineHeight: 1.4, //unitless scaler depends on your font
     checkboxMaxSize: 18,
+    checkboxIndeterminateInnerSize: 7,
     markLine: "#313139",
     groupIconColor: "#fff",
     groupHeaderIconColor: "#fff",
