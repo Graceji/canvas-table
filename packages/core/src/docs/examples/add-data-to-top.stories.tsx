@@ -91,6 +91,9 @@ export const AddDataToTop: React.VFC = () => {
                         // 有内容但未编辑直接退出
                     }
                 }}
+                onVisibleRegionChanged={() => {
+                    tableRef.current?.closeEditor();
+                }}
             />
         </>
     );

@@ -83,3 +83,13 @@
 - [theme] 新增 `checkboxIndeterminateInnerSize` 主题变量，支持通过 styles/theme 配置半选内部方块尺寸，不暴露为 CSS 变量
 - [docs] 补充 checkbox boolean column 示例与 theme 字段说明
 - [test] 增加半选 checkbox hover 绘制与半选内部尺寸配置的回归测试
+
+# 1.3.4-beta.6
+
+- [overlay] 修复冻结列存在且横向滚动时，可编辑单元格部分进入冻结列遮挡区域后打开编辑态，DOM 编辑器覆盖冻结列或文本位置与单元格错位的问题；命中该场景时会滚动到完整展示编辑列，并将 editor target 对齐到冻结区右边界
+- [test] 增加冻结列遮挡场景下打开编辑器的滚动与 editor target 定位回归测试
+
+# 1.3.4-beta.7
+
+- [overlay] 优化冻结列遮挡场景下打开编辑器的时序：命中遮挡时先记录 pending editor 并滚动到完整展示位置，等 visible region 和外部滚动回调处理完成后，再用最新 bounds 创建 editor，避免外部滚动回调中 closeEditor 导致需要二次点击
+- [test] 增加冻结列遮挡场景下延迟创建 editor 的回归测试，覆盖外部 onVisibleRegionChanged 调用 closeEditor 时仍可一次打开编辑态

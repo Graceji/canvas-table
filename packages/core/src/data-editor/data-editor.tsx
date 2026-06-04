@@ -927,6 +927,12 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         forceEditMode: boolean;
         activation: CellActivatedEventArgs;
     }>();
+    type PendingEditor = {
+        readonly cell: Item;
+        readonly makeOverlay: (target: Rectangle) => Omit<NonNullable<typeof overlay>, "theme">;
+        retries: number;
+    };
+    const pendingEditorRef = React.useRef<PendingEditor | undefined>();
     const searchInputRef = React.useRef<HTMLInputElement | null>(null);
     const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
     const [mouseState, setMouseState] = React.useState<MouseState>();
@@ -1137,6 +1143,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const gridSelectionOuterRef = React.useRef(gridSelectionOuter);
     gridSelectionOuterRef.current = gridSelectionOuter;
     const gridSelection = gridSelectionOuterMangled ?? gridSelectionInner;
+    const gridSelectionRef = React.useRef(gridSelection);
+    gridSelectionRef.current = gridSelection;
 
     const abortControllerRef = React.useRef() as React.MutableRefObject<AbortController>;
     if (abortControllerRef.current === undefined) abortControllerRef.current = new AbortController();
@@ -1763,168 +1771,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         [getRowThemeOverride, mangledCols, mangledGetGroupDetails, mergedTheme]
     );
 
-    const reselect = React.useCallback(
-        (bounds: Rectangle, activation: CellActivatedEventArgs, initialValue?: string) => {
-            if (gridSelection.current === undefined) return;
-
-            const [col, row] = gridSelection.current.cell;
-            const c = getMangledCellContent([col, row]);
-            if (c.kind !== GridCellKind.Boolean && c.allowOverlay && c.readonly !== true) {
-                let content = c;
-                if (initialValue !== undefined) {
-                    switch (content.kind) {
-                        case GridCellKind.Number: {
-                            const d = maybe(() => (initialValue === "-" ? -0 : Number.parseFloat(initialValue)), 0);
-                            content = {
-                                ...content,
-                                data: Number.isNaN(d) ? 0 : d,
-                            };
-                            break;
-                        }
-                        case GridCellKind.Text:
-                        case GridCellKind.Markdown:
-                        case GridCellKind.Uri:
-                            content = {
-                                ...content,
-                                data: initialValue,
-                            };
-                            break;
-                    }
-                }
-
-                setOverlaySimple({
-                    target: bounds,
-                    content,
-                    initialValue,
-                    cell: [col, row],
-                    highlight: initialValue === undefined,
-                    forceEditMode: initialValue !== undefined,
-                    activation,
-                });
-            } else if (c.kind === GridCellKind.Boolean && activation.inputType === "keyboard" && c.readonly !== true) {
-                mangledOnCellsEdited([
-                    {
-                        location: gridSelection.current.cell,
-                        value: {
-                            ...c,
-                            data: toggleBoolean(c.data),
-                        },
-                    },
-                ]);
-                gridRef.current?.damage([{ cell: gridSelection.current.cell }]);
-            }
-        },
-        [getMangledCellContent, gridSelection, mangledOnCellsEdited, setOverlaySimple]
-    );
-
-    const reselectFilter = React.useCallback(
-        (bounds: Rectangle, activation: CellActivatedEventArgs, initialValue?: string) => {
-            if (gridSelection.current === undefined) return;
-
-            const [col, row] = gridSelection.current.cell;
-            const c = getMangledFilterCellContent(col);
-            // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-            if (c.kind !== GridCellKind.Boolean && c.allowOverlay) {
-                let content = c as any;
-                if (initialValue !== undefined) {
-                    switch (content.kind) {
-                        case GridCellKind.Number: {
-                            const d = maybe(() => (initialValue === "-" ? -0 : Number.parseFloat(initialValue)), 0);
-                            content = {
-                                ...content,
-                                data: Number.isNaN(d) ? 0 : d,
-                            } as any;
-                            break;
-                        }
-                        case GridCellKind.Text:
-                        case GridCellKind.Markdown:
-                        case GridCellKind.Uri:
-                            content = {
-                                ...content,
-                                data: initialValue,
-                            } as any;
-                            break;
-                    }
-                }
-
-                setOverlaySimple({
-                    target: bounds,
-                    content,
-                    initialValue,
-                    cell: [col, row],
-                    highlight: initialValue === undefined,
-                    forceEditMode: initialValue !== undefined,
-                    activation,
-                });
-            } else if (
-                c.kind === GridCellKind.Boolean &&
-                activation.inputType === "keyboard" &&
-                (c as any).readonly !== true
-            ) {
-                mangledOnCellsEdited([
-                    {
-                        location: gridSelection.current.cell,
-                        value: {
-                            ...c,
-                            data: toggleBoolean((c as any).data),
-                        } as any,
-                    },
-                ]);
-                gridRef.current?.damage([{ cell: gridSelection.current.cell }]);
-            }
-        },
-        [getMangledFilterCellContent, gridSelection, mangledOnCellsEdited, setOverlaySimple]
-    );
-
-    const focusOnRowFromTrailingBlankRow = React.useCallback(
-        (col: number, row: number) => {
-            const bounds = gridRef.current?.getBounds(col, row);
-            if (bounds === undefined || scrollRef.current === null) {
-                return false;
-            }
-
-            const content = row === -3 ? getMangledFilterCellContent(col) : getMangledCellContent([col, row]);
-
-            if (content.allowOverlay !== true || (content as any).readonly === true) {
-                return false;
-            }
-
-            setOverlaySimple({
-                target: bounds,
-                content,
-                initialValue: undefined,
-                highlight: true,
-                cell: [col, row],
-                forceEditMode: true,
-                activation: { inputType: "keyboard", key: "Enter" },
-            });
-            return true;
-        },
-        [getMangledFilterCellContent, getMangledCellContent, scrollRef, setOverlaySimple]
-    );
-
-    // 可编辑单元格自动获取焦点;
-    const focusCellForEdit = React.useCallback(
-        (col: number, row: number) => {
-            const bounds = gridRef.current?.getBounds(col, row);
-            if (bounds === undefined || scrollRef.current === null) return;
-
-            const content = getMangledCellContent([col, row]);
-            if (!content.allowOverlay || (content as any).readonly === true) return;
-
-            setOverlaySimple({
-                target: bounds,
-                content,
-                initialValue: undefined,
-                highlight: true,
-                cell: [col, row],
-                forceEditMode: false,
-                activation: { inputType: "programmatic" },
-            });
-        },
-        [getMangledCellContent, scrollRef, setOverlaySimple]
-    );
-
     const scrollTo = React.useCallback<ScrollToFn>(
         (col, row, dir = "both", paddingX = 0, paddingY = 0, options = undefined): void => {
             if (scrollRef.current !== null) {
@@ -2078,6 +1924,253 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             mangledRows,
             rowHeight,
         ]
+    );
+
+    const shouldRevealEditorCell = React.useCallback(
+        (cell: Item, bounds: Rectangle) => {
+            const [col] = cell;
+            if (col < rowMarkerOffset + freezeColumns) return false;
+
+            let frozenWidth = rowMarkerOffset * rowMarkerWidth;
+            for (let i = 0; i < freezeColumns; i++) {
+                frozenWidth += columns[i]?.width ?? 0;
+            }
+            if (frozenWidth <= 0) return false;
+
+            const canvasBounds = canvasRef.current?.getBoundingClientRect();
+            const scale =
+                canvasBounds !== undefined && canvasRef.current !== null && canvasRef.current.offsetWidth > 0
+                    ? canvasBounds.width / canvasRef.current.offsetWidth
+                    : 1;
+            const frozenRight = (canvasBounds?.left ?? 0) + frozenWidth * scale;
+
+            return bounds.x < frozenRight;
+        },
+        [columns, freezeColumns, rowMarkerOffset, rowMarkerWidth]
+    );
+
+    const tryOpenPendingEditor = React.useCallback(() => {
+        const pending = pendingEditorRef.current;
+        if (pending === undefined) return;
+
+        const selected = gridSelectionRef.current.current?.cell;
+        if (!itemsAreEqual(selected, pending.cell)) {
+            pendingEditorRef.current = undefined;
+            return;
+        }
+
+        const bounds = gridRef.current?.getBounds(...pending.cell);
+        if (bounds === undefined) {
+            pendingEditorRef.current = undefined;
+            return;
+        }
+
+        if (shouldRevealEditorCell(pending.cell, bounds)) {
+            if (pending.retries >= 2) {
+                pendingEditorRef.current = undefined;
+                return;
+            }
+
+            pending.retries++;
+            window.requestAnimationFrame(tryOpenPendingEditor);
+            return;
+        }
+
+        pendingEditorRef.current = undefined;
+        setOverlaySimple(pending.makeOverlay(bounds));
+    }, [setOverlaySimple, shouldRevealEditorCell]);
+
+    const queuePendingEditorOpen = React.useCallback(() => {
+        window.requestAnimationFrame(tryOpenPendingEditor);
+    }, [tryOpenPendingEditor]);
+
+    /** @type {*}
+     * 主要为解决编辑单元格部分被冻结列遮挡时，进入编辑态后，Dom元素会在冻结列之上的问题
+     *
+     * 命中冻结列遮挡时，不立即创建 editor DOM：
+     * 1. 先记录 pending editor，并调用 scrollTo 将目标单元格滚动到完整展示区域
+     * 2. 等滚动引起的 onVisibleRegionChanged 和外部回调处理完成后，再用最新 bounds 创建 editor
+     * 3. 这样外部如果在滚动时调用 closeEditor，此时 overlay 尚未创建，不会导致需要点击两次
+     */
+    const openEditorWithFrozenColumnScroll = React.useCallback(
+        (
+            cell: Item,
+            bounds: Rectangle,
+            makeOverlay: (target: Rectangle) => Omit<NonNullable<typeof overlay>, "theme">
+        ): void => {
+            const [col, row] = cell;
+            if (shouldRevealEditorCell(cell, bounds)) {
+                pendingEditorRef.current = { cell, makeOverlay, retries: 0 };
+                scrollTo(col - rowMarkerOffset, row, "horizontal");
+                queuePendingEditorOpen();
+                return;
+            }
+
+            setOverlaySimple(makeOverlay(bounds));
+        },
+        [queuePendingEditorOpen, rowMarkerOffset, scrollTo, setOverlaySimple, shouldRevealEditorCell]
+    );
+
+    const reselect = React.useCallback(
+        (bounds: Rectangle, activation: CellActivatedEventArgs, initialValue?: string) => {
+            if (gridSelection.current === undefined) return;
+
+            const [col, row] = gridSelection.current.cell;
+            const c = getMangledCellContent([col, row]);
+            if (c.kind !== GridCellKind.Boolean && c.allowOverlay && c.readonly !== true) {
+                let content = c;
+                if (initialValue !== undefined) {
+                    switch (content.kind) {
+                        case GridCellKind.Number: {
+                            const d = maybe(() => (initialValue === "-" ? -0 : Number.parseFloat(initialValue)), 0);
+                            content = {
+                                ...content,
+                                data: Number.isNaN(d) ? 0 : d,
+                            };
+                            break;
+                        }
+                        case GridCellKind.Text:
+                        case GridCellKind.Markdown:
+                        case GridCellKind.Uri:
+                            content = {
+                                ...content,
+                                data: initialValue,
+                            };
+                            break;
+                    }
+                }
+
+                openEditorWithFrozenColumnScroll([col, row], bounds, target => ({
+                    target,
+                    content,
+                    initialValue,
+                    cell: [col, row],
+                    highlight: initialValue === undefined,
+                    forceEditMode: initialValue !== undefined,
+                    activation,
+                }));
+            } else if (c.kind === GridCellKind.Boolean && activation.inputType === "keyboard" && c.readonly !== true) {
+                mangledOnCellsEdited([
+                    {
+                        location: gridSelection.current.cell,
+                        value: {
+                            ...c,
+                            data: toggleBoolean(c.data),
+                        },
+                    },
+                ]);
+                gridRef.current?.damage([{ cell: gridSelection.current.cell }]);
+            }
+        },
+        [getMangledCellContent, gridSelection, mangledOnCellsEdited, openEditorWithFrozenColumnScroll]
+    );
+
+    const reselectFilter = React.useCallback(
+        (bounds: Rectangle, activation: CellActivatedEventArgs, initialValue?: string) => {
+            if (gridSelection.current === undefined) return;
+
+            const [col, row] = gridSelection.current.cell;
+            const c = getMangledFilterCellContent(col);
+            // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+            if (c.kind !== GridCellKind.Boolean && c.allowOverlay) {
+                let content = c as any;
+                if (initialValue !== undefined) {
+                    switch (content.kind) {
+                        case GridCellKind.Number: {
+                            const d = maybe(() => (initialValue === "-" ? -0 : Number.parseFloat(initialValue)), 0);
+                            content = {
+                                ...content,
+                                data: Number.isNaN(d) ? 0 : d,
+                            } as any;
+                            break;
+                        }
+                        case GridCellKind.Text:
+                        case GridCellKind.Markdown:
+                        case GridCellKind.Uri:
+                            content = {
+                                ...content,
+                                data: initialValue,
+                            } as any;
+                            break;
+                    }
+                }
+
+                openEditorWithFrozenColumnScroll([col, row], bounds, target => ({
+                    target,
+                    content,
+                    initialValue,
+                    cell: [col, row],
+                    highlight: initialValue === undefined,
+                    forceEditMode: initialValue !== undefined,
+                    activation,
+                }));
+            } else if (
+                c.kind === GridCellKind.Boolean &&
+                activation.inputType === "keyboard" &&
+                (c as any).readonly !== true
+            ) {
+                mangledOnCellsEdited([
+                    {
+                        location: gridSelection.current.cell,
+                        value: {
+                            ...c,
+                            data: toggleBoolean((c as any).data),
+                        } as any,
+                    },
+                ]);
+                gridRef.current?.damage([{ cell: gridSelection.current.cell }]);
+            }
+        },
+        [getMangledFilterCellContent, gridSelection, mangledOnCellsEdited, openEditorWithFrozenColumnScroll]
+    );
+
+    const focusOnRowFromTrailingBlankRow = React.useCallback(
+        (col: number, row: number) => {
+            const bounds = gridRef.current?.getBounds(col, row);
+            if (bounds === undefined || scrollRef.current === null) {
+                return false;
+            }
+
+            const content = row === -3 ? getMangledFilterCellContent(col) : getMangledCellContent([col, row]);
+
+            if (content.allowOverlay !== true || (content as any).readonly === true) {
+                return false;
+            }
+
+            openEditorWithFrozenColumnScroll([col, row], bounds, target => ({
+                target,
+                content,
+                initialValue: undefined,
+                highlight: true,
+                cell: [col, row],
+                forceEditMode: true,
+                activation: { inputType: "keyboard", key: "Enter" },
+            }));
+            return true;
+        },
+        [getMangledFilterCellContent, getMangledCellContent, openEditorWithFrozenColumnScroll, scrollRef]
+    );
+
+    // 可编辑单元格自动获取焦点;
+    const focusCellForEdit = React.useCallback(
+        (col: number, row: number) => {
+            const bounds = gridRef.current?.getBounds(col, row);
+            if (bounds === undefined || scrollRef.current === null) return;
+
+            const content = getMangledCellContent([col, row]);
+            if (!content.allowOverlay || (content as any).readonly === true) return;
+
+            openEditorWithFrozenColumnScroll([col, row], bounds, target => ({
+                target,
+                content,
+                initialValue: undefined,
+                highlight: true,
+                cell: [col, row],
+                forceEditMode: false,
+                activation: { inputType: "programmatic" },
+            }));
+        },
+        [getMangledCellContent, openEditorWithFrozenColumnScroll, scrollRef]
     );
 
     const focusCallback = React.useRef(focusOnRowFromTrailingBlankRow);
@@ -3752,6 +3845,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             setVisibleRegion(newRegion);
             setClientSize([clientWidth, clientHeight, rightElWidth]);
             onVisibleRegionChanged?.(newRegion, newRegion.tx, newRegion.ty, newRegion.extras);
+            if (pendingEditorRef.current !== undefined) {
+                queuePendingEditorOpen();
+            }
         },
         [
             currentCell,
@@ -3762,6 +3858,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             freezeTrailingRows,
             setVisibleRegion,
             onVisibleRegionChanged,
+            queuePendingEditorOpen,
         ]
     );
 
