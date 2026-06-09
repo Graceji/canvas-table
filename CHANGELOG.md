@@ -93,3 +93,8 @@
 
 - [overlay] 优化冻结列遮挡场景下打开编辑器的时序：命中遮挡时先记录 pending editor 并滚动到完整展示位置，等 visible region 和外部滚动回调处理完成后，再用最新 bounds 创建 editor，避免外部滚动回调中 closeEditor 导致需要二次点击
 - [test] 增加冻结列遮挡场景下延迟创建 editor 的回归测试，覆盖外部 onVisibleRegionChanged 调用 closeEditor 时仍可一次打开编辑态
+
+# 1.3.4-beta.8
+
+- [overlay] 扩展可编辑单元格部分遮挡场景的 reveal 判断：除左侧冻结列遮挡外，右侧横向可视区裁切、纵向被表头或底部裁切时，也会先滚动到完整展示位置，再延迟创建 editor，避免 overlay 创建在不完整展示的单元格 bounds 上
+- [test] 增加右侧横向裁切、顶部纵向裁切场景下延迟创建 editor 的回归测试

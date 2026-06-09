@@ -1926,27 +1926,67 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         ]
     );
 
-    const shouldRevealEditorCell = React.useCallback(
-        (cell: Item, bounds: Rectangle) => {
-            const [col] = cell;
-            if (col < rowMarkerOffset + freezeColumns) return false;
-
-            let frozenWidth = rowMarkerOffset * rowMarkerWidth;
-            for (let i = 0; i < freezeColumns; i++) {
-                frozenWidth += columns[i]?.width ?? 0;
-            }
-            if (frozenWidth <= 0) return false;
-
+    const getEditorRevealDirection = React.useCallback(
+        (cell: Item, bounds: Rectangle): "horizontal" | "vertical" | "both" | undefined => {
+            const [col, row] = cell;
             const canvasBounds = canvasRef.current?.getBoundingClientRect();
-            const scale =
-                canvasBounds !== undefined && canvasRef.current !== null && canvasRef.current.offsetWidth > 0
-                    ? canvasBounds.width / canvasRef.current.offsetWidth
-                    : 1;
-            const frozenRight = (canvasBounds?.left ?? 0) + frozenWidth * scale;
+            if (canvasBounds === undefined || canvasRef.current === null) return undefined;
 
-            return bounds.x < frozenRight;
+            const scale = canvasRef.current.offsetWidth > 0 ? canvasBounds.width / canvasRef.current.offsetWidth : 1;
+            let needsHorizontalReveal = false;
+            let needsVerticalReveal = false;
+
+            if (col >= rowMarkerOffset + freezeColumns) {
+                let scrollableLeftOffset = rowMarkerOffset * rowMarkerWidth;
+                for (let i = 0; i < freezeColumns; i++) {
+                    scrollableLeftOffset += columns[i]?.width ?? 0;
+                }
+
+                const scrollableLeft = canvasBounds.left + scrollableLeftOffset * scale;
+                const scrollableRight = canvasBounds.right;
+                const scrollableWidth = scrollableRight - scrollableLeft;
+
+                needsHorizontalReveal =
+                    bounds.width <= scrollableWidth &&
+                    (bounds.x < scrollableLeft || bounds.x + bounds.width > scrollableRight);
+            }
+
+            const freezeTrailingRowsEffective = freezeTrailingRows + (lastRowSticky ? 1 : 0);
+            if (row >= 0 && row < mangledRows - freezeTrailingRowsEffective) {
+                let trailingRowHeight = 0;
+                if (freezeTrailingRowsEffective > 0) {
+                    trailingRowHeight = getFreezeTrailingHeight(mangledRows, freezeTrailingRowsEffective, rowHeight);
+                }
+
+                const scrollableTop =
+                    canvasBounds.top + (totalHeaderHeight + (showFilter && filterHeight > 0 ? filterHeight : 0)) * scale;
+                const scrollableBottom = canvasBounds.bottom - trailingRowHeight * scale;
+                const scrollableHeight = scrollableBottom - scrollableTop;
+
+                needsVerticalReveal =
+                    bounds.height <= scrollableHeight &&
+                    (bounds.y < scrollableTop || bounds.y + bounds.height > scrollableBottom);
+            }
+
+            if (needsHorizontalReveal && needsVerticalReveal) return "both";
+            if (needsHorizontalReveal) return "horizontal";
+            if (needsVerticalReveal) return "vertical";
+
+            return undefined;
         },
-        [columns, freezeColumns, rowMarkerOffset, rowMarkerWidth]
+        [
+            columns,
+            filterHeight,
+            freezeColumns,
+            freezeTrailingRows,
+            lastRowSticky,
+            mangledRows,
+            rowHeight,
+            rowMarkerOffset,
+            rowMarkerWidth,
+            showFilter,
+            totalHeaderHeight,
+        ]
     );
 
     const tryOpenPendingEditor = React.useCallback(() => {
@@ -1965,7 +2005,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             return;
         }
 
-        if (shouldRevealEditorCell(pending.cell, bounds)) {
+        if (getEditorRevealDirection(pending.cell, bounds) !== undefined) {
             if (pending.retries >= 2) {
                 pendingEditorRef.current = undefined;
                 return;
@@ -1978,37 +2018,39 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
         pendingEditorRef.current = undefined;
         setOverlaySimple(pending.makeOverlay(bounds));
-    }, [setOverlaySimple, shouldRevealEditorCell]);
+    }, [getEditorRevealDirection, setOverlaySimple]);
 
     const queuePendingEditorOpen = React.useCallback(() => {
         window.requestAnimationFrame(tryOpenPendingEditor);
     }, [tryOpenPendingEditor]);
 
     /** @type {*}
-     * 主要为解决编辑单元格部分被冻结列遮挡时，进入编辑态后，Dom元素会在冻结列之上的问题
+     * 主要为解决编辑单元格部分被遮挡时，进入编辑态后，Dom元素位置异常的问题
+     * 包括左侧被冻结列遮挡、右侧超出横向可视区域、纵向被表头或底部遮挡等场景
      *
-     * 命中冻结列遮挡时，不立即创建 editor DOM：
+     * 命中部分遮挡时，不立即创建 editor DOM：
      * 1. 先记录 pending editor，并调用 scrollTo 将目标单元格滚动到完整展示区域
      * 2. 等滚动引起的 onVisibleRegionChanged 和外部回调处理完成后，再用最新 bounds 创建 editor
      * 3. 这样外部如果在滚动时调用 closeEditor，此时 overlay 尚未创建，不会导致需要点击两次
      */
-    const openEditorWithFrozenColumnScroll = React.useCallback(
+    const openEditorWithRevealScroll = React.useCallback(
         (
             cell: Item,
             bounds: Rectangle,
             makeOverlay: (target: Rectangle) => Omit<NonNullable<typeof overlay>, "theme">
         ): void => {
             const [col, row] = cell;
-            if (shouldRevealEditorCell(cell, bounds)) {
+            const revealDirection = getEditorRevealDirection(cell, bounds);
+            if (revealDirection !== undefined) {
                 pendingEditorRef.current = { cell, makeOverlay, retries: 0 };
-                scrollTo(col - rowMarkerOffset, row, "horizontal");
+                scrollTo(col - rowMarkerOffset, row, revealDirection);
                 queuePendingEditorOpen();
                 return;
             }
 
             setOverlaySimple(makeOverlay(bounds));
         },
-        [queuePendingEditorOpen, rowMarkerOffset, scrollTo, setOverlaySimple, shouldRevealEditorCell]
+        [getEditorRevealDirection, queuePendingEditorOpen, rowMarkerOffset, scrollTo, setOverlaySimple]
     );
 
     const reselect = React.useCallback(
@@ -2040,7 +2082,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     }
                 }
 
-                openEditorWithFrozenColumnScroll([col, row], bounds, target => ({
+                openEditorWithRevealScroll([col, row], bounds, target => ({
                     target,
                     content,
                     initialValue,
@@ -2062,7 +2104,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 gridRef.current?.damage([{ cell: gridSelection.current.cell }]);
             }
         },
-        [getMangledCellContent, gridSelection, mangledOnCellsEdited, openEditorWithFrozenColumnScroll]
+        [getMangledCellContent, gridSelection, mangledOnCellsEdited, openEditorWithRevealScroll]
     );
 
     const reselectFilter = React.useCallback(
@@ -2095,7 +2137,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     }
                 }
 
-                openEditorWithFrozenColumnScroll([col, row], bounds, target => ({
+                openEditorWithRevealScroll([col, row], bounds, target => ({
                     target,
                     content,
                     initialValue,
@@ -2121,7 +2163,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 gridRef.current?.damage([{ cell: gridSelection.current.cell }]);
             }
         },
-        [getMangledFilterCellContent, gridSelection, mangledOnCellsEdited, openEditorWithFrozenColumnScroll]
+        [getMangledFilterCellContent, gridSelection, mangledOnCellsEdited, openEditorWithRevealScroll]
     );
 
     const focusOnRowFromTrailingBlankRow = React.useCallback(
@@ -2137,7 +2179,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 return false;
             }
 
-            openEditorWithFrozenColumnScroll([col, row], bounds, target => ({
+            openEditorWithRevealScroll([col, row], bounds, target => ({
                 target,
                 content,
                 initialValue: undefined,
@@ -2148,7 +2190,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             }));
             return true;
         },
-        [getMangledFilterCellContent, getMangledCellContent, openEditorWithFrozenColumnScroll, scrollRef]
+        [getMangledFilterCellContent, getMangledCellContent, openEditorWithRevealScroll, scrollRef]
     );
 
     // 可编辑单元格自动获取焦点;
@@ -2160,7 +2202,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             const content = getMangledCellContent([col, row]);
             if (!content.allowOverlay || (content as any).readonly === true) return;
 
-            openEditorWithFrozenColumnScroll([col, row], bounds, target => ({
+            openEditorWithRevealScroll([col, row], bounds, target => ({
                 target,
                 content,
                 initialValue: undefined,
@@ -2170,7 +2212,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 activation: { inputType: "programmatic" },
             }));
         },
-        [getMangledCellContent, openEditorWithFrozenColumnScroll, scrollRef]
+        [getMangledCellContent, openEditorWithRevealScroll, scrollRef]
     );
 
     const focusCallback = React.useRef(focusOnRowFromTrailingBlankRow);

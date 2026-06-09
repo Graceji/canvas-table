@@ -1788,6 +1788,142 @@ describe("data-editor", () => {
         expect(targetSpy).toHaveBeenCalledWith(expect.objectContaining({ x: 150 }));
     });
 
+    test("Opening editor scrolls horizontally clipped cells fully into view", async () => {
+        const ref = React.createRef<DataEditorRef>();
+        const targetSpy = vi.fn();
+        const provider: ProvideEditorCallback<GridCell> = cell => {
+            if (cell.kind !== GridCellKind.Markdown) return undefined;
+            return {
+                editor: p => {
+                    targetSpy(p.target);
+                    return <input data-testid="delayed-right-edge-editor" />;
+                },
+            };
+        };
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                smoothScrollX={true}
+                provideEditor={provider}
+                ref={ref}
+                onVisibleRegionChanged={() => {
+                    ref.current?.closeEditor();
+                }}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [9, 1],
+                        range: { x: 9, y: 1, width: 1, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        const scroller = prep();
+        assert(scroller !== null);
+
+        vi.spyOn(scroller, "scrollWidth", "get").mockImplementation(() =>
+            basicProps.columns.map(c => (isSizedGridColumn(c) ? c.width : 150)).reduce((pv, cv) => pv + cv, 0)
+        );
+        vi.spyOn(scroller, "scrollHeight", "get").mockImplementation(() => 1000 * 32 + 36);
+        let scrollLeft = 0;
+        vi.spyOn(scroller, "scrollLeft", "get").mockImplementation(() => scrollLeft);
+        vi.spyOn(scroller, "scrollTop", "get").mockImplementation(() => 0);
+        fireEvent.scroll(scroller);
+        (Element.prototype.scrollTo as Mock).mockImplementation((opts: ScrollToOptions) => {
+            scrollLeft = opts.left ?? scrollLeft;
+            fireEvent.scroll(scroller);
+        });
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        fireEvent.keyDown(canvas, {
+            key: "Enter",
+        });
+        expect(targetSpy).not.toHaveBeenCalled();
+
+        expect(Element.prototype.scrollTo).toBeCalledWith({
+            behavior: "auto",
+            left: 51,
+            top: 0,
+        });
+        await screen.findByTestId("delayed-right-edge-editor");
+        expect(targetSpy).toHaveBeenCalledWith(expect.objectContaining({ x: 909 }));
+    });
+
+    test("Opening editor scrolls vertically clipped cells fully into view", async () => {
+        const ref = React.createRef<DataEditorRef>();
+        const targetSpy = vi.fn();
+        const provider: ProvideEditorCallback<GridCell> = cell => {
+            if (cell.kind !== GridCellKind.Text) return undefined;
+            return {
+                editor: p => {
+                    targetSpy(p.target);
+                    return <input data-testid="delayed-top-edge-editor" />;
+                },
+            };
+        };
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                smoothScrollY={true}
+                provideEditor={provider}
+                ref={ref}
+                onVisibleRegionChanged={() => {
+                    ref.current?.closeEditor();
+                }}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [1, 0],
+                        range: { x: 1, y: 0, width: 1, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        const scroller = prep();
+        assert(scroller !== null);
+
+        vi.spyOn(scroller, "scrollWidth", "get").mockImplementation(() =>
+            basicProps.columns.map(c => (isSizedGridColumn(c) ? c.width : 150)).reduce((pv, cv) => pv + cv, 0)
+        );
+        vi.spyOn(scroller, "scrollHeight", "get").mockImplementation(() => 1000 * 32 + 36);
+        vi.spyOn(scroller, "scrollLeft", "get").mockImplementation(() => 0);
+        let scrollTop = 20;
+        vi.spyOn(scroller, "scrollTop", "get").mockImplementation(() => scrollTop);
+        fireEvent.scroll(scroller);
+        (Element.prototype.scrollTo as Mock).mockImplementation((opts: ScrollToOptions) => {
+            scrollTop = opts.top ?? scrollTop;
+            fireEvent.scroll(scroller);
+        });
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        fireEvent.keyDown(canvas, {
+            key: "Enter",
+        });
+        expect(targetSpy).not.toHaveBeenCalled();
+
+        expect(Element.prototype.scrollTo).toBeCalledWith({
+            behavior: "auto",
+            left: 0,
+            top: 0,
+        });
+        await screen.findByTestId("delayed-top-edge-editor");
+        expect(targetSpy).toHaveBeenCalledWith(expect.objectContaining({ y: 36 }));
+    });
+
     test("Send edit", async () => {
         const spy = vi.fn();
         vi.useFakeTimers();
