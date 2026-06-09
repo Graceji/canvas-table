@@ -1786,6 +1786,14 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
     }, [getCellContent, getCellRenderer, hoveredItem]);
 
     const hoveredRef = React.useRef<GridMouseEventArgs>();
+    const damageHeaderHover = React.useCallback(
+        (args: GridMouseEventArgs) => {
+            if (args.kind === headerKind || args.kind === groupHeaderKind || args.kind === filterHeaderKind) {
+                damageInternal(new CellSet([args.location]));
+            }
+        },
+        [damageInternal]
+    );
     const onPointerMove = React.useCallback(
         (ev: MouseEvent) => {
             const canvas = ref.current;
@@ -1820,11 +1828,12 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             if (!mouseEventArgsAreEqual(args, hoveredRef.current)) {
                 setDrawCursorOverride(undefined);
                 onItemHovered?.(args);
-                maybeSetHoveredInfo(
-                    args.kind === outOfBoundsKind ? undefined : [args.location, [args.localEventX, args.localEventY]],
-                    true
-                );
+                const newInfo: typeof hoverInfoRef.current =
+                    args.kind === outOfBoundsKind ? undefined : [args.location, [args.localEventX, args.localEventY]];
+                maybeSetHoveredInfo(newInfo, true);
+                hoverInfoRef.current = newInfo;
                 hoveredRef.current = args;
+                damageHeaderHover(args);
             } else if (
                 args.kind === "cell" ||
                 args.kind === headerKind ||
@@ -1896,7 +1905,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             onItemHovered,
             getCellContent,
             getCellRenderer,
-            damageInternal,
+            damageHeaderHover,
         ]
     );
     useEventListener("pointermove", onPointerMove, windowEventTarget, true);

@@ -221,7 +221,8 @@ export function drawGridHeaders(
             hover,
             spriteManager,
             drawHeaderCallback,
-            touchMode
+            touchMode,
+            hoveredBoolean ? overrideCursor : undefined
         );
 
         ctx.restore();
@@ -955,7 +956,8 @@ export function drawHeader(
     hoverAmount: number,
     spriteManager: SpriteManager,
     drawHeaderCallback: DrawHeaderCallback | undefined,
-    touchMode: boolean
+    touchMode: boolean,
+    overrideCursor?: (cursor: GridMouseCursor) => void
 ) {
     const isRtl = direction(c.title) === "rtl";
     const headerLayout = computeHeaderLayout(ctx, c, x, y, width, height, theme, isRtl);
@@ -983,6 +985,7 @@ export function drawHeader(
                 menuBounds: headerLayout?.menuBounds ?? { x: 0, y: 0, height: 0, width: 0 },
                 hoverX: posX,
                 hoverY: posY,
+                overrideCursor: overrideCursor ?? (() => undefined),
             },
             () =>
                 drawHeaderInner(

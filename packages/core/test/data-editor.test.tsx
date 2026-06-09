@@ -1002,6 +1002,145 @@ describe("data-editor", () => {
         expect(spy).toHaveBeenCalledWith(1, expect.anything());
     });
 
+    test("Custom header cells can prevent default header click handling", async () => {
+        const headerSpy = vi.fn();
+        const customHeaderSpy = vi.fn();
+        const customHeaderCell: CustomCell = {
+            kind: GridCellKind.Custom,
+            allowOverlay: false,
+            copyData: "",
+            data: { kind: "custom-header" },
+        };
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={[
+                    basicProps.columns[0],
+                    {
+                        ...basicProps.columns[1],
+                        customHeaderCell,
+                    },
+                    ...basicProps.columns.slice(2),
+                ]}
+                customRenderers={[
+                    {
+                        kind: GridCellKind.Custom,
+                        draw: () => true,
+                        isMatch: (cell): cell is CustomCell =>
+                            cell.kind === GridCellKind.Custom && (cell.data as any)?.kind === "custom-header",
+                        onClick: args => {
+                            customHeaderSpy(args.location);
+                            args.preventDefault();
+                            return undefined;
+                        },
+                    },
+                ]}
+                onHeaderClicked={headerSpy}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 300,
+            clientY: 16,
+        });
+
+        expect(customHeaderSpy).toHaveBeenCalledWith([1, -1]);
+        expect(headerSpy).not.toHaveBeenCalled();
+    });
+
+    test("Custom header cell click respects preventDefault false", async () => {
+        const headerSpy = vi.fn();
+        const customHeaderCell: CustomCell = {
+            kind: GridCellKind.Custom,
+            allowOverlay: false,
+            copyData: "",
+            data: { kind: "custom-header" },
+        };
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                columns={[
+                    basicProps.columns[0],
+                    {
+                        ...basicProps.columns[1],
+                        customHeaderCell,
+                    },
+                    ...basicProps.columns.slice(2),
+                ]}
+                customRenderers={[
+                    {
+                        kind: GridCellKind.Custom,
+                        draw: () => true,
+                        isMatch: (cell): cell is CustomCell =>
+                            cell.kind === GridCellKind.Custom && (cell.data as any)?.kind === "custom-header",
+                        onClick: args => {
+                            args.preventDefault(false);
+                            return undefined;
+                        },
+                    },
+                ]}
+                onHeaderClicked={headerSpy}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        prep();
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        sendClick(canvas, {
+            clientX: 300,
+            clientY: 16,
+        });
+
+        expect(headerSpy).toHaveBeenCalledWith(1, expect.anything());
+    });
+
+    test("Draw header callback can override the cursor while drawing hovered headers", async () => {
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                drawHeader={(args, draw) => {
+                    if (args.columnIndex === 0) {
+                        args.overrideCursor?.("not-allowed");
+                    }
+
+                    draw();
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        const scroller = prep() as HTMLElement | null;
+        assert(scroller !== null);
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        fireEvent.pointerMove(canvas, {
+            clientX: 60,
+            clientY: 16,
+        });
+
+        expect(scroller.style.cursor).toBe("not-allowed");
+
+        fireEvent.pointerMove(canvas, {
+            clientX: 300,
+            clientY: 16,
+        });
+
+        expect(scroller.style.cursor).not.toBe("not-allowed");
+    });
+
     test("Emits header click on touch", async () => {
         const spy = vi.fn();
 

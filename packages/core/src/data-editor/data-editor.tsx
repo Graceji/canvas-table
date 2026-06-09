@@ -89,6 +89,7 @@ import {
     type GridKeyEventArgs,
     type CellActivatedEventArgs,
     type GridMouseFilterHeaderEventArgs,
+    type GridMouseHeaderEventArgs,
     filterHeaderKind,
     headerKind,
     type CellContextEventArgs,
@@ -3169,6 +3170,51 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         button: number;
         location: Item;
     }>();
+    const isPrevented = React.useRef(false);
+
+    const getHeaderCustomCellClickArgs = React.useCallback(
+        (args: GridMouseHeaderEventArgs, preventDefault: (status?: boolean) => void) => {
+            const column = mangledCols[args.location[0]];
+            const cell = column?.customHeaderCell;
+            if (cell === undefined) return undefined;
+
+            return {
+                ...args,
+                cell,
+                posX: args.localEventX,
+                posY: args.localEventY,
+                bounds: args.bounds,
+                theme: themeForCell(cell, args.location),
+                preventDefault,
+            };
+        },
+        [mangledCols, themeForCell]
+    );
+
+    const handleHeaderCustomCellSelect = React.useCallback(
+        (args: GridMouseHeaderEventArgs) => {
+            let prevented = false;
+            const clickArgs = getHeaderCustomCellClickArgs(args, (status?: boolean) => {
+                prevented = status === undefined ? true : status;
+            });
+            if (clickArgs === undefined) return false;
+
+            getCellRenderer(clickArgs.cell)?.onSelect?.(clickArgs);
+            return prevented;
+        },
+        [getCellRenderer, getHeaderCustomCellClickArgs]
+    );
+
+    const handleHeaderCustomCellClick = React.useCallback(
+        (args: GridMouseHeaderEventArgs, preventDefault: (status?: boolean) => void) => {
+            const clickArgs = getHeaderCustomCellClickArgs(args, preventDefault);
+            if (clickArgs === undefined) return;
+
+            getCellRenderer(clickArgs.cell)?.onClick?.(clickArgs);
+        },
+        [getCellRenderer, getHeaderCustomCellClickArgs]
+    );
+
     const onMouseDown = React.useCallback(
         (args: GridMouseEventArgs) => {
             isPrevented.current = false;
@@ -3188,25 +3234,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             if (args?.kind === "header") {
                 isActivelyDraggingHeader.current = true;
                 const [col, row] = args.location;
-                const column = mangledCols[col];
-                let prevented = false;
-                if (column.customHeaderCell !== undefined) {
-                    const r = getCellRenderer(column.customHeaderCell);
-                    if (r !== undefined && r.onSelect !== undefined) {
-                        r.onSelect?.({
-                            ...args,
-                            cell: column.customHeaderCell,
-                            posX: args.localEventX,
-                            posY: args.localEventY,
-                            bounds: args.bounds,
-                            theme: themeForCell(column.customHeaderCell, args.location),
-                            preventDefault: (status?: boolean) => {
-                                prevented = status === undefined ? true : status;
-                            },
-                        });
-                    }
-                }
-                if (prevented) {
+                if (handleHeaderCustomCellSelect(args)) {
                     // 这里修改是因为bug, 点击头部的radio cell(层级)，会触发选中所以当调用onSelect时传入preventDefault方法来阻止默认行为，如果prevented为true,就不进行后续操作，主要是handleSelect
                     lastMouseSelectLocation.current = [col, row];
                     return;
@@ -3229,7 +3257,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 lastMouseSelectLocation.current = args.location;
             }
         },
-        [getCellRenderer, getNormalizedSelection, gridSelection, handleSelect, mangledCols, themeForCell]
+        [getNormalizedSelection, gridSelection, handleHeaderCustomCellSelect, handleSelect]
     );
 
     const [renameGroup, setRenameGroup] = React.useState<{
@@ -3293,8 +3321,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             rowSelectionBlending,
         ]
     );
-
-    const isPrevented = React.useRef(false);
 
     const normalSizeColumn = React.useCallback(
         async (col: number): Promise<void> => {
@@ -3490,8 +3516,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             const [col, row] = args.location;
             const [lastMouseDownCol, lastMouseDownRow] = lastMouseSelectLocation.current ?? [];
 
-            const preventDefault = () => {
-                isPrevented.current = true;
+            const preventDefault = (status?: boolean) => {
+                isPrevented.current = status === undefined ? true : status;
             };
 
             const handleMaybeClick = (a: GridMouseCellEventArgs): boolean => {
@@ -3654,6 +3680,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         break;
                     }
                     case headerKind: {
+                        handleHeaderCustomCellClick(args, preventDefault);
+                        if (isPrevented.current) break;
+
                         if (clickLocation >= 0) {
                             onHeaderClicked?.(clickLocation, {
                                 ...args,
@@ -3688,21 +3717,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         void normalSizeColumn(col);
                     }
                 } else if (args.button === 0 && col === lastMouseDownCol && row === lastMouseDownRow) {
-                    const column = mangledCols[col];
-                    if (column.customHeaderCell !== undefined) {
-                        const r = getCellRenderer(column.customHeaderCell);
-                        if (r !== undefined && r.onClick !== undefined) {
-                            r.onClick({
-                                ...args,
-                                cell: column.customHeaderCell,
-                                posX: args.localEventX,
-                                posY: args.localEventY,
-                                bounds: args.bounds,
-                                theme: themeForCell(column.customHeaderCell, args.location),
-                                preventDefault,
-                            });
-                        }
-                    }
+                    handleHeaderCustomCellClick(args, preventDefault);
+                    if (isPrevented.current) return;
+
                     if (clickLocation >= 0) {
                         onHeaderClicked?.(clickLocation, { ...args, preventDefault, sourceEvent });
                     } else {
@@ -3770,6 +3787,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             onHeaderClicked,
             onRowMarkerHeaderClicked,
             normalSizeColumn,
+            handleHeaderCustomCellClick,
             handleGroupHeaderSelection,
             reselectFilter,
             defaultFilterCell,

@@ -98,3 +98,10 @@
 
 - [overlay] 扩展可编辑单元格部分遮挡场景的 reveal 判断：除左侧冻结列遮挡外，右侧横向可视区裁切、纵向被表头或底部裁切时，也会先滚动到完整展示位置，再延迟创建 editor，避免 overlay 创建在不完整展示的单元格 bounds 上
 - [test] 增加右侧横向裁切、顶部纵向裁切场景下延迟创建 editor 的回归测试
+
+# 1.3.4-beta.9
+
+- [custom header] 支持 `customHeaderCell` 的 `onClick` 拦截表头默认点击逻辑，便于自定义表头 checkbox 控制全选、半选和禁用状态
+- [custom header] 对齐表头自定义 cell `onClick` 与 `onSelect` 的 `preventDefault(status?)` 语义，支持通过 `preventDefault(false)` 显式放行默认表头逻辑
+- [cursor] `drawHeader` 回调新增 `overrideCursor`，并在表头 hover 首次进入时触发局部重绘，支持禁用表头 checkbox 悬浮显示 `not-allowed`
+- [test] 增加自定义表头点击拦截、`preventDefault(false)` 和表头 cursor override 回归测试

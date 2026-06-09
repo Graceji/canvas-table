@@ -53,6 +53,7 @@ export type DrawHeaderCallback = (
         menuBounds: Rectangle;
         hoverX: number | undefined;
         hoverY: number | undefined;
+        overrideCursor: (cursor: GridMouseCursor) => void;
     },
     drawContent: () => void
 ) => void;
