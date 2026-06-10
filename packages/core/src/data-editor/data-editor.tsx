@@ -1934,6 +1934,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             if (canvasBounds === undefined || canvasRef.current === null) return undefined;
 
             const scale = canvasRef.current.offsetWidth > 0 ? canvasBounds.width / canvasRef.current.offsetWidth : 1;
+            // Bounds include the grid line, so a cell flush with the viewport can appear a hair outside it
+            const revealTolerance = Math.max(1, scale);
             let needsHorizontalReveal = false;
             let needsVerticalReveal = false;
 
@@ -1949,7 +1951,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
                 needsHorizontalReveal =
                     bounds.width <= scrollableWidth &&
-                    (bounds.x < scrollableLeft || bounds.x + bounds.width > scrollableRight);
+                    (bounds.x < scrollableLeft - revealTolerance ||
+                        bounds.x + bounds.width > scrollableRight + revealTolerance);
             }
 
             const freezeTrailingRowsEffective = freezeTrailingRows + (lastRowSticky ? 1 : 0);
@@ -1960,13 +1963,15 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 }
 
                 const scrollableTop =
-                    canvasBounds.top + (totalHeaderHeight + (showFilter && filterHeight > 0 ? filterHeight : 0)) * scale;
+                    canvasBounds.top +
+                    (totalHeaderHeight + (showFilter && filterHeight > 0 ? filterHeight : 0)) * scale;
                 const scrollableBottom = canvasBounds.bottom - trailingRowHeight * scale;
                 const scrollableHeight = scrollableBottom - scrollableTop;
 
                 needsVerticalReveal =
                     bounds.height <= scrollableHeight &&
-                    (bounds.y < scrollableTop || bounds.y + bounds.height > scrollableBottom);
+                    (bounds.y < scrollableTop - revealTolerance ||
+                        bounds.y + bounds.height > scrollableBottom + revealTolerance);
             }
 
             if (needsHorizontalReveal && needsVerticalReveal) return "both";

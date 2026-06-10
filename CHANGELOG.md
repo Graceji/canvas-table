@@ -105,3 +105,8 @@
 - [custom header] 对齐表头自定义 cell `onClick` 与 `onSelect` 的 `preventDefault(status?)` 语义，支持通过 `preventDefault(false)` 显式放行默认表头逻辑
 - [cursor] `drawHeader` 回调新增 `overrideCursor`，并在表头 hover 首次进入时触发局部重绘，支持禁用表头 checkbox 悬浮显示 `not-allowed`
 - [test] 增加自定义表头点击拦截、`preventDefault(false)` 和表头 cursor override 回归测试
+
+# 1.3.4-beta.10
+
+- [overlay] 修复可编辑单元格紧贴横向可视区右边界时，因 cell bounds 包含 1px 网格线被误判为右侧裁切，导致 pending editor 在滚动边界重试后放弃、无法进入编辑态的问题；该问题在最后一列 filter cell 贴近视图末尾时更容易暴露
+- [overlay] editor reveal 判断增加 scale-aware 边界容差，保留真实遮挡场景下先滚动再创建 editor 的行为，同时允许贴边单元格直接进入编辑态
