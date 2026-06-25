@@ -1699,7 +1699,7 @@ describe("data-editor", () => {
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
 
-        const overlay = screen.getByText("Header: 9, 1");
+        const overlay = await screen.findByText("Header: 9, 1");
         expect(document.body.contains(overlay)).toBe(true);
 
         vi.useFakeTimers();
@@ -1993,6 +1993,76 @@ describe("data-editor", () => {
         });
         await screen.findByTestId("delayed-right-edge-editor");
         expect(targetSpy).toHaveBeenCalledWith(expect.objectContaining({ x: 909 }));
+    });
+
+    test("Open editor passes clipped target to provider when wrapper is clipped by scrollbar", async () => {
+        const targetSpy = vi.fn();
+        const provider: ProvideEditorCallback<GridCell> = cell => {
+            if (cell.kind !== GridCellKind.Markdown) return undefined;
+            return {
+                editor: p => {
+                    targetSpy(p.target);
+                    return <input data-testid="scrollbar-clipped-editor" style={{ width: 600 }} />;
+                },
+            };
+        };
+
+        vi.useFakeTimers();
+        render(
+            <DataEditor
+                {...basicProps}
+                provideEditor={provider}
+                gridSelection={{
+                    columns: CompactSelection.empty(),
+                    rows: CompactSelection.empty(),
+                    current: {
+                        cell: [9, 1],
+                        range: { x: 9, y: 1, width: 1, height: 1 },
+                        rangeStack: [],
+                    },
+                }}
+            />,
+            {
+                wrapper: Context,
+            }
+        );
+        const scroller = prep(false);
+        assert(scroller !== null);
+
+        vi.spyOn(scroller, "clientWidth", "get").mockImplementation(() => 985);
+        vi.spyOn(scroller, "scrollWidth", "get").mockImplementation(() =>
+            basicProps.columns.map(c => (isSizedGridColumn(c) ? c.width : 150)).reduce((pv, cv) => pv + cv, 0)
+        );
+        vi.spyOn(scroller, "scrollHeight", "get").mockImplementation(() => 1000 * 32 + 36);
+        vi.spyOn(scroller, "scrollLeft", "get").mockImplementation(() => 0);
+        vi.spyOn(scroller, "scrollTop", "get").mockImplementation(() => 0);
+        fireEvent.scroll(scroller);
+
+        const canvas = screen.getByTestId("data-grid-canvas");
+        fireEvent.keyDown(canvas, {
+            key: "Enter",
+        });
+
+        await screen.findByTestId("scrollbar-clipped-editor");
+        const target = targetSpy.mock.calls.at(-1)?.[0] as Rectangle | undefined;
+        assert(target !== undefined);
+        const targetRight = target.x + target.width;
+        expect(target.x).toBeGreaterThan(900);
+        expect(target.width).toBeGreaterThan(0);
+        expect(target.width).toBeLessThan(90);
+        expect(targetRight).toBeCloseTo(985);
+        expect(targetRight).toBeLessThanOrEqual(985);
+
+        const overlay = screen.getByTestId("scrollbar-clipped-editor").closest('[id^="gdg-overlay-"]');
+        assert(overlay !== null);
+        const overlayStyle = getComputedStyle(overlay);
+        const styleLeft = Number.parseFloat(overlayStyle.left);
+        const overlayLeft = Number.isNaN(styleLeft) ? target.x + 0.5 : styleLeft;
+        const overlayWidth = Number.parseFloat((overlay as HTMLElement).style.width);
+        expect(overlayLeft).toBeGreaterThanOrEqual(target.x);
+        expect(overlayWidth).toBeGreaterThan(0);
+        expect(overlayWidth).toBeLessThan(target.width);
+        expect(overlayLeft + overlayWidth).toBeLessThanOrEqual(985);
     });
 
     test("Opening editor scrolls vertically clipped cells fully into view", async () => {

@@ -110,3 +110,12 @@
 
 - [overlay] 修复可编辑单元格紧贴横向可视区右边界时，因 cell bounds 包含 1px 网格线被误判为右侧裁切，导致 pending editor 在滚动边界重试后放弃、无法进入编辑态的问题；该问题在最后一列 filter cell 贴近视图末尾时更容易暴露
 - [overlay] editor reveal 判断增加 scale-aware 边界容差，保留真实遮挡场景下先滚动再创建 editor 的行为，同时允许贴边单元格直接进入编辑态
+
+# 1.3.5-beta.0
+
+- [overlay] 修复筛选项切换导致垂直滚动条出现或可视区域变化时，已打开的 overlay editor 继续使用旧 cell bounds 和累加的 stay-on-screen 偏移，造成筛选项下拉层溢出单元格/滚动区的问题；overlay target 会随 visible region/client size 变化重新裁剪到 scroller 可视内容区
+
+# 1.3.5-beta.1
+
+- [overlay] 修复筛选行、批量编辑等自定义 overlay editor 在可视区裁剪后，wrapper 与编辑器收到的 target 不一致导致的宽高和位置偏移问题；custom editor 现在与 wrapper 共用裁剪后的有效 target
+- [test] 增加横向滚动边界裁剪场景下 overlay editor target 的回归测试

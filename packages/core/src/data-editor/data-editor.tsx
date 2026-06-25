@@ -920,6 +920,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
     const [overlay, setOverlay] = React.useState<{
         target: Rectangle;
+        clippedTarget?: Rectangle;
         content: GridCell;
         theme: FullTheme;
         initialValue: string | undefined;
@@ -930,7 +931,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     }>();
     type PendingEditor = {
         readonly cell: Item;
-        readonly makeOverlay: (target: Rectangle) => Omit<NonNullable<typeof overlay>, "theme">;
+        readonly makeOverlay: (target: Rectangle) => Omit<NonNullable<typeof overlay>, "theme" | "clippedTarget">;
         retries: number;
     };
     const pendingEditorRef = React.useRef<PendingEditor | undefined>();
@@ -1755,21 +1756,24 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         [getGroupDetails, onGroupHeaderRenamed]
     );
 
-    const setOverlaySimple = React.useCallback(
-        (val: Omit<NonNullable<typeof overlay>, "theme">) => {
-            const [col, row] = val.cell;
-            const column = mangledCols[col];
-            const groupTheme =
-                column?.group !== undefined ? mangledGetGroupDetails(column.group)?.overrideTheme : undefined;
-            const colTheme = column?.themeOverride;
-            const rowTheme = getRowThemeOverride?.(row);
+    // Editor overlay must stay inside the scroller's real content area. The canvas rect can include
+    // vertical scrollbar space and sticky right content, both of which would make overlay bounds too wide.
+    const getScrollerContentBounds = React.useCallback(
+        (scroll: HTMLDivElement, scale: number): { readonly right: number; readonly bottom: number } => {
+            const [clientWidth, clientHeight, rightElWidth] = clientSize;
+            const scrollBounds = scroll.getBoundingClientRect();
+            const scrollerClientWidth =
+                clientWidth > 0 ? Math.min(scroll.clientWidth, clientWidth) : scroll.clientWidth;
+            const scrollerClientHeight =
+                clientHeight > 0 ? Math.min(scroll.clientHeight, clientHeight) : scroll.clientHeight;
+            const stickyRightWidth = rightElementProps?.sticky === true ? rightElWidth : 0;
 
-            setOverlay({
-                ...val,
-                theme: mergeAndRealizeTheme(mergedTheme, groupTheme, colTheme, rowTheme, val.content.themeOverride),
-            });
+            return {
+                right: scrollBounds.left + Math.max(0, scrollerClientWidth - stickyRightWidth) * scale,
+                bottom: scrollBounds.top + scrollerClientHeight * scale,
+            };
         },
-        [getRowThemeOverride, mangledCols, mangledGetGroupDetails, mergedTheme]
+        [clientSize, rightElementProps?.sticky]
     );
 
     const scrollTo = React.useCallback<ScrollToFn>(
@@ -1927,26 +1931,161 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         ]
     );
 
+    // Compute the visible rect used only by editor reveal/clipping. Keeping this separate avoids
+    // changing the public scrollTo contract used by keyboard navigation and imperative refs.
+    const getEditorVisibleRect = React.useCallback(
+        (cell: Item): Rectangle | undefined => {
+            const [col, row] = cell;
+            const canvas = canvasRef.current;
+            if (canvas === null) return undefined;
+
+            const canvasBounds = canvas.getBoundingClientRect();
+            const scroll = scrollRef.current;
+            const scale = canvas.offsetWidth > 0 ? canvasBounds.width / canvas.offsetWidth : 1;
+            const scrollerContentBounds =
+                scroll === null ? undefined : getScrollerContentBounds(scroll, scale);
+
+            let left = canvasBounds.left;
+            if (col >= rowMarkerOffset + freezeColumns) {
+                let scrollableLeftOffset = rowMarkerOffset * rowMarkerWidth;
+                for (let i = 0; i < freezeColumns; i++) {
+                    scrollableLeftOffset += columns[i]?.width ?? 0;
+                }
+                left = canvasBounds.left + scrollableLeftOffset * scale;
+            }
+
+            const right = Math.min(
+                canvasBounds.right,
+                scrollerContentBounds === undefined ? canvasBounds.right : scrollerContentBounds.right
+            );
+
+            let top = canvasBounds.top;
+            let bottom = Math.min(
+                canvasBounds.bottom,
+                scrollerContentBounds === undefined ? canvasBounds.bottom : scrollerContentBounds.bottom
+            );
+
+            const freezeTrailingRowsEffective = freezeTrailingRows + (lastRowSticky ? 1 : 0);
+            if (row >= 0 && row < mangledRows - freezeTrailingRowsEffective) {
+                let trailingRowHeight = 0;
+                if (freezeTrailingRowsEffective > 0) {
+                    trailingRowHeight = getFreezeTrailingHeight(mangledRows, freezeTrailingRowsEffective, rowHeight);
+                }
+
+                top =
+                    canvasBounds.top +
+                    (totalHeaderHeight + (showFilter && filterHeight > 0 ? filterHeight : 0)) * scale;
+                bottom -= trailingRowHeight * scale;
+            }
+
+            return {
+                x: left,
+                y: top,
+                width: Math.max(0, right - left),
+                height: Math.max(0, bottom - top),
+            };
+        },
+        [
+            columns,
+            filterHeight,
+            freezeColumns,
+            freezeTrailingRows,
+            getScrollerContentBounds,
+            lastRowSticky,
+            mangledRows,
+            rowHeight,
+            rowMarkerOffset,
+            rowMarkerWidth,
+            scrollRef,
+            showFilter,
+            totalHeaderHeight,
+        ]
+    );
+
+    // Keep the editor API target as the full cell bounds, but clip the wrapper target to the
+    // actual visible editor area so dropdown/select content cannot overflow into scrollbar space.
+    const constrainEditorTarget = React.useCallback(
+        (cell: Item, target: Rectangle): Rectangle => {
+            const visible = getEditorVisibleRect(cell);
+            if (visible === undefined) return target;
+
+            const visibleRight = visible.x + visible.width;
+            const visibleBottom = visible.y + visible.height;
+            let left = Math.max(target.x, visible.x);
+            let top = Math.max(target.y, visible.y);
+            let right = Math.min(target.x + target.width, visibleRight);
+            let bottom = Math.min(target.y + target.height, visibleBottom);
+
+            if (right <= left) {
+                if (target.x >= visibleRight) {
+                    right = visibleRight;
+                    left = Math.max(visible.x, right - 1);
+                } else {
+                    left = visible.x;
+                    right = Math.min(visibleRight, left + 1);
+                }
+            }
+
+            if (bottom <= top) {
+                if (target.y >= visibleBottom) {
+                    bottom = visibleBottom;
+                    top = Math.max(visible.y, bottom - 1);
+                } else {
+                    top = visible.y;
+                    bottom = Math.min(visibleBottom, top + 1);
+                }
+            }
+
+            return {
+                x: left,
+                y: top,
+                width: Math.max(1, right - left),
+                height: Math.max(1, bottom - top),
+            };
+        },
+        [getEditorVisibleRect]
+    );
+
+    // Store clippedTarget only when clipping is required. Normal editor paths keep the original
+    // overlay shape, while clipped paths use the same effective target for the wrapper and editor.
+    const setOverlaySimple = React.useCallback(
+        (val: Omit<NonNullable<typeof overlay>, "theme" | "clippedTarget">) => {
+            const [col, row] = val.cell;
+            const column = mangledCols[col];
+            const groupTheme =
+                column?.group !== undefined ? mangledGetGroupDetails(column.group)?.overrideTheme : undefined;
+            const colTheme = column?.themeOverride;
+            const rowTheme = getRowThemeOverride?.(row);
+            const clippedTarget = constrainEditorTarget(val.cell, val.target);
+
+            setOverlay({
+                ...val,
+                clippedTarget: isRectangleEqual(val.target, clippedTarget) ? undefined : clippedTarget,
+                theme: mergeAndRealizeTheme(mergedTheme, groupTheme, colTheme, rowTheme, val.content.themeOverride),
+            });
+        },
+        [constrainEditorTarget, getRowThemeOverride, mangledCols, mangledGetGroupDetails, mergedTheme]
+    );
+
+    // Decide whether opening the editor needs a reveal scroll using the same editor-visible rect
+    // that wrapper clipping uses. This keeps the decision consistent at scrollbar/sticky edges.
     const getEditorRevealDirection = React.useCallback(
         (cell: Item, bounds: Rectangle): "horizontal" | "vertical" | "both" | undefined => {
             const [col, row] = cell;
-            const canvasBounds = canvasRef.current?.getBoundingClientRect();
-            if (canvasBounds === undefined || canvasRef.current === null) return undefined;
+            const visible = getEditorVisibleRect(cell);
+            const canvas = canvasRef.current;
+            if (visible === undefined || canvas === null) return undefined;
 
-            const scale = canvasRef.current.offsetWidth > 0 ? canvasBounds.width / canvasRef.current.offsetWidth : 1;
+            const canvasBounds = canvas.getBoundingClientRect();
+            const scale = canvas.offsetWidth > 0 ? canvasBounds.width / canvas.offsetWidth : 1;
             // Bounds include the grid line, so a cell flush with the viewport can appear a hair outside it
             const revealTolerance = Math.max(1, scale);
             let needsHorizontalReveal = false;
             let needsVerticalReveal = false;
 
             if (col >= rowMarkerOffset + freezeColumns) {
-                let scrollableLeftOffset = rowMarkerOffset * rowMarkerWidth;
-                for (let i = 0; i < freezeColumns; i++) {
-                    scrollableLeftOffset += columns[i]?.width ?? 0;
-                }
-
-                const scrollableLeft = canvasBounds.left + scrollableLeftOffset * scale;
-                const scrollableRight = canvasBounds.right;
+                const scrollableLeft = visible.x;
+                const scrollableRight = visible.x + visible.width;
                 const scrollableWidth = scrollableRight - scrollableLeft;
 
                 needsHorizontalReveal =
@@ -1957,15 +2096,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
             const freezeTrailingRowsEffective = freezeTrailingRows + (lastRowSticky ? 1 : 0);
             if (row >= 0 && row < mangledRows - freezeTrailingRowsEffective) {
-                let trailingRowHeight = 0;
-                if (freezeTrailingRowsEffective > 0) {
-                    trailingRowHeight = getFreezeTrailingHeight(mangledRows, freezeTrailingRowsEffective, rowHeight);
-                }
-
-                const scrollableTop =
-                    canvasBounds.top +
-                    (totalHeaderHeight + (showFilter && filterHeight > 0 ? filterHeight : 0)) * scale;
-                const scrollableBottom = canvasBounds.bottom - trailingRowHeight * scale;
+                const scrollableTop = visible.y;
+                const scrollableBottom = visible.y + visible.height;
                 const scrollableHeight = scrollableBottom - scrollableTop;
 
                 needsVerticalReveal =
@@ -1981,19 +2113,126 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             return undefined;
         },
         [
-            columns,
-            filterHeight,
             freezeColumns,
             freezeTrailingRows,
+            getEditorVisibleRect,
             lastRowSticky,
             mangledRows,
-            rowHeight,
             rowMarkerOffset,
-            rowMarkerWidth,
-            showFilter,
-            totalHeaderHeight,
         ]
     );
+
+    // Editor reveal needs the clipped editor viewport, but public scrollTo intentionally keeps its
+    // original canvas-based semantics. This helper limits the new behavior to editor opening only.
+    const scrollToForEditorReveal = React.useCallback(
+        (cell: Item, bounds: Rectangle, dir: "horizontal" | "vertical" | "both"): void => {
+            const scroll = scrollRef.current;
+            const canvas = canvasRef.current;
+            if (scroll === null || canvas === null) return;
+
+            const visible = getEditorVisibleRect(cell);
+            if (visible === undefined) return;
+
+            let scrollX = 0;
+            let scrollY = 0;
+
+            if (dir !== "vertical") {
+                const left = visible.x;
+                const right = visible.x + visible.width;
+                if (bounds.x < left) {
+                    scrollX = bounds.x - left;
+                } else if (bounds.x + bounds.width > right) {
+                    scrollX = bounds.x + bounds.width - right;
+                }
+            }
+
+            if (dir !== "horizontal") {
+                const top = visible.y;
+                const bottom = visible.y + visible.height;
+                if (bounds.y < top) {
+                    scrollY = bounds.y - top;
+                } else if (bounds.y + bounds.height > bottom) {
+                    scrollY = bounds.y + bounds.height - bottom;
+                }
+            }
+
+            if (scrollX === 0 && scrollY === 0) return;
+
+            const canvasBounds = canvas.getBoundingClientRect();
+            const scale = canvas.offsetWidth > 0 ? canvasBounds.width / canvas.offsetWidth : 1;
+            if (scale !== 1) {
+                scrollX /= scale;
+                scrollY /= scale;
+            }
+
+            scroll.scrollTo({
+                left: scroll.scrollLeft + scrollX,
+                top: scroll.scrollTop + scrollY,
+                behavior: "auto",
+            });
+        },
+        [getEditorVisibleRect, scrollRef]
+    );
+
+    // An already-open overlay needs fresh bounds when scrolling, resizing, or scrollbar visibility
+    // changes so wrapper and custom editor keep sharing the same effective target.
+    const updateOverlayTarget = React.useCallback(() => {
+        setOverlay(current => {
+            if (current === undefined) return current;
+
+            const bounds = gridRef.current?.getBounds(...current.cell);
+            if (bounds === undefined) return current;
+
+            const clippedTarget = constrainEditorTarget(current.cell, bounds);
+            const nextClippedTarget = isRectangleEqual(bounds, clippedTarget) ? undefined : clippedTarget;
+            if (
+                isRectangleEqual(current.target, bounds) &&
+                isRectangleEqual(current.clippedTarget, nextClippedTarget)
+            ) {
+                return current;
+            }
+
+            return {
+                ...current,
+                target: bounds,
+                clippedTarget: nextClippedTarget,
+            };
+        });
+    }, [constrainEditorTarget]);
+
+    const overlayEditorOpen = overlay !== undefined;
+    const overlayCellKey = overlay === undefined ? undefined : `${overlay.cell[0]},${overlay.cell[1]}`;
+    const overlayUpdateRafRef = React.useRef<number | undefined>();
+
+    // Update once during layout to avoid a visible stale frame, then once more after paint so
+    // browser/layout changes caused by scrollbars are reflected before portal editors reposition.
+    React.useLayoutEffect(() => {
+        if (!overlayEditorOpen) return;
+
+        updateOverlayTarget();
+        overlayUpdateRafRef.current = window.requestAnimationFrame(() => {
+            overlayUpdateRafRef.current = undefined;
+            updateOverlayTarget();
+        });
+
+        return () => {
+            if (overlayUpdateRafRef.current !== undefined) {
+                window.cancelAnimationFrame(overlayUpdateRafRef.current);
+                overlayUpdateRafRef.current = undefined;
+            }
+        };
+    }, [
+        mangledRows,
+        overlayCellKey,
+        overlayEditorOpen,
+        updateOverlayTarget,
+        visibleRegion.height,
+        visibleRegion.tx,
+        visibleRegion.ty,
+        visibleRegion.width,
+        visibleRegion.x,
+        visibleRegion.y,
+    ]);
 
     const tryOpenPendingEditor = React.useCallback(() => {
         const pending = pendingEditorRef.current;
@@ -2014,6 +2253,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         if (getEditorRevealDirection(pending.cell, bounds) !== undefined) {
             if (pending.retries >= 2) {
                 pendingEditorRef.current = undefined;
+                setOverlaySimple(pending.makeOverlay(bounds));
                 return;
             }
 
@@ -2035,7 +2275,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
      * 包括左侧被冻结列遮挡、右侧超出横向可视区域、纵向被表头或底部遮挡等场景
      *
      * 命中部分遮挡时，不立即创建 editor DOM：
-     * 1. 先记录 pending editor，并调用 scrollTo 将目标单元格滚动到完整展示区域
+     * 1. 先记录 pending editor，并按 editor 可视区将目标单元格滚动到完整展示区域
      * 2. 等滚动引起的 onVisibleRegionChanged 和外部回调处理完成后，再用最新 bounds 创建 editor
      * 3. 这样外部如果在滚动时调用 closeEditor，此时 overlay 尚未创建，不会导致需要点击两次
      */
@@ -2043,20 +2283,19 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         (
             cell: Item,
             bounds: Rectangle,
-            makeOverlay: (target: Rectangle) => Omit<NonNullable<typeof overlay>, "theme">
+            makeOverlay: (target: Rectangle) => Omit<NonNullable<typeof overlay>, "theme" | "clippedTarget">
         ): void => {
-            const [col, row] = cell;
             const revealDirection = getEditorRevealDirection(cell, bounds);
             if (revealDirection !== undefined) {
                 pendingEditorRef.current = { cell, makeOverlay, retries: 0 };
-                scrollTo(col - rowMarkerOffset, row, revealDirection);
+                scrollToForEditorReveal(cell, bounds, revealDirection);
                 queuePendingEditorOpen();
                 return;
             }
 
             setOverlaySimple(makeOverlay(bounds));
         },
-        [getEditorRevealDirection, queuePendingEditorOpen, rowMarkerOffset, scrollTo, setOverlaySimple]
+        [getEditorRevealDirection, queuePendingEditorOpen, scrollToForEditorReveal, setOverlaySimple]
     );
 
     const reselect = React.useCallback(

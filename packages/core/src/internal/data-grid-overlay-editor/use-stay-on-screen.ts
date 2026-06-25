@@ -1,4 +1,5 @@
 import * as React from "react";
+import type { Rectangle } from "../data-grid/data-grid-types.js";
 
 function useRefState(): [HTMLElement | undefined, React.RefCallback<HTMLElement | null>] {
     const [refState, setRefState] = React.useState<HTMLElement | null>();
@@ -22,10 +23,18 @@ interface StayOnScreen {
 //     column,
 //     leftSiblingsWidth,
 // }
-export function useStayOnScreen(): StayOnScreen {
+export function useStayOnScreen(target?: Rectangle): StayOnScreen {
     const [ref, setRef] = useRefState();
     const [xOffset, setXOffset] = React.useState(0);
+    const xOffsetRef = React.useRef(0);
     const [isIntersecting, setIsIntersecting] = React.useState(true);
+
+    // A new target means a new positioning baseline. Reset the old translate offset so it does not
+    // accumulate across scroll/resize-driven overlay target updates.
+    React.useLayoutEffect(() => {
+        xOffsetRef.current = 0;
+        setXOffset(0);
+    }, [target?.height, target?.width, target?.x, target?.y]);
 
     React.useLayoutEffect(() => {
         if (ref === undefined) return;
@@ -49,8 +58,13 @@ export function useStayOnScreen(): StayOnScreen {
         let rafHandle: number | undefined;
         const fn = () => {
             const { right: refRight } = ref.getBoundingClientRect();
+            // Measure from the unshifted right edge, then set an absolute offset. Adding deltas here
+            // can over-correct when the overlay target changes while it is already translated.
+            const unshiftedRight = refRight - xOffsetRef.current;
 
-            setXOffset(cv => Math.min(cv + window.innerWidth - refRight - 10, 0));
+            const nextOffset = Math.min(window.innerWidth - unshiftedRight - 10, 0);
+            xOffsetRef.current = nextOffset;
+            setXOffset(nextOffset);
             rafHandle = requestAnimationFrame(fn);
         };
 

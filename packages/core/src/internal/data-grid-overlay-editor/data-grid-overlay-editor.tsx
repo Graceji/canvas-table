@@ -26,6 +26,7 @@ type ImageEditorType = React.ComponentType<OverlayImageEditorProps>;
 
 interface DataGridOverlayEditorProps {
     readonly target: Rectangle;
+    readonly clippedTarget?: Rectangle;
     readonly cell: Item;
     readonly content: GridCell;
     readonly className?: string;
@@ -63,6 +64,7 @@ interface DataGridOverlayEditorProps {
 const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps> = p => {
     const {
         target,
+        clippedTarget,
         content,
         onFinishEditing: onFinishEditingIn,
         onEditing: onEditingIn,
@@ -275,7 +277,11 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
         [editorProvider?.preventArrow, gridSelection, onFinishEditing, tempValue]
     );
 
-    const { ref, style: stayOnScreenStyle } = useStayOnScreen();
+    // Use the same effective target for both the wrapper and custom editors. If the wrapper is
+    // clipped but the editor still receives the full cell bounds, editor DOM can outgrow and offset
+    // the overlay shell.
+    const wrapperTarget = clippedTarget ?? target;
+    const { ref, style: stayOnScreenStyle } = useStayOnScreen(wrapperTarget);
 
     let pad = true;
     let editor: React.ReactNode;
@@ -301,7 +307,7 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
                 onFinishedEditing={onEditorFinished}
                 validatedSelection={isEditableGridCell(targetValue) ? targetValue.selectionRange : undefined}
                 forceEditMode={forceEditMode}
-                target={target}
+                target={wrapperTarget}
                 imageEditorOverride={imageEditorOverride}
                 markdownDivCreateNode={markdownDivCreateNode}
                 isValid={isValid}
@@ -333,6 +339,21 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
 
     const bloomX = bloom?.[0] ?? 1;
     const bloomY = bloom?.[1] ?? 1;
+    const constrainWrapperSize = clippedTarget !== undefined;
+    const targetWidth = Math.max(1, wrapperTarget.width - (cell?.[1] < 0 ? 0 : 3) + bloomX * 2);
+    const targetHeight = Math.max(1, wrapperTarget.height - (cell?.[1] < 0 ? 0 : 3) + bloomY * 2);
+    // The styled wrapper uses min sizes by default. When clipped, force width/max sizes too so
+    // wide custom editors cannot stretch the wrapper past the visible cell area.
+    const wrapperStyle = constrainWrapperSize
+        ? {
+              ...styleOverride,
+              width: targetWidth,
+              minWidth: targetWidth,
+              maxWidth: targetWidth,
+              minHeight: targetHeight,
+              maxHeight: targetHeight,
+          }
+        : styleOverride;
 
     return createPortal(
         <ThemeContext.Provider value={theme}>
@@ -346,12 +367,12 @@ const DataGridOverlayEditor: React.FunctionComponent<DataGridOverlayEditorProps>
                     ref={ref}
                     id={id}
                     className={classWrap}
-                    style={styleOverride}
+                    style={wrapperStyle}
                     as={useLabel === true ? "label" : undefined}
-                    targetX={target.x + (cell?.[1] < 0 ? 0 : 1.5) - bloomX}
-                    targetY={target.y + (cell?.[1] < 0 ? 0 : 1.5) - bloomY}
-                    targetWidth={target.width - (cell?.[1] < 0 ? 0 : 3) + bloomX * 2}
-                    targetHeight={target.height - (cell?.[1] < 0 ? 0 : 3) + bloomY * 2}>
+                    targetX={wrapperTarget.x + (cell?.[1] < 0 ? 0 : 1.5) - bloomX}
+                    targetY={wrapperTarget.y + (cell?.[1] < 0 ? 0 : 1.5) - bloomY}
+                    targetWidth={targetWidth}
+                    targetHeight={targetHeight}>
                     <div className="gdg-clip-region" onKeyDown={onKeyDown}>
                         {editor}
                     </div>
