@@ -11,12 +11,12 @@ import {
     type DrawHeaderCallback,
     type Rectangle,
     GridColumnMenuIcon,
+    GridCellKind,
     type GridSelection,
     type DrawCellCallback,
     type InnerGridCell,
     type Item,
     type GridMouseCursor,
-    GridCellKind,
 } from "../data-grid-types.js";
 import type { ImageWindowLoader } from "../image-window-loader-interface.js";
 import {
@@ -126,7 +126,7 @@ export function drawGridHeaders(
         const filterHoveredBoolean = !noHover && hRow === -3 && hCol === c.sourceIndex;
         const hover = noHover
             ? 0
-            : hoverValues.find(s => s.item[0] === c.sourceIndex && s.item[1] === -1)?.hoverAmount ?? 0;
+            : (hoverValues.find(s => s.item[0] === c.sourceIndex && s.item[1] === -1)?.hoverAmount ?? 0);
 
         const hasSelectedCell = selection?.current !== undefined && selection.current.cell[0] === c.sourceIndex;
 
@@ -287,8 +287,8 @@ export function drawGroups(
         const groupIconSize = group?.iconSize ?? 16;
         const isHovered = hRow === -2 && hCol !== undefined && hCol >= span[0] && hCol <= span[1];
         const fillColor = isHovered
-            ? groupTheme.bgGroupHeaderHovered ?? groupTheme.bgHeaderHovered
-            : groupTheme.bgGroupHeader ?? groupTheme.bgHeader;
+            ? (groupTheme.bgGroupHeaderHovered ?? groupTheme.bgHeaderHovered)
+            : (groupTheme.bgGroupHeader ?? groupTheme.bgHeader);
 
         if (fillColor !== theme.bgHeader) {
             ctx.fillStyle = fillColor;
@@ -355,7 +355,7 @@ export function drawGroups(
                               actionBoxes[actionBoxes.length - 1].width +
                               (drawTextWidth - measureTextCached(displayName, ctx).width) / 2
                             : x +
-                              (padding + (group.icon !== undefined ? groupIconSize ?? 16 : 0)) +
+                              (padding + (group.icon !== undefined ? (groupIconSize ?? 16) : 0)) +
                               (drawTextWidth - measureTextCached(displayName, ctx).width) / 2;
 
                     // ctx.beginPath();
@@ -414,7 +414,7 @@ export function drawGroups(
                 } else {
                     start =
                         x +
-                        (padding + (group.icon !== undefined ? groupIconSize ?? 16 : 0)) +
+                        (padding + (group.icon !== undefined ? (groupIconSize ?? 16) : 0)) +
                         (drawTextWidth - measureTextCached(displayName, ctx).width) / 2;
                 }
 
@@ -473,23 +473,34 @@ function getHeaderMenuBounds(x: number, y: number, width: number, height: number
     };
 }
 
-const filterActionButtonSize = 13;
 export function getFilterActionBounds(
     x: number,
     y: number,
     width: number,
     height: number,
+    iconSize: number,
     padding: number,
     isRtl: boolean
 ): Rectangle {
-    const buttonWidth = filterActionButtonSize + padding;
-    if (isRtl) return { x, y, width: filterActionButtonSize, height: Math.min(buttonWidth, height) };
+    const buttonWidth = iconSize + padding * 2;
+    if (isRtl) return { x, y, width: buttonWidth, height: Math.min(buttonWidth, height) };
     return {
         x: x + width - buttonWidth, // right align
         y: Math.max(y, y + height / 2 - buttonWidth / 2), // center vertically
         width: buttonWidth,
         height: Math.min(buttonWidth, height),
     };
+}
+
+function pointInFilterActionBounds(
+    actionBounds: Rectangle,
+    cellX: number,
+    cellY: number,
+    localX: number | undefined,
+    localY: number | undefined
+): boolean {
+    if (localX === undefined || localY === undefined) return false;
+    return pointInRect(actionBounds, cellX + localX, cellY + localY);
 }
 
 function getGroupActonsWidth(actions: GroupDetails["actions"]) {
@@ -501,6 +512,24 @@ function getGroupActonsWidth(actions: GroupDetails["actions"]) {
     }
 
     return 0;
+}
+
+export function hasFilterDisplayData(cell: InnerGridCell | undefined): boolean {
+    if (cell === undefined) return false;
+    const filterCell = cell as InnerGridCell & {
+        readonly displayData?: unknown;
+        readonly data?: {
+            readonly displayData?: unknown;
+        };
+    };
+    const displayData = filterCell.displayData ?? filterCell.data?.displayData;
+    if (Array.isArray(displayData)) return displayData.length > 0;
+    if (typeof displayData === "string") return displayData.length > 0;
+    return displayData !== undefined && displayData !== null;
+}
+
+function shouldReserveFilterClearSpace(cell: InnerGridCell): boolean {
+    return cell.kind === GridCellKind.Text || cell.kind === GridCellKind.Number;
 }
 
 export function getActionBoundsForGroup(
@@ -611,7 +640,7 @@ export function computeHeaderLayout(
     if (c.indicatorIcon !== undefined) {
         const textWidth =
             ctx === undefined
-                ? getMeasuredTextCache(c.title, theme.headerFontFull)?.width ?? 0
+                ? (getMeasuredTextCache(c.title, theme.headerFontFull)?.width ?? 0)
                 : measureTextCached(c.title, ctx, theme.headerFontFull).width;
         textBounds.width = textWidth;
         drawX += textWidth + xPad;
@@ -880,35 +909,31 @@ export function drawFilterCell(
         }
     }
 
-    const filterBounds = getFilterActionBounds(x, y, c.width, filterHeight, theme.cellHorizontalPadding, false);
-    const shouldDrawMenu =
-        isHovered &&
-        filterBounds !== undefined &&
-        filterCell?.kind === GridCellKind.Custom &&
-        (Array.isArray((filterCell.data as any)?.displayData)
-            ? (filterCell.data as any)?.displayData.length > 0
-            : // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-              !!(filterCell.data as any)?.displayData);
+    const clearIconSize = theme.clearIconSize ?? 12;
+    const filterBounds = getFilterActionBounds(
+        x,
+        y,
+        c.width,
+        filterHeight,
+        clearIconSize,
+        theme.cellHorizontalPadding,
+        false
+    );
+    const shouldDrawMenu = isHovered && filterBounds !== undefined && hasFilterDisplayData(filterCell);
 
     if (shouldDrawMenu) {
-        const hovered = posX !== undefined && posY !== undefined && pointInRect(filterBounds, posX + x, posY + y);
+        const isClearHovered = pointInFilterActionBounds(filterBounds, x, y, posX, posY);
 
-        if (!hovered) {
-            ctx.globalAlpha = 0.7;
-        }
-
-        if (hovered) {
+        if (isClearHovered) {
             overrideCursor("pointer");
         }
-
-        const startX = x + c.width - 13 - theme.cellHorizontalPadding * 2;
-        const startY = y + (filterHeight - 13) / 2 + 0.3;
-        spriteManager.drawSprite("clearIcon", "normal", ctx, startX, startY, 13, theme);
-
-        if (!hovered) {
-            ctx.globalAlpha = 1;
-        }
     }
+
+    const clearIconContentReserve = clearIconSize + theme.cellHorizontalPadding;
+    const drawCellWidth =
+        shouldDrawMenu && shouldReserveFilterClearSpace(filterCell)
+            ? Math.max(0, c.width - clearIconContentReserve)
+            : c.width;
 
     prepResult = drawCell(
         ctx,
@@ -919,7 +944,7 @@ export function drawFilterCell(
         false,
         x,
         y,
-        c.width,
+        drawCellWidth,
         filterHeight,
         false, // accentCount > 0,
         theme,
@@ -937,6 +962,29 @@ export function drawFilterCell(
         getFilterCellRenderer,
         overrideCursor
     );
+
+    if (shouldDrawMenu) {
+        const isClearHovered = pointInFilterActionBounds(filterBounds, x, y, posX, posY);
+
+        const startX = filterBounds.x + (filterBounds.width - clearIconSize) / 2;
+        const startY = y + (filterHeight - clearIconSize) / 2;
+        const clearIconColor = isClearHovered
+            ? (theme.clearIconHoverColor ?? "rgba(0, 0, 0, 0.65)")
+            : (theme.clearIconColor ?? "rgba(0, 0, 0, 0.65)");
+        spriteManager.drawSprite(
+            "clearIcon",
+            "normal",
+            ctx,
+            startX,
+            startY,
+            clearIconSize,
+            theme,
+            1,
+            undefined,
+            undefined,
+            clearIconColor
+        );
+    }
 }
 
 export function drawHeader(

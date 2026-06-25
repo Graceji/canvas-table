@@ -68,6 +68,7 @@ import {
     computeHeaderLayout,
     getFilterActionBounds,
     flipHorizontal,
+    hasFilterDisplayData,
 } from "./render/data-grid-render.header.js";
 
 export interface DataGridProps {
@@ -1448,7 +1449,8 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                             filterBounds.y,
                             filterBounds.width,
                             filterBounds.height,
-                            theme.cellHorizontalPadding * 2,
+                            theme.clearIconSize ?? 12,
+                            theme.cellHorizontalPadding,
                             false
                         ),
                         filterBounds.x + filterBounds.width / 2,
@@ -1464,11 +1466,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
                 if (
                     filterLayout.actionBounds !== undefined &&
                     pointInRect(filterLayout.actionBounds, clientX, clientY) &&
-                    filterCell?.kind === GridCellKind.Custom &&
-                    (Array.isArray((filterCell.data as any)?.displayData)
-                        ? (filterCell.data as any)?.displayData.length > 0
-                        : // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-                          !!(filterCell.data as any)?.displayData)
+                    hasFilterDisplayData(filterCell)
                 ) {
                     return {
                         area: "filter",
@@ -1488,6 +1486,7 @@ const DataGrid: React.ForwardRefRenderFunction<DataGridRef, DataGridProps> = (p,
             isResizing,
             showFilter,
             theme.cellHorizontalPadding,
+            theme.clearIconSize,
         ]
     );
 

@@ -44,6 +44,7 @@ export function useRemAdjuster({
             {
                 ...themeIn,
                 headerIconSize: (themeIn?.headerIconSize ?? bt.headerIconSize) * scaler,
+                clearIconSize: (themeIn?.clearIconSize ?? bt.clearIconSize ?? 12) * scaler,
                 cellHorizontalPadding: (themeIn?.cellHorizontalPadding ?? bt.cellHorizontalPadding) * scaler,
                 cellVerticalPadding: (themeIn?.cellVerticalPadding ?? bt.cellVerticalPadding) * scaler,
             },

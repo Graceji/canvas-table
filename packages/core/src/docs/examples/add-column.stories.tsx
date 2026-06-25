@@ -8,7 +8,7 @@ import {
     defaultProps,
 } from "../../data-editor/stories/utils.js";
 import { SimpleThemeWrapper } from "../../stories/story-utils.js";
-import { CompactSelection, GridCellKind } from "../../internal/data-grid/data-grid-types.js";
+import { CompactSelection, GridCellKind, type GridCell } from "../../internal/data-grid/data-grid-types.js";
 
 export default {
     title: "Glide-Data-Grid/DataEditor Demos",
@@ -39,7 +39,7 @@ interface AddColumnsProps {
 
 export const AddColumns: React.FC<AddColumnsProps> = p => {
     const { cols, getCellContent } = useMockDataGenerator(p.columnsCount, true);
-    const [filterValue, setFilterValue] = useState("filter");
+    const [filterValue, setFilterValue] = useState("filter value that should stop before clear icon");
 
     const getFilterCellContent = (col: number): GridCell => {
         if (col !== -1) {
@@ -124,21 +124,23 @@ export const AddColumns: React.FC<AddColumnsProps> = p => {
                 ],
             }}
             getCellContent={getCellContent}
-            // onCellEdited={(cell, newValue) => {
-            //     if (newValue.kind === "marker") {
-            //         console.log(cell, newValue);
-
-            //         return;
-            //     }
-            //     setFilterValue(newValue.data);
-            // }}
+            onCellEdited={(_cell, newValue) => {
+                if (newValue.kind !== GridCellKind.Text) return;
+                setFilterValue(newValue.data);
+            }}
             getFilterCellContent={getFilterCellContent}
             experimental={{ strict: true }}
             columns={cols}
             rows={10}
             showFilter
             theme={{
+                clearIconColor: "rgba(0, 0, 0, 0.65)",
+                clearIconHoverColor: "rgba(0, 0, 0, 0.65)",
+                clearIconSize: 14,
                 filterHeaderBg: "orange",
+            }}
+            onFilterClearClick={() => {
+                setFilterValue("");
             }}
             gridSelection={selection}
             onGridSelectionChange={newSelection => {

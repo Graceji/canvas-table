@@ -119,3 +119,8 @@
 
 - [overlay] 修复筛选行、批量编辑等自定义 overlay editor 在可视区裁剪后，wrapper 与编辑器收到的 target 不一致导致的宽高和位置偏移问题；custom editor 现在与 wrapper 共用裁剪后的有效 target
 - [test] 增加横向滚动边界裁剪场景下 overlay editor target 的回归测试
+
+# 1.3.5-beta.2
+
+- [filter] 修改filter行clear icon svg
+- [filter] 添加filter行clear icon 自定义icon、size 属性

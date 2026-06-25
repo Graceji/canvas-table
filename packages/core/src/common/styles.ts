@@ -104,6 +104,9 @@ export interface Theme {
     filterFontStyle: string;
     headerIconSize: number;
     markerIconSize: number;
+    clearIconSize?: number;
+    clearIconColor?: string;
+    clearIconHoverColor?: string;
     baseFontStyle: string;
     markerFontStyle: string;
     fontFamily: string;
