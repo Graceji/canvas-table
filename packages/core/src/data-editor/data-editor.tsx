@@ -928,10 +928,14 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         highlight: boolean;
         forceEditMode: boolean;
         activation: CellActivatedEventArgs;
+        editorSessionKey: number;
     }>();
+    const overlaySessionRef = React.useRef(0);
     type PendingEditor = {
         readonly cell: Item;
-        readonly makeOverlay: (target: Rectangle) => Omit<NonNullable<typeof overlay>, "theme" | "clippedTarget">;
+        readonly makeOverlay: (
+            target: Rectangle
+        ) => Omit<NonNullable<typeof overlay>, "theme" | "clippedTarget" | "editorSessionKey">;
         retries: number;
     };
     const pendingEditorRef = React.useRef<PendingEditor | undefined>();
@@ -2049,7 +2053,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     // Store clippedTarget only when clipping is required. Normal editor paths keep the original
     // overlay shape, while clipped paths use the same effective target for the wrapper and editor.
     const setOverlaySimple = React.useCallback(
-        (val: Omit<NonNullable<typeof overlay>, "theme" | "clippedTarget">) => {
+        (val: Omit<NonNullable<typeof overlay>, "theme" | "clippedTarget" | "editorSessionKey">) => {
             const [col, row] = val.cell;
             const column = mangledCols[col];
             const groupTheme =
@@ -2060,6 +2064,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
             setOverlay({
                 ...val,
+                editorSessionKey: overlaySessionRef.current++,
                 clippedTarget: isRectangleEqual(val.target, clippedTarget) ? undefined : clippedTarget,
                 theme: mergeAndRealizeTheme(mergedTheme, groupTheme, colTheme, rowTheme, val.content.themeOverride),
             });
@@ -2283,7 +2288,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         (
             cell: Item,
             bounds: Rectangle,
-            makeOverlay: (target: Rectangle) => Omit<NonNullable<typeof overlay>, "theme" | "clippedTarget">
+            makeOverlay: (
+                target: Rectangle
+            ) => Omit<NonNullable<typeof overlay>, "theme" | "clippedTarget" | "editorSessionKey">
         ): void => {
             const revealDirection = getEditorRevealDirection(cell, bounds);
             if (revealDirection !== undefined) {
@@ -6295,6 +6302,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 {overlay !== undefined && (
                     <React.Suspense fallback={null}>
                         <DataGridOverlayEditor
+                            key={overlay.editorSessionKey}
                             {...overlay}
                             validateCell={validateCell}
                             bloom={editorBloom}

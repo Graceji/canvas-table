@@ -124,3 +124,8 @@
 
 - [filter] 修改filter行clear icon svg
 - [filter] 添加filter行clear icon 自定义icon、size 属性
+
+# 1.3.5-beta.3
+
+- [group header] 修复开启一级表头时，鼠标悬浮在一级表头左侧边框附近触发局部重绘，空分组区域被清空导致左侧层级/索引区域出现遮挡的问题
+- [overlay] 修复 React 18 自动批处理下，筛选行/批量编辑通过 Tab 连续切换编辑格时 overlay editor 可能被复用，导致下一格带入上一格输入值且后续 Tab 被忽略的问题；每次打开新的 overlay editor 时会创建独立编辑会话并重置内部临时状态

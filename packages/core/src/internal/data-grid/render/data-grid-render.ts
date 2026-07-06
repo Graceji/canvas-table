@@ -44,7 +44,10 @@ function clipHeaderDamage(
 
     ctx.beginPath();
 
-    walkGroups(effectiveColumns, width, translateX, groupHeaderHeight, (span, _group, x, y, w, h) => {
+    walkGroups(effectiveColumns, width, translateX, groupHeaderHeight, (span, groupName, x, y, w, h) => {
+        // Empty groups do not have a first-level group header; keep this aligned with drawGroups.
+        if (groupName === "") return;
+
         const hasItemInSpan = damage.hasItemInRectangle({
             x: span[0],
             y: -2,
